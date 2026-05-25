@@ -1,0 +1,54 @@
+# ── Secrets — NEVER commit ───────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+pip-wheel-metadata/
+.venv/
+venv/
+ENV/
+
+# ── Testing & coverage ───────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# ── Output artefacts ─────────────────────────────────────────────────────────
+output/
+*.pdf
+# Keep the templates directory
+!reporting/templates/
+
+# ── Benchmark held-out splits — NEVER publish ───────────────────────────────
+benchmarks/packs/*_held_out/
+benchmarks/packs/*.held_out.jsonl
+
+# ── IDE ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.suo
+*.user
+
+# ── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Alembic ──────────────────────────────────────────────────────────────────
+# Keep versions directory but not SQLite test DBs
+*.db
+*.sqlite3
