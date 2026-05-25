@@ -83,13 +83,14 @@ def test_low_coverage_flag():
 
 
 def test_custom_weights_valid():
+    # Methodology v1.0 constraints: no dimension > 0.40, no dimension < 0.05, sum = 1.0
     custom = {
-        "language_performance": 0.50,
-        "cultural_appropriateness": 0.20,
-        "hallucination_risk": 0.15,
+        "language_performance": 0.35,
+        "cultural_appropriateness": 0.25,
+        "hallucination_risk": 0.20,
         "bias_fairness": 0.10,
-        "code_switching_quality": 0.03,
-        "safety_robustness": 0.02,
+        "code_switching_quality": 0.05,
+        "safety_robustness": 0.05,
     }
     scores = {dim: [0.7] for dim in custom}
     result = compute_composite_score(scores, weights=custom)

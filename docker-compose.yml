@@ -1,0 +1,35 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: afroeval
+      POSTGRES_PASSWORD: afroeval
+      POSTGRES_DB: afroeval_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U afroeval"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  label_studio:
+    image: heartexlabs/label-studio:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ls_data:/label-studio/data
+    environment:
+      LABEL_STUDIO_LOCAL_FILES_SERVING_ENABLED: "true"
+    profiles:
+      - hitl   # Only starts with: docker compose --profile hitl up
+
+volumes:
+  pg_data:
+  ls_data:

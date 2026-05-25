@@ -1,0 +1,21 @@
+AfroEval database migrations — managed by Alembic.
+
+# Commands
+
+# Generate a new migration (after changing db/models.py):
+alembic revision --autogenerate -m "describe what changed"
+
+# Apply all pending migrations:
+alembic upgrade head
+
+# Roll back one migration:
+alembic downgrade -1
+
+# Check current revision:
+alembic current
+
+# Local development (PostgreSQL via Docker):
+docker compose up -d db
+alembic upgrade head
+
+# Tests use SQLite in-memory (conftest.py) — no migrations needed for tests.
