@@ -58,11 +58,9 @@ You do NOT write sample AI responses. You write the specification of what a corr
 
 ### Per-item rate
 
-**$X per validated item** (payment after the item passes two-validator review).  
+**$5 per validated item** (payment after the item passes two-validator review).  
 Items that fail validation are returned to you for revision. A revised item that passes pays the full rate.  
-Items rejected after revision are paid at 50%.
-
-*Note: Exact rates set by founder before contracting. Placeholder $X to be replaced.*
+Items rejected after revision are paid at $2.50 (50%).
 
 ---
 
@@ -106,7 +104,7 @@ You review items authored by others and score them for accuracy, cultural approp
 
 ### Per-item rate
 
-**$Y per validated item reviewed** (paid regardless of pass/fail outcome).
+**$3 per item reviewed** (paid regardless of pass/fail outcome).
 
 ---
 
@@ -126,7 +124,7 @@ When two validators disagree on a cultural rubric score by more than 1 point, th
 
 ### Per-adjudication rate
 
-**$Z per adjudicated item.** (Included in the lead linguist contract, not separate.)
+Adjudication is included in the lead linguist contract — no separate per-item rate.
 
 ---
 
