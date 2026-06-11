@@ -9,10 +9,15 @@ keeping unit tests independent of API calls.
 
 import json
 import logging
+import random
+import time
 
-from openai import AzureOpenAI, OpenAI
+from openai import AzureOpenAI, BadRequestError, OpenAI, RateLimitError
 
 logger = logging.getLogger(__name__)
+
+_MAX_RETRIES = 4
+_BASE_DELAY_S = 1.0
 
 _SYSTEM_PROMPT = (
     "You are an expert evaluation judge for AI systems deployed in African markets. "
@@ -62,22 +67,42 @@ class LLMJudge:
 
         Returns (score, reason). On any error returns (fallback, error_message).
         """
-        try:
-            completion = self._client.chat.completions.create(
-                model=self._model,
-                messages=[
-                    {"role": "system", "content": _SYSTEM_PROMPT},
-                    {"role": "user", "content": criterion},
-                ],
-                response_format={"type": "json_object"},
-                temperature=0.0,
-                max_tokens=256,
-            )
-            raw = completion.choices[0].message.content or "{}"
-            data = json.loads(raw)
-            score = float(data.get("score", fallback))
-            reason = str(data.get("reason", "No reason provided."))
-            return max(0.0, min(1.0, score)), reason
-        except Exception as exc:
-            logger.warning("LLMJudge call failed: %s", exc)
-            return fallback, f"Judge unavailable: {exc}"
+        for attempt in range(_MAX_RETRIES + 1):
+            try:
+                completion = self._client.chat.completions.create(
+                    model=self._model,
+                    messages=[
+                        {"role": "system", "content": _SYSTEM_PROMPT},
+                        {"role": "user", "content": criterion},
+                    ],
+                    response_format={"type": "json_object"},
+                    temperature=0.0,
+                    max_tokens=256,
+                )
+                raw = completion.choices[0].message.content or "{}"
+                data = json.loads(raw)
+                score = float(data.get("score", fallback))
+                reason = str(data.get("reason", "No reason provided."))
+                return max(0.0, min(1.0, score)), reason
+
+            except RateLimitError as exc:
+                if attempt == _MAX_RETRIES:
+                    logger.warning("LLMJudge rate limit — exhausted retries: %s", exc)
+                    return fallback, f"Rate limit after {_MAX_RETRIES} retries: {exc}"
+                delay = _BASE_DELAY_S * (2 ** attempt) + random.uniform(0, 0.5)
+                logger.info(
+                    "LLMJudge rate limited — retry %d/%d in %.1fs",
+                    attempt + 1, _MAX_RETRIES, delay,
+                )
+                time.sleep(delay)
+
+            except BadRequestError as exc:
+                # Content filter and other 400s are non-retryable
+                logger.warning("LLMJudge non-retryable error: %s", exc)
+                return fallback, f"Judge error (non-retryable): {exc}"
+
+            except Exception as exc:
+                logger.warning("LLMJudge call failed: %s", exc)
+                return fallback, f"Judge unavailable: {exc}"
+
+        return fallback, "Judge unavailable: retry loop exhausted"
