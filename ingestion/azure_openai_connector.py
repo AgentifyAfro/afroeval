@@ -7,7 +7,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 import structlog
-from openai import APIStatusError, APITimeoutError, AzureOpenAI
+from openai import APIStatusError, APITimeoutError, AzureOpenAI, BadRequestError
 
 from ingestion.base import ModelConnector, ModelResponseRaw
 
@@ -80,6 +80,38 @@ class AzureOpenAIConnector(ModelConnector):
                 latency_ms=latency,
                 tokens_used=tokens_used,
             )
+        except BadRequestError as exc:
+            # Catch content filter (400 ResponsibleAIPolicyViolation) before the
+            # generic APIStatusError so we can return a labeled placeholder.
+            # Azure's filter has poor calibration for African languages — a legitimate
+            # response about fraud prevention or utility connections can be blocked.
+            # Returning "" silently tanks all dimension scores; a labeled placeholder
+            # lets evaluators produce a traceable low score instead.
+            body = getattr(exc, "body", {}) or {}
+            inner = (body.get("innererror") or {})
+            if inner.get("code") == "ResponsibleAIPolicyViolation":
+                filter_result = inner.get("content_filter_result", {})
+                logger.warning(
+                    "Content filter blocked model response — likely false positive for African-language content",
+                    item_id=item_id,
+                    filter_result=filter_result,
+                )
+                return ModelResponseRaw(
+                    item_id=item_id,
+                    prompt=prompt,
+                    raw_output=(
+                        "[AFROEVAL NOTE: Azure content filter blocked this response. "
+                        "This is a known false-positive pattern for African-language "
+                        "evaluation content. The model attempted to respond but was "
+                        "prevented by the content moderation system.]"
+                    ),
+                    latency_ms=None,
+                )
+            logger.error("Azure bad request", item_id=item_id, error=str(exc))
+            return ModelResponseRaw(
+                item_id=item_id, prompt=prompt, raw_output="", latency_ms=None
+            )
+
         except (APITimeoutError, APIStatusError) as exc:
             logger.error("Azure OpenAI API error", item_id=item_id, error=str(exc))
             return ModelResponseRaw(
