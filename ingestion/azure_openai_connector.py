@@ -1,8 +1,10 @@
 """
 Azure OpenAI connector — live implementation using openai.AzureOpenAI client.
+Sprint 2: parallel item calls via ThreadPoolExecutor.
 """
 
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 import structlog
 from openai import APIStatusError, APITimeoutError, AzureOpenAI
@@ -11,13 +13,13 @@ from ingestion.base import ModelConnector, ModelResponseRaw
 
 logger = structlog.get_logger(__name__)
 
-# System prompt scopes the model to evaluation context so responses are
-# grounded in the benchmark domain rather than defaulting to generic help.
 _EVAL_SYSTEM_PROMPT = (
     "You are an AI assistant being evaluated for deployment in African markets. "
     "Answer each question accurately, in the same language as the question, "
     "and with cultural context appropriate to the region."
 )
+
+_MAX_WORKERS = 5  # concurrent Azure calls per connector
 
 
 class AzureOpenAIConnector(ModelConnector):
@@ -41,50 +43,55 @@ class AzureOpenAIConnector(ModelConnector):
             api_key=api_key,
             azure_endpoint=endpoint,
             api_version=api_version,
+            timeout=60.0,
         )
 
     @property
     def provider_name(self) -> str:
         return "azure_openai"
 
+    def _call_single(self, item: dict) -> ModelResponseRaw:
+        item_id = item.get("id", "")
+        prompt = item.get("prompt", "")
+        try:
+            start = time.monotonic()
+            completion = self._client.chat.completions.create(
+                model=self.deployment_name,
+                messages=[
+                    {"role": "system", "content": _EVAL_SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
+                max_tokens=self.max_tokens,
+                temperature=0.0,
+            )
+            latency = int((time.monotonic() - start) * 1000)
+            raw_output = completion.choices[0].message.content or ""
+            tokens_used = completion.usage.total_tokens if completion.usage else None
+            logger.info(
+                "Model response received",
+                item_id=item_id,
+                latency_ms=latency,
+                tokens=tokens_used,
+            )
+            return ModelResponseRaw(
+                item_id=item_id,
+                prompt=prompt,
+                raw_output=raw_output,
+                latency_ms=latency,
+                tokens_used=tokens_used,
+            )
+        except (APITimeoutError, APIStatusError) as exc:
+            logger.error("Azure OpenAI API error", item_id=item_id, error=str(exc))
+            return ModelResponseRaw(
+                item_id=item_id,
+                prompt=prompt,
+                raw_output="",
+                latency_ms=None,
+            )
+
     def get_responses(self, items: list[dict], **kwargs) -> list[ModelResponseRaw]:
-        responses = []
-        for item in items:
-            item_id = item.get("id", "")
-            prompt = item.get("prompt", "")
-            try:
-                start = time.monotonic()
-                completion = self._client.chat.completions.create(
-                    model=self.deployment_name,
-                    messages=[
-                        {"role": "system", "content": _EVAL_SYSTEM_PROMPT},
-                        {"role": "user", "content": prompt},
-                    ],
-                    max_tokens=self.max_tokens,
-                    temperature=0.0,
-                )
-                latency = int((time.monotonic() - start) * 1000)
-                raw_output = completion.choices[0].message.content or ""
-                tokens_used = completion.usage.total_tokens if completion.usage else None
-                logger.info(
-                    "Model response received",
-                    item_id=item_id,
-                    latency_ms=latency,
-                    tokens=tokens_used,
-                )
-                responses.append(ModelResponseRaw(
-                    item_id=item_id,
-                    prompt=prompt,
-                    raw_output=raw_output,
-                    latency_ms=latency,
-                    tokens_used=tokens_used,
-                ))
-            except (APITimeoutError, APIStatusError) as exc:
-                logger.error("Azure OpenAI API error", item_id=item_id, error=str(exc))
-                responses.append(ModelResponseRaw(
-                    item_id=item_id,
-                    prompt=prompt,
-                    raw_output="",
-                    latency_ms=None,
-                ))
-        return responses
+        if not items:
+            return []
+        workers = min(_MAX_WORKERS, len(items))
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            return list(pool.map(self._call_single, items))

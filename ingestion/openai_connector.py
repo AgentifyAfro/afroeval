@@ -1,9 +1,10 @@
 """
 OpenAI API connector — live implementation using openai.OpenAI client.
-Sprint 1: real chat completion loop with per-item error handling and cost tracking.
+Sprint 2: parallel item calls via ThreadPoolExecutor.
 """
 
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 import structlog
 from openai import APIStatusError, APITimeoutError, OpenAI
@@ -17,6 +18,8 @@ _EVAL_SYSTEM_PROMPT = (
     "Answer each question accurately, in the same language as the question, "
     "and with cultural context appropriate to the region."
 )
+
+_MAX_WORKERS = 5  # concurrent OpenAI calls per connector
 
 
 class OpenAIConnector(ModelConnector):
@@ -32,44 +35,48 @@ class OpenAIConnector(ModelConnector):
     def provider_name(self) -> str:
         return "openai"
 
+    def _call_single(self, item: dict) -> ModelResponseRaw:
+        item_id = item.get("id", "")
+        prompt = item.get("prompt", "")
+        try:
+            start = time.monotonic()
+            completion = self._client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": _EVAL_SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
+                max_tokens=self.max_tokens,
+                temperature=0.0,
+            )
+            latency = int((time.monotonic() - start) * 1000)
+            raw_output = completion.choices[0].message.content or ""
+            tokens_used = completion.usage.total_tokens if completion.usage else None
+            logger.info(
+                "Model response received",
+                item_id=item_id,
+                latency_ms=latency,
+                tokens=tokens_used,
+            )
+            return ModelResponseRaw(
+                item_id=item_id,
+                prompt=prompt,
+                raw_output=raw_output,
+                latency_ms=latency,
+                tokens_used=tokens_used,
+            )
+        except (APITimeoutError, APIStatusError) as exc:
+            logger.error("OpenAI API error", item_id=item_id, error=str(exc))
+            return ModelResponseRaw(
+                item_id=item_id,
+                prompt=prompt,
+                raw_output="",
+                latency_ms=None,
+            )
+
     def get_responses(self, items: list[dict], **kwargs) -> list[ModelResponseRaw]:
-        responses = []
-        for item in items:
-            item_id = item.get("id", "")
-            prompt = item.get("prompt", "")
-            try:
-                start = time.monotonic()
-                completion = self._client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": _EVAL_SYSTEM_PROMPT},
-                        {"role": "user", "content": prompt},
-                    ],
-                    max_tokens=self.max_tokens,
-                    temperature=0.0,
-                )
-                latency = int((time.monotonic() - start) * 1000)
-                raw_output = completion.choices[0].message.content or ""
-                tokens_used = completion.usage.total_tokens if completion.usage else None
-                logger.info(
-                    "Model response received",
-                    item_id=item_id,
-                    latency_ms=latency,
-                    tokens=tokens_used,
-                )
-                responses.append(ModelResponseRaw(
-                    item_id=item_id,
-                    prompt=prompt,
-                    raw_output=raw_output,
-                    latency_ms=latency,
-                    tokens_used=tokens_used,
-                ))
-            except (APITimeoutError, APIStatusError) as exc:
-                logger.error("OpenAI API error", item_id=item_id, error=str(exc))
-                responses.append(ModelResponseRaw(
-                    item_id=item_id,
-                    prompt=prompt,
-                    raw_output="",
-                    latency_ms=None,
-                ))
-        return responses
+        if not items:
+            return []
+        workers = min(_MAX_WORKERS, len(items))
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            return list(pool.map(self._call_single, items))

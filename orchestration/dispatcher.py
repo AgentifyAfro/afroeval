@@ -6,9 +6,12 @@ and the evaluators. It wires them together without either module knowing
 about the other (module contract).
 
 Sprint 1: live model connectors, LLM-judge evaluators, connector routing by provider.
-Sprint 2: ModelResponse + MetricResult persistence, AIL LLM-judge evaluators.
+Sprint 2: parallel connector calls (ThreadPoolExecutor) + parallel evaluator calls
+          (asyncio.gather + semaphore). ModelResponse/MetricResult persistence deferred
+          to Sprint 3 (requires benchmark items seeded in DB for FK chain).
 """
 
+import asyncio
 import uuid
 from datetime import datetime
 
@@ -100,7 +103,8 @@ async def dispatch_run(run_id: str) -> None:
       6. Persist the Scorecard.
       7. Mark run COMPLETED.
 
-    Sprint 2: add ModelResponse + MetricResult persistence.
+    Sprint 2: parallel connector + evaluator calls.
+    Sprint 3: ModelResponse + MetricResult persistence (requires benchmark items in DB).
     """
     from api.settings import get_settings
     from db.models import Assessment, Run, RunStatus, Scorecard
@@ -150,11 +154,12 @@ async def dispatch_run(run_id: str) -> None:
                         "Check pack IDs and run: python scripts/seed_benchmarks.py"
                     )
 
-                # ── Step 3: Get model responses ───────────────────────────────
+                # ── Step 3: Get model responses (parallel via ThreadPoolExecutor) ──
                 connector = _build_connector(assessment.model_provider, cfg)
-                raw_responses = connector.get_responses(all_items)
+                # Run connector in a thread so the event loop stays responsive.
+                raw_responses = await asyncio.to_thread(connector.get_responses, all_items)
 
-                # ── Step 4: Evaluate each response ────────────────────────────
+                # ── Step 4: Evaluate each response (parallel via asyncio.gather) ──
                 from ail.code_switching import CodeSwitchingEvaluator
                 from ail.cultural_appropriateness import CulturalAppropriatenessEvaluator
                 from ail.hallucination_probes import AfricanHallucinationProbeEvaluator
@@ -182,22 +187,35 @@ async def dispatch_run(run_id: str) -> None:
                 dimension_scores: dict[str, list[float]] = {dim: [] for dim in DEFAULT_WEIGHTS}
                 item_counts: dict[str, int] = {dim: 0 for dim in DEFAULT_WEIGHTS}
 
-                for raw, item in zip(raw_responses, all_items):
+                # Semaphore caps simultaneous LLM-judge (Azure) calls to avoid rate limits.
+                _judge_sem = asyncio.Semaphore(10)
+
+                async def _eval_one(raw, item, evaluator):
                     context = {
                         "language": item.get("language", ""),
                         "domain": item.get("domain", ""),
                         "cohort": item.get("cohort", ""),
                     }
-                    for evaluator in evaluators:
-                        output = evaluator.evaluate(
+                    async with _judge_sem:
+                        return await asyncio.to_thread(
+                            evaluator.evaluate,
                             prompt=raw.prompt,
                             model_response=raw.raw_output,
                             expected_behavior=item.get("expected_behavior", ""),
                             context=context,
                         )
-                        if output.dimension in dimension_scores:
-                            dimension_scores[output.dimension].append(output.score)
-                            item_counts[output.dimension] += 1
+
+                tasks = [
+                    _eval_one(raw, item, ev)
+                    for raw, item in zip(raw_responses, all_items)
+                    for ev in evaluators
+                ]
+                all_outputs = await asyncio.gather(*tasks)
+
+                for output in all_outputs:
+                    if output.dimension in dimension_scores:
+                        dimension_scores[output.dimension].append(output.score)
+                        item_counts[output.dimension] += 1
 
                 # ── Step 5: Compute composite score ───────────────────────────
                 result = compute_composite_score(
