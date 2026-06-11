@@ -11,9 +11,12 @@ def get_engine():
     global _engine
     if _engine is None:
         settings = get_settings()
+        is_postgres = settings.database_url.startswith("postgresql")
+        connect_args = {"sslmode": "require"} if is_postgres else {}
         _engine = create_engine(
             settings.database_url,
             echo=settings.afroeval_env == "development",
+            connect_args=connect_args,
         )
     return _engine
 
