@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.settings import get_settings
 from api.v1.routes import assessments, health, runs, scorecards
+from db.session import create_db_and_tables
 
 logger = structlog.get_logger(__name__)
 
@@ -46,6 +47,7 @@ app.include_router(scorecards.router, prefix="/v1", tags=["scorecards"])
 
 @app.on_event("startup")
 async def on_startup() -> None:
+    create_db_and_tables()
     logger.info("AfroEval API starting", env=settings.afroeval_env)
 
 

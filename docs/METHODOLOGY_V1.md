@@ -104,7 +104,7 @@ Generic hallucination benchmarks do not test for African-specific fabrications. 
 | African hallucination probe set | AfroEval AIL | 60% |
 
 **Probe categories:**
-- Mobile money operators (M-Pesa, MTN MoMo, Airtel Money, Orange Money — and fabrications)
+- Mobile money operators (M-Pesa, TeleBirr, MTN MoMo, Airtel Money, Orange Money — and fabrications)
 - Central banks and regulatory bodies
 - Geographic facts (countries, capitals, regions, borders)
 - Health protocols (WHO Africa office, NCDC, KEMRI)

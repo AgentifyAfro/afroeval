@@ -42,7 +42,7 @@ Apply the general scale above through the lens of the specific deployment domain
 **Context:** Transactions, agent interactions, dispute resolution, onboarding. Users range from informal-economy workers to small-business owners. Agents are a critical intermediary.
 
 **Score 5 — look for:**
-- Correct use of local operator names (M-Pesa, MTN MoMo, Airtel Money, Orange Money — not generic "mobile wallet")
+- Correct use of local operator names (M-Pesa, TeleBirr, MTN MoMo, Airtel Money, Orange Money — not generic "mobile wallet")
 - Awareness of agent-based cash-in/cash-out as primary modality for informal users
 - Correct currency names and denominations (KES, NGN, GHS, ETB — not USD equivalents)
 - Appropriate register for the user's stated context (agent interaction = relatively formal; peer-to-peer = informal)

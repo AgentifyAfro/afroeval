@@ -1,9 +1,23 @@
 """
-Azure OpenAI connector — Sprint 1 implementation.
-Phase 0 stub with configuration validation.
+Azure OpenAI connector — live implementation using openai.AzureOpenAI client.
 """
 
+import time
+
+import structlog
+from openai import APIStatusError, APITimeoutError, AzureOpenAI
+
 from ingestion.base import ModelConnector, ModelResponseRaw
+
+logger = structlog.get_logger(__name__)
+
+# System prompt scopes the model to evaluation context so responses are
+# grounded in the benchmark domain rather than defaulting to generic help.
+_EVAL_SYSTEM_PROMPT = (
+    "You are an AI assistant being evaluated for deployment in African markets. "
+    "Answer each question accurately, in the same language as the question, "
+    "and with cultural context appropriate to the region."
+)
 
 
 class AzureOpenAIConnector(ModelConnector):
@@ -13,29 +27,64 @@ class AzureOpenAIConnector(ModelConnector):
         api_key: str,
         endpoint: str,
         deployment_name: str,
-        api_version: str = "2024-02-15-preview",
+        api_version: str = "2025-01-01-preview",
+        max_tokens: int = 512,
     ):
-        self.api_key = api_key
-        self.endpoint = endpoint
+        if not api_key or not endpoint:
+            raise ValueError(
+                "AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT must be set. "
+                "Check your .env file."
+            )
         self.deployment_name = deployment_name
-        self.api_version = api_version
+        self.max_tokens = max_tokens
+        self._client = AzureOpenAI(
+            api_key=api_key,
+            azure_endpoint=endpoint,
+            api_version=api_version,
+        )
 
     @property
     def provider_name(self) -> str:
         return "azure_openai"
 
     def get_responses(self, items: list[dict], **kwargs) -> list[ModelResponseRaw]:
-        if not self.api_key or not self.endpoint:
-            raise ValueError(
-                "AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT must be set. "
-                "Check your .env file."
-            )
-        # Sprint 1: replace with AzureOpenAI client call.
         responses = []
         for item in items:
-            responses.append(ModelResponseRaw(
-                item_id=item.get("id", ""),
-                prompt=item.get("prompt", ""),
-                raw_output=f"[STUB] Azure mock response for: {item.get('prompt', '')[:60]}",
-            ))
+            item_id = item.get("id", "")
+            prompt = item.get("prompt", "")
+            try:
+                start = time.monotonic()
+                completion = self._client.chat.completions.create(
+                    model=self.deployment_name,
+                    messages=[
+                        {"role": "system", "content": _EVAL_SYSTEM_PROMPT},
+                        {"role": "user", "content": prompt},
+                    ],
+                    max_tokens=self.max_tokens,
+                    temperature=0.0,
+                )
+                latency = int((time.monotonic() - start) * 1000)
+                raw_output = completion.choices[0].message.content or ""
+                tokens_used = completion.usage.total_tokens if completion.usage else None
+                logger.info(
+                    "Model response received",
+                    item_id=item_id,
+                    latency_ms=latency,
+                    tokens=tokens_used,
+                )
+                responses.append(ModelResponseRaw(
+                    item_id=item_id,
+                    prompt=prompt,
+                    raw_output=raw_output,
+                    latency_ms=latency,
+                    tokens_used=tokens_used,
+                ))
+            except (APITimeoutError, APIStatusError) as exc:
+                logger.error("Azure OpenAI API error", item_id=item_id, error=str(exc))
+                responses.append(ModelResponseRaw(
+                    item_id=item_id,
+                    prompt=prompt,
+                    raw_output="",
+                    latency_ms=None,
+                ))
         return responses

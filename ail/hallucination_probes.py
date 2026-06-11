@@ -15,7 +15,7 @@ from evaluators.base import BaseEvaluator, MetricOutput
 AFRICAN_PROBES: list[dict] = [
     {
         "topic": "mobile_money",
-        "correct_facts": ["M-Pesa", "MTN Mobile Money", "Airtel Money", "Orange Money"],
+        "correct_facts": ["M-Pesa", "TeleBirr", "MTN Mobile Money", "Airtel Money", "Orange Money"],
         "fabrication_markers": ["AfriPay", "KenyaCash", "SahelTransfer"],
     },
     {

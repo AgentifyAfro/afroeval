@@ -46,7 +46,7 @@ You do NOT write sample AI responses. You write the specification of what a corr
    - What the response must cover
    - What register is appropriate
    - Any cultural norms the response must respect
-5. Complete the provenance field — where does this scenario come from? (e.g., "Observed at M-Pesa agent, Westlands, Nairobi, April 2026")
+5. Complete the provenance field — where does this scenario come from? (e.g., "Observed at M-Pesa agent, Westlands, Nairobi, April 2026" or "Observed at TeleBirr agent, Bole, Addis Ababa, April 2026")
 6. Mark the item as "authored" and submit.
 
 ### Quality standards

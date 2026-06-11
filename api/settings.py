@@ -20,14 +20,14 @@ class Settings(BaseSettings):
 
     azure_openai_api_key: str = ""
     azure_openai_endpoint: str = ""
-    azure_openai_api_version: str = "2024-02-15-preview"
-    azure_openai_deployment_name: str = "gpt-4o"
+    azure_openai_api_version: str = "2025-01-01-preview"
+    azure_openai_deployment_name: str = "gpt-4.1-mini"
 
     gemini_api_key: str = ""
 
     # Africa Intelligence Layer judge
-    ail_judge_model: str = "gpt-4o"
-    ail_judge_provider: str = "openai"
+    ail_judge_model: str = "gpt-4.1-mini"
+    ail_judge_provider: str = "azure_openai"
 
     # Reporting
     scorecard_output_dir: str = "./output/scorecards"
