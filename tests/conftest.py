@@ -10,6 +10,10 @@ from sqlmodel.pool import StaticPool
 from api.main import app
 from db.session import get_session
 
+# Matches the default afroeval_secret_key in api/settings.py.
+# Tests don't load .env so this stays as the hardcoded dev default.
+_TEST_API_KEY = "dev-secret-change-in-production"
+
 
 @pytest.fixture(name="session")
 def session_fixture():
@@ -32,6 +36,6 @@ def client_fixture(session: Session):
         return session
 
     app.dependency_overrides[get_session] = get_session_override
-    client = TestClient(app)
+    client = TestClient(app, headers={"X-API-Key": _TEST_API_KEY})
     yield client
     app.dependency_overrides.clear()

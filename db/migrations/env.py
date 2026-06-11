@@ -4,7 +4,10 @@ import os
 from logging.config import fileConfig
 
 from alembic import context
+from dotenv import load_dotenv
 from sqlmodel import SQLModel
+
+load_dotenv()
 
 # Import all models so Alembic sees the metadata
 import db.models  # noqa: F401 — registers all tables

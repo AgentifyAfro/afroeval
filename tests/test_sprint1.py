@@ -1,0 +1,245 @@
+"""
+Sprint 1 test coverage — LLM judge, evaluator injection, connector routing, auth.
+
+All LLM/API calls are mocked; no network required.
+"""
+
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from evaluators.base import MetricOutput
+from evaluators.llm_judge import LLMJudge
+from evaluators.language_performance import AnswerCompletenessEvaluator, SemanticSimilarityEvaluator
+from evaluators.hallucination import FaithfulnessEvaluator
+
+
+# ── LLMJudge ──────────────────────────────────────────────────────────────────
+
+class TestLLMJudge:
+
+    def _make_judge(self, score: float, reason: str) -> LLMJudge:
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = MagicMock(
+            choices=[MagicMock(message=MagicMock(content=f'{{"score": {score}, "reason": "{reason}"}}'  ))]
+        )
+        return LLMJudge(client=mock_client, model="mock")
+
+    def test_score_returns_float_and_reason(self):
+        judge = self._make_judge(0.85, "Good semantic match")
+        score, reason = judge.score("some criterion")
+        assert score == pytest.approx(0.85)
+        assert "Good semantic match" in reason
+
+    def test_score_clamps_above_1(self):
+        judge = self._make_judge(1.5, "Too high")
+        score, _ = judge.score("criterion")
+        assert score == 1.0
+
+    def test_score_clamps_below_0(self):
+        judge = self._make_judge(-0.3, "Negative")
+        score, _ = judge.score("criterion")
+        assert score == 0.0
+
+    def test_score_returns_fallback_on_api_error(self):
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.side_effect = Exception("API down")
+        judge = LLMJudge(client=mock_client, model="mock")
+        score, reason = judge.score("criterion", fallback=0.5)
+        assert score == 0.5
+        assert "Judge unavailable" in reason
+
+    def test_score_returns_fallback_on_bad_json(self):
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = MagicMock(
+            choices=[MagicMock(message=MagicMock(content="not json at all"))]
+        )
+        judge = LLMJudge(client=mock_client, model="mock")
+        score, reason = judge.score("criterion", fallback=0.42)
+        assert score == pytest.approx(0.42)
+
+
+# ── SemanticSimilarityEvaluator ───────────────────────────────────────────────
+
+class TestSemanticSimilarityEvaluator:
+
+    def test_stub_fallback_when_no_judge(self):
+        ev = SemanticSimilarityEvaluator()
+        out = ev.evaluate(
+            prompt="Test prompt",
+            model_response="send money m-pesa",
+            expected_behavior="send money using m-pesa steps",
+        )
+        assert isinstance(out, MetricOutput)
+        assert out.dimension == "language_performance"
+        assert out.metric_name == "semantic_similarity"
+        assert 0.0 <= out.score <= 1.0
+
+    def test_stub_perfect_overlap(self):
+        ev = SemanticSimilarityEvaluator()
+        expected = "the cat sat on the mat"
+        out = ev.evaluate("p", expected, expected)
+        assert out.score == pytest.approx(1.0)
+
+    def test_stub_zero_overlap(self):
+        ev = SemanticSimilarityEvaluator()
+        out = ev.evaluate("p", "banana orange apple", "cat dog fish")
+        assert out.score == pytest.approx(0.0)
+
+    def test_with_judge_uses_llm_score(self):
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = MagicMock(
+            choices=[MagicMock(message=MagicMock(content='{"score": 0.9, "reason": "Strong match"}'))]
+        )
+        judge = LLMJudge(client=mock_client, model="mock")
+        ev = SemanticSimilarityEvaluator(judge=judge)
+        out = ev.evaluate("prompt", "response", "expected", context={"language": "sw"})
+        assert out.score == pytest.approx(0.9)
+        assert out.passed is True
+
+    def test_with_judge_passes_at_0_6(self):
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = MagicMock(
+            choices=[MagicMock(message=MagicMock(content='{"score": 0.6, "reason": "Adequate"}'))]
+        )
+        judge = LLMJudge(client=mock_client, model="mock")
+        ev = SemanticSimilarityEvaluator(judge=judge)
+        out = ev.evaluate("p", "r", "e")
+        assert out.passed is True
+
+    def test_with_judge_fails_below_0_6(self):
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = MagicMock(
+            choices=[MagicMock(message=MagicMock(content='{"score": 0.4, "reason": "Weak"}'))]
+        )
+        judge = LLMJudge(client=mock_client, model="mock")
+        ev = SemanticSimilarityEvaluator(judge=judge)
+        out = ev.evaluate("p", "r", "e")
+        assert out.passed is False
+
+
+# ── AnswerCompletenessEvaluator ───────────────────────────────────────────────
+
+class TestAnswerCompletenessEvaluator:
+
+    def test_stub_nonempty_response_scores_0_5(self):
+        ev = AnswerCompletenessEvaluator()
+        out = ev.evaluate("p", "some answer", "expected")
+        assert out.score == pytest.approx(0.5)
+        assert out.passed is True
+
+    def test_stub_empty_response_scores_0(self):
+        ev = AnswerCompletenessEvaluator()
+        out = ev.evaluate("p", "   ", "expected")
+        assert out.score == pytest.approx(0.0)
+        assert out.passed is False
+
+    def test_with_judge_uses_llm_score(self):
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = MagicMock(
+            choices=[MagicMock(message=MagicMock(content='{"score": 0.75, "reason": "Most elements present"}'))]
+        )
+        judge = LLMJudge(client=mock_client, model="mock")
+        ev = AnswerCompletenessEvaluator(judge=judge)
+        out = ev.evaluate("p", "r", "e")
+        assert out.score == pytest.approx(0.75)
+
+
+# ── FaithfulnessEvaluator ─────────────────────────────────────────────────────
+
+class TestFaithfulnessEvaluator:
+
+    def test_stub_no_fabrication_signals_scores_0_8(self):
+        ev = FaithfulnessEvaluator()
+        out = ev.evaluate("p", "M-Pesa charges KES 11 for KES 500.", "KES 11 fee for KES 500")
+        assert out.score == pytest.approx(0.8)
+        assert out.passed is True
+
+    def test_stub_fabrication_signal_scores_0_4(self):
+        ev = FaithfulnessEvaluator()
+        out = ev.evaluate("p", "As of my knowledge cutoff, the fee is KES 11.", "expected")
+        assert out.score == pytest.approx(0.4)
+        assert out.passed is False
+
+    def test_with_judge_uses_llm_score(self):
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = MagicMock(
+            choices=[MagicMock(message=MagicMock(content='{"score": 0.95, "reason": "Fully faithful"}'))]
+        )
+        judge = LLMJudge(client=mock_client, model="mock")
+        ev = FaithfulnessEvaluator(judge=judge)
+        out = ev.evaluate("p", "r", "e", context={"domain": "mobile_money"})
+        assert out.score == pytest.approx(0.95)
+        assert out.passed is True
+
+
+# ── Connector routing ─────────────────────────────────────────────────────────
+
+class TestConnectorRouting:
+
+    def test_azure_provider_returns_azure_connector(self):
+        from orchestration.dispatcher import _build_connector
+
+        cfg = MagicMock()
+        cfg.azure_openai_api_key = "test-key"
+        cfg.azure_openai_endpoint = "https://test.openai.azure.com/"
+        cfg.azure_openai_deployment_name = "gpt-4.1-mini"
+        cfg.azure_openai_api_version = "2025-01-01-preview"
+
+        with patch("ingestion.azure_openai_connector.AzureOpenAI"):
+            connector = _build_connector("azure_openai", cfg)
+            from ingestion.azure_openai_connector import AzureOpenAIConnector
+            assert isinstance(connector, AzureOpenAIConnector)
+
+    def test_openai_provider_returns_openai_connector(self):
+        from orchestration.dispatcher import _build_connector
+
+        cfg = MagicMock()
+        cfg.openai_api_key = "sk-test"
+        cfg.openai_default_model = "gpt-4o"
+
+        with patch("ingestion.openai_connector.OpenAI"):
+            connector = _build_connector("openai", cfg)
+            from ingestion.openai_connector import OpenAIConnector
+            assert isinstance(connector, OpenAIConnector)
+
+    def test_unknown_provider_raises(self):
+        from orchestration.dispatcher import _build_connector
+        with pytest.raises(ValueError, match="Unsupported model_provider"):
+            _build_connector("gemini", MagicMock())
+
+    def test_jsonl_provider_raises_with_clear_message(self):
+        from orchestration.dispatcher import _build_connector
+        with pytest.raises(ValueError, match="JSONL upload"):
+            _build_connector("jsonl_upload", MagicMock())
+
+
+# ── Auth middleware ───────────────────────────────────────────────────────────
+
+class TestAuthMiddleware:
+
+    def test_no_key_returns_401(self, client):
+        # client fixture sends the correct key; create a bare client for this test
+        from fastapi.testclient import TestClient
+        from api.main import app
+        bare = TestClient(app, raise_server_exceptions=False)
+        resp = bare.get("/v1/assessments")
+        assert resp.status_code == 401
+
+    def test_wrong_key_returns_401(self, client):
+        from fastapi.testclient import TestClient
+        from api.main import app
+        bad = TestClient(app, headers={"X-API-Key": "wrong-key"}, raise_server_exceptions=False)
+        resp = bad.get("/v1/assessments")
+        assert resp.status_code == 401
+
+    def test_health_is_public(self, client):
+        from fastapi.testclient import TestClient
+        from api.main import app
+        bare = TestClient(app, raise_server_exceptions=False)
+        resp = bare.get("/v1/health")
+        assert resp.status_code == 200
+
+    def test_correct_key_allows_access(self, client):
+        resp = client.get("/v1/assessments")
+        assert resp.status_code == 200

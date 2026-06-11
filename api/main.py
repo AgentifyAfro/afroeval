@@ -10,6 +10,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.middleware.auth import APIKeyMiddleware
 from api.settings import get_settings
 from api.v1.routes import assessments, health, runs, scorecards
 from db.session import create_db_and_tables
@@ -30,9 +31,13 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+# Auth must be added before CORS so unauthenticated requests are rejected first.
+app.add_middleware(APIKeyMiddleware, api_key=settings.afroeval_secret_key)
+
+_DEV_ORIGINS = ["http://localhost:8501", "http://localhost:3000", "http://localhost:8000"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if not settings.is_production else ["https://afroeval.agentifyafro.ai"],
+    allow_origins=_DEV_ORIGINS if not settings.is_production else ["https://afroeval.agentifyafro.ai"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
