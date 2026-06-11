@@ -107,9 +107,10 @@ async def dispatch_run(run_id: str) -> None:
     Sprint 3: ModelResponse + MetricResult persistence (requires benchmark items in DB).
     """
     from api.settings import get_settings
-    from db.models import Assessment, Run, RunStatus, Scorecard
+    from benchmarks.ids import stable_item_uuid as _item_uuid
+    from db.models import Assessment, BenchmarkItem, MetricResult, ModelResponse, Run, RunStatus, Scorecard
     from db.session import get_engine
-    from sqlmodel import Session
+    from sqlmodel import Session, select
 
     engine = get_engine()
 
@@ -158,6 +159,36 @@ async def dispatch_run(run_id: str) -> None:
                 connector = _build_connector(assessment.model_provider, cfg)
                 # Run connector in a thread so the event loop stays responsive.
                 raw_responses = await asyncio.to_thread(connector.get_responses, all_items)
+
+                # ── Step 3b: Persist ModelResponse rows ───────────────────────
+                # Only write rows for items that have been seeded into benchmark_items.
+                # Runs against un-seeded packs still work — persistence is just skipped.
+                item_uuids = [_item_uuid(item["id"]) for item in all_items]
+                seeded_ids = set(
+                    session.exec(
+                        select(BenchmarkItem.id).where(BenchmarkItem.id.in_(item_uuids))
+                    ).all()
+                )
+                response_id_by_idx: dict[int, uuid.UUID] = {}
+                for idx, (raw, item) in enumerate(zip(raw_responses, all_items)):
+                    item_db_id = _item_uuid(item["id"])
+                    if item_db_id in seeded_ids:
+                        mr = ModelResponse(
+                            id=uuid.uuid4(),
+                            run_id=uuid.UUID(run_id),
+                            item_id=item_db_id,
+                            raw_output=raw.raw_output,
+                            latency_ms=raw.latency_ms,
+                            tokens_used=raw.tokens_used,
+                        )
+                        session.add(mr)
+                        response_id_by_idx[idx] = mr.id
+                logger.info(
+                    "ModelResponse rows queued",
+                    run_id=run_id,
+                    count=len(response_id_by_idx),
+                    skipped=len(all_items) - len(response_id_by_idx),
+                )
 
                 # ── Step 4: Evaluate each response (parallel via asyncio.gather) ──
                 from ail.code_switching import CodeSwitchingEvaluator
@@ -212,10 +243,25 @@ async def dispatch_run(run_id: str) -> None:
                 ]
                 all_outputs = await asyncio.gather(*tasks)
 
-                for output in all_outputs:
+                n_evaluators = len(evaluators)
+                for i, output in enumerate(all_outputs):
                     if output.dimension in dimension_scores:
                         dimension_scores[output.dimension].append(output.score)
                         item_counts[output.dimension] += 1
+
+                    # ── Step 4b: Persist MetricResult rows ────────────────────
+                    item_idx = i // n_evaluators
+                    if item_idx in response_id_by_idx:
+                        session.add(MetricResult(
+                            id=uuid.uuid4(),
+                            response_id=response_id_by_idx[item_idx],
+                            dimension=output.dimension,
+                            metric_name=output.metric_name,
+                            score=output.score,
+                            passed=output.passed,
+                            reason=output.reason,
+                            extra=output.extra,
+                        ))
 
                 # ── Step 5: Compute composite score ───────────────────────────
                 result = compute_composite_score(
