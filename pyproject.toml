@@ -40,8 +40,9 @@ dependencies = [
     # Operator console
     "streamlit>=1.36.0",
 
-    # Reporting
-    "weasyprint>=62.0",
+    # Reporting (ADR-004: WeasyPrint was the original plan but requires native GTK
+    # libs unavailable on Windows; reportlab is the documented fallback)
+    "reportlab>=4.0.0",
     "jinja2>=3.1.4",
 
     # Observability

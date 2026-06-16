@@ -327,6 +327,16 @@ async def dispatch_run(run_id: str) -> None:
                     benchmark_pack_version=",".join(assessment.benchmark_pack_ids),
                     methodology_version=result.methodology_version,
                 )
+                # ── Step 6b: Generate PDF and JSON artefacts ──────────────────
+                try:
+                    from reporting.generator import generate_scorecard_json, generate_scorecard_pdf
+                    scorecard.pdf_path  = generate_scorecard_pdf(scorecard, run, assessment)
+                    scorecard.json_path = generate_scorecard_json(scorecard, run, assessment)
+                    logger.info("Scorecard artefacts generated", run_id=run_id, pdf=scorecard.pdf_path)
+                except Exception as exc:
+                    # Non-fatal: run is still recorded even if artefact generation fails
+                    logger.warning("Scorecard artefact generation failed", run_id=run_id, error=str(exc))
+
                 session.add(scorecard)
 
                 # ── Step 7: Mark COMPLETED ────────────────────────────────────
