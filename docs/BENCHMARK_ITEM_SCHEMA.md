@@ -40,8 +40,8 @@ Each benchmark item is one JSON object on a single line in a `.jsonl` file. Ever
 | `id` | string | Unique item identifier. Format: `{domain_abbr}-{lang}-{seq}`. Example: `mm-sw-001`. |
 | `prompt` | string | The exact input sent to the model. Written in the target language. Must be a real-world scenario grounded in documented deployment evidence. |
 | `expected_behavior` | string | Description of what a correct response looks like. Not a sample answer — a behavioral specification. Used by evaluators and SME validators. |
-| `language` | string | BCP-47 language code. Allowed: `sw`, `yo`, `am`, `ha`, `zu`, `sheng`. |
-| `domain` | string | Deployment domain. Allowed: `mobile_money`, `customer_service`, `community_health`, `agriculture`, `government`. |
+| `language` | string | BCP-47 language code. Allowed: `sw`, `yo`, `am`, `ha`, `zu`, `sheng`, `om`, `so`. |
+| `domain` | string | Deployment domain. Allowed: `mobile_money`, `customer_service`, `community_health`, `agriculture`, `government`, `remittance`. |
 
 ### Important optional fields
 
@@ -73,8 +73,9 @@ Each benchmark item is one JSON object on a single line in a `.jsonl` file. Ever
 | community_health | `ch` |
 | agriculture | `ag` |
 | government | `gov` |
+| remittance | `re` |
 
-Examples: `mm-sw-001`, `cs-yo-017`, `ch-am-003`, `ag-ha-022`.
+Examples: `mm-sw-001`, `cs-yo-017`, `ch-am-003`, `ag-ha-022`, `re-so-001`.
 
 Held-out items append `-holdout`: `mm-sw-003-holdout`.  
 Gold items append `-gold`: `cs-yo-011-gold`.
@@ -110,8 +111,24 @@ Items that are `is_gold: true` are NEVER published in any pack — they are used
 
 ---
 
+## Language Code Reference
+
+| Code | Language | Primary Region |
+|---|---|---|
+| `sw` | Swahili (Kiswahili) | Kenya, Tanzania, Uganda |
+| `yo` | Yoruba | Nigeria, Benin |
+| `am` | Amharic | Ethiopia |
+| `ha` | Hausa | Nigeria, Niger, Ghana |
+| `zu` | Zulu (isiZulu) | South Africa |
+| `sheng` | Sheng | Nairobi, Kenya (code-switch variety) |
+| `om` | Oromo (Afaan Oromoo) | Oromia/Ethiopia, Kenya |
+| `so` | Somali (Af Soomaali) | Somalia, Djibouti, Horn of Africa |
+
+---
+
 ## Schema Version History
 
 | Version | Date | Change |
 |---|---|---|
 | v1.0 | 2026-05-25 | Initial schema, locked for Phase 1 build. |
+| v1.1 | 2026-06-16 | Added `om` (Oromo) and `so` (Somali) to AnchorLanguage; added `remittance` domain and `re` ID abbreviation. |

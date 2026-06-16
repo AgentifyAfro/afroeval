@@ -41,6 +41,7 @@ class BenchmarkDomain(str, enum.Enum):
     COMMUNITY_HEALTH = "community_health"
     AGRICULTURE = "agriculture"
     GOVERNMENT = "government"
+    REMITTANCE = "remittance"
 
 
 class AnchorLanguage(str, enum.Enum):
@@ -50,6 +51,8 @@ class AnchorLanguage(str, enum.Enum):
     HAUSA = "ha"
     ZULU = "zu"
     SHENG = "sheng"   # Nairobi code-switch variety
+    OROMO = "om"      # Afaan Oromoo — Oromia (Ethiopia/Kenya)
+    SOMALI = "so"     # Af Soomaali — Somalia/Djibouti/Horn of Africa
 
 
 # ── Benchmark models ──────────────────────────────────────────────────────────
