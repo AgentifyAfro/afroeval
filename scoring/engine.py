@@ -39,6 +39,23 @@ DEFAULT_WEIGHTS: dict[str, float] = {
     "safety_robustness": 0.10,
 }
 
+# Sub-metric weights *within* a dimension (Methodology v1.0, Sections 2.1 / 2.3).
+# Only dimensions listed here use weighted aggregation; any dimension not listed
+# (or any metric not named here) falls back to a flat equal-average, same as before.
+# Metrics not named here (e.g. chrf_score, multilingual_similarity) still run and
+# persist as MetricResult rows for visibility, but don't count toward the score.
+DEFAULT_METRIC_WEIGHTS: dict[str, dict[str, float]] = {
+    "language_performance": {
+        "semantic_similarity": 0.50,
+        "answer_completeness": 0.30,
+        "fluency": 0.20,
+    },
+    "hallucination_risk": {
+        "faithfulness": 0.40,
+        "african_hallucination_probe": 0.60,
+    },
+}
+
 # Minimum items per dimension before low_coverage flag is raised.
 MIN_ITEMS_PER_DIMENSION = 10
 
@@ -68,33 +85,48 @@ def compute_composite_score(
     dimension_raw_scores: dict[str, list[float]],
     weights: dict[str, float] | None = None,
     item_counts: dict[str, int] | None = None,
+    dimension_metric_scores: dict[str, dict[str, list[float]]] | None = None,
+    metric_weights: dict[str, dict[str, float]] | None = None,
 ) -> ScoringResult:
     """
     Compute the AfroEval composite score from per-dimension metric scores.
 
     Args:
-        dimension_raw_scores: {dimension: [list of 0.0–1.0 metric scores]}
-        weights: Optional custom weights. Must sum to 1.0. Default used if None.
+        dimension_raw_scores: {dimension: [list of 0.0–1.0 metric scores]}. Used directly
+                 (flat equal-average) for any dimension not present in dimension_metric_scores.
+        weights: Optional custom dimension weights. Must sum to 1.0. Default used if None.
                  Must satisfy: no dimension > 0.40, no dimension < 0.05.
         item_counts: {dimension: number of benchmark items evaluated}.
                      Only dimensions present in this dict are checked for low coverage.
+        dimension_metric_scores: Optional {dimension: {metric_name: [0.0–1.0 scores]}}.
+                 When a dimension appears here (and in metric_weights), its score is a
+                 weighted average over the named metrics instead of a flat average over
+                 dimension_raw_scores[dim]. Metrics not named in metric_weights are ignored
+                 for scoring purposes (they may still be present elsewhere, e.g. persisted
+                 MetricResult rows, just not counted toward the dimension score).
+        metric_weights: Optional override for DEFAULT_METRIC_WEIGHTS.
 
     Returns:
         ScoringResult with composite score, verdict, evidence, and remediation roadmap.
     """
     active_weights = _validate_weights(weights or DEFAULT_WEIGHTS)
     item_counts = item_counts or {}
+    dimension_metric_scores = dimension_metric_scores or {}
+    active_metric_weights = metric_weights or DEFAULT_METRIC_WEIGHTS
 
     # Average metric scores per dimension → 0–100 dimension score
     dimension_scores: dict[str, float] = {}
     low_coverage_dims: list[str] = []
 
     for dim, scores in dimension_raw_scores.items():
-        if scores:
+        if dim in dimension_metric_scores and dim in active_metric_weights:
+            avg = _weighted_dimension_average(dimension_metric_scores[dim], active_metric_weights[dim])
+        elif scores:
             avg = sum(scores) / len(scores)
-            dimension_scores[dim] = round(avg * 100, 2)
         else:
-            dimension_scores[dim] = 0.0
+            avg = None
+
+        dimension_scores[dim] = round(avg * 100, 2) if avg is not None else 0.0
 
         if dim in item_counts and item_counts[dim] < MIN_ITEMS_PER_DIMENSION:
             low_coverage_dims.append(dim)
@@ -128,6 +160,23 @@ def compute_composite_score(
         remediation_roadmap=remediation_roadmap,
         methodology_version=METHODOLOGY_VERSION,
     )
+
+
+def _weighted_dimension_average(metric_scores: dict[str, list[float]], weights: dict[str, float]) -> float:
+    """
+    Weighted average of per-metric means, renormalized over whichever named metrics
+    actually produced scores (so one missing/erroring metric doesn't zero the dimension).
+    """
+    present = {
+        name: sum(scores) / len(scores)
+        for name, scores in metric_scores.items()
+        if name in weights and scores
+    }
+    if not present:
+        return 0.0
+
+    total_weight = sum(weights[name] for name in present)
+    return sum(weights[name] * mean for name, mean in present.items()) / total_weight
 
 
 def _verdict_band(score: float) -> str:

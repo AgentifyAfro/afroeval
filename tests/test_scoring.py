@@ -9,10 +9,12 @@ Reference model expected scores are added in Sprint 5.
 import pytest
 
 from scoring.engine import (
+    DEFAULT_METRIC_WEIGHTS,
     DEFAULT_WEIGHTS,
     ScoringResult,
     _verdict_band,
     _validate_weights,
+    _weighted_dimension_average,
     compute_composite_score,
 )
 
@@ -115,6 +117,51 @@ def test_failing_examples_on_low_scores():
     result = compute_composite_score(scores)
     # All dimensions below 60 should appear as failing
     assert len(result.failing_examples) == len(DEFAULT_WEIGHTS)
+
+
+def test_weighted_dimension_average_matches_documented_weights():
+    # language_performance: semantic_similarity 50%, answer_completeness 30%, fluency 20%
+    metric_scores = {
+        "semantic_similarity": [1.0],
+        "answer_completeness": [1.0],
+        "fluency": [0.0],
+    }
+    avg = _weighted_dimension_average(metric_scores, DEFAULT_METRIC_WEIGHTS["language_performance"])
+    assert avg == pytest.approx(0.8)  # 1.0*0.5 + 1.0*0.3 + 0.0*0.2
+
+
+def test_weighted_dimension_average_renormalizes_missing_metric():
+    # fluency missing entirely (e.g. evaluator errored for every item) -> renormalize over the rest
+    metric_scores = {
+        "semantic_similarity": [1.0],
+        "answer_completeness": [1.0],
+    }
+    avg = _weighted_dimension_average(metric_scores, DEFAULT_METRIC_WEIGHTS["language_performance"])
+    assert avg == pytest.approx(1.0)
+
+
+def test_compute_composite_score_uses_metric_weights_when_provided():
+    scores = {dim: [0.5] for dim in DEFAULT_WEIGHTS}  # flat fallback for other dimensions
+    metric_scores = {
+        "language_performance": {
+            "semantic_similarity": [1.0],
+            "answer_completeness": [1.0],
+            "fluency": [1.0],
+            "chrf_score": [0.0],            # not in DEFAULT_METRIC_WEIGHTS -> ignored
+            "multilingual_similarity": [0.0],  # not in DEFAULT_METRIC_WEIGHTS -> ignored
+        },
+    }
+    result = compute_composite_score(scores, dimension_metric_scores=metric_scores)
+    assert result.dimension_scores["language_performance"] == pytest.approx(100.0)
+    # Untouched dimensions still use the flat average exactly as before
+    assert result.dimension_scores["cultural_appropriateness"] == pytest.approx(50.0)
+
+
+def test_compute_composite_score_without_metric_scores_is_unaffected():
+    # Old call style (no dimension_metric_scores) must behave exactly as before.
+    scores = {dim: [0.8, 0.6] for dim in DEFAULT_WEIGHTS}
+    result = compute_composite_score(scores)
+    assert result.dimension_scores["language_performance"] == pytest.approx(70.0)
 
 
 def test_evaluator_base_contract():

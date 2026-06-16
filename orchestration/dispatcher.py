@@ -17,7 +17,7 @@ from datetime import datetime
 
 import structlog
 
-from scoring.engine import DEFAULT_WEIGHTS, compute_composite_score
+from scoring.engine import DEFAULT_METRIC_WEIGHTS, DEFAULT_WEIGHTS, compute_composite_score
 
 logger = structlog.get_logger(__name__)
 
@@ -37,6 +37,7 @@ def _parse_pack_id(pack_id: str) -> tuple[str, str]:
 
 def _build_connector(model_provider: str, cfg):
     """Return the right ingestion connector for the given provider."""
+    from ingestion.anthropic_connector import AnthropicConnector
     from ingestion.azure_openai_connector import AzureOpenAIConnector
     from ingestion.openai_connector import OpenAIConnector
 
@@ -51,6 +52,11 @@ def _build_connector(model_provider: str, cfg):
         return OpenAIConnector(
             api_key=cfg.openai_api_key,
             model=cfg.openai_default_model,
+        )
+    elif model_provider == "anthropic":
+        return AnthropicConnector(
+            api_key=cfg.anthropic_api_key,
+            model=cfg.anthropic_default_model,
         )
     elif model_provider == "jsonl_upload":
         raise ValueError(
@@ -78,6 +84,22 @@ def _build_judge(cfg):
             model=cfg.ail_judge_model,
         )
     logger.warning("LLM judge not configured — evaluators will use stub fallback")
+    return None
+
+
+def _build_deepeval_model(cfg):
+    """Build the Azure-backed DeepEval model for AnswerRelevancy/GEval/Faithfulness. None if not configured."""
+    from deepeval.models import AzureOpenAIModel
+
+    if cfg.ail_judge_provider == "azure_openai" and cfg.azure_openai_api_key:
+        return AzureOpenAIModel(
+            model=cfg.azure_openai_deployment_name,
+            deployment_name=cfg.azure_openai_deployment_name,
+            api_key=cfg.azure_openai_api_key,
+            base_url=cfg.azure_openai_endpoint,
+            api_version=cfg.azure_openai_api_version,
+        )
+    logger.warning("DeepEval model not configured — DeepEval-backed evaluators will use stub fallback")
     return None
 
 
@@ -198,16 +220,23 @@ async def dispatch_run(run_id: str) -> None:
                 from evaluators.hallucination import FaithfulnessEvaluator
                 from evaluators.language_performance import (
                     AnswerCompletenessEvaluator,
+                    ChrFEvaluator,
+                    FluencyEvaluator,
+                    MultilingualSimilarityEvaluator,
                     SemanticSimilarityEvaluator,
                 )
                 from evaluators.safety import SafetyEvaluator
 
                 judge = _build_judge(cfg)
+                deepeval_model = _build_deepeval_model(cfg)
 
                 evaluators = [
-                    SemanticSimilarityEvaluator(judge=judge),
-                    AnswerCompletenessEvaluator(judge=judge),
-                    FaithfulnessEvaluator(judge=judge),
+                    SemanticSimilarityEvaluator(model=deepeval_model),
+                    AnswerCompletenessEvaluator(model=deepeval_model),
+                    FluencyEvaluator(judge=judge),
+                    ChrFEvaluator(),
+                    MultilingualSimilarityEvaluator(),
+                    FaithfulnessEvaluator(model=deepeval_model),
                     AfricanHallucinationProbeEvaluator(),
                     CohortDisparityEvaluator(),
                     SafetyEvaluator(),
@@ -216,6 +245,9 @@ async def dispatch_run(run_id: str) -> None:
                 ]
 
                 dimension_scores: dict[str, list[float]] = {dim: [] for dim in DEFAULT_WEIGHTS}
+                dimension_metric_scores: dict[str, dict[str, list[float]]] = {
+                    dim: {name: [] for name in metrics} for dim, metrics in DEFAULT_METRIC_WEIGHTS.items()
+                }
                 item_counts: dict[str, int] = {dim: 0 for dim in DEFAULT_WEIGHTS}
 
                 # Semaphore caps simultaneous LLM-judge (Azure) calls to avoid rate limits.
@@ -249,6 +281,10 @@ async def dispatch_run(run_id: str) -> None:
                         dimension_scores[output.dimension].append(output.score)
                         item_counts[output.dimension] += 1
 
+                    dim_metrics = dimension_metric_scores.get(output.dimension)
+                    if dim_metrics is not None and output.metric_name in dim_metrics:
+                        dim_metrics[output.metric_name].append(output.score)
+
                     # ── Step 4b: Persist MetricResult rows ────────────────────
                     item_idx = i // n_evaluators
                     if item_idx in response_id_by_idx:
@@ -267,6 +303,7 @@ async def dispatch_run(run_id: str) -> None:
                 result = compute_composite_score(
                     dimension_raw_scores=dimension_scores,
                     item_counts=item_counts,
+                    dimension_metric_scores=dimension_metric_scores,
                 )
                 logger.info(
                     "Scoring complete",

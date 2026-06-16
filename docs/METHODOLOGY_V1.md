@@ -92,7 +92,7 @@ A technically correct response that violates local norms, uses inappropriate reg
 **Weight: 20% | Code:** `hallucination_risk`
 
 **What it measures:**  
-Whether the model fabricates facts. Evaluated in two layers: (a) general faithfulness via Ragas, and (b) African-specific hallucination probes targeting institutions, geography, regulation, mobile money operators, and currency.
+Whether the model fabricates facts. Evaluated in two layers: (a) general faithfulness via DeepEval, and (b) African-specific hallucination probes targeting institutions, geography, regulation, mobile money operators, and currency.
 
 **Why it matters:**  
 Generic hallucination benchmarks do not test for African-specific fabrications. A model may correctly cite US institutions while fabricating African central banks, mobile money operators, or health protocols. The African probe set is a key differentiator of AfroEval.
@@ -100,7 +100,7 @@ Generic hallucination benchmarks do not test for African-specific fabrications. 
 **Metrics:**
 | Metric | Tool | Weight within dimension |
 |---|---|---|
-| Faithfulness (RAG context vs output) | Ragas `FaithfulnessMetric` | 40% |
+| Faithfulness (ground truth vs output) | DeepEval `FaithfulnessMetric`<sup>†</sup> | 40% |
 | African hallucination probe set | AfroEval AIL | 60% |
 
 **Probe categories:**
@@ -112,6 +112,12 @@ Generic hallucination benchmarks do not test for African-specific fabrications. 
 - Currency values and exchange rates
 
 **Pass threshold:** ≥ 0.75 (no African fabrication markers present; faithfulness ≥ 0.7).
+
+<sup>†</sup> Originally specified as Ragas `FaithfulnessMetric`; switched to DeepEval's equivalent
+metric (same concept — checks output against a reference passage) because Ragas 0.4.3 has a
+broken dependency (langchain-community version mismatch) as of this implementation. AfroEval
+items have no retrieval step, so the item's SME-authored `expected_behavior` is passed as the
+sole reference passage rather than retrieved documents.
 
 ---
 

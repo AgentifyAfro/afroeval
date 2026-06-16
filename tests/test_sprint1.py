@@ -10,7 +10,11 @@ import pytest
 
 from evaluators.base import MetricOutput
 from evaluators.llm_judge import LLMJudge
-from evaluators.language_performance import AnswerCompletenessEvaluator, SemanticSimilarityEvaluator
+from evaluators.language_performance import (
+    AnswerCompletenessEvaluator,
+    FluencyEvaluator,
+    SemanticSimilarityEvaluator,
+)
 from evaluators.hallucination import FaithfulnessEvaluator
 
 
@@ -86,36 +90,35 @@ class TestSemanticSimilarityEvaluator:
         out = ev.evaluate("p", "banana orange apple", "cat dog fish")
         assert out.score == pytest.approx(0.0)
 
-    def test_with_judge_uses_llm_score(self):
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = MagicMock(
-            choices=[MagicMock(message=MagicMock(content='{"score": 0.9, "reason": "Strong match"}'))]
-        )
-        judge = LLMJudge(client=mock_client, model="mock")
-        ev = SemanticSimilarityEvaluator(judge=judge)
+    @patch("evaluators.language_performance.AnswerRelevancyMetric")
+    def test_with_model_uses_deepeval_score(self, mock_metric_cls):
+        mock_metric_cls.return_value = MagicMock(score=0.9, reason="Strong match")
+        ev = SemanticSimilarityEvaluator(model=MagicMock())
         out = ev.evaluate("prompt", "response", "expected", context={"language": "sw"})
         assert out.score == pytest.approx(0.9)
         assert out.passed is True
 
-    def test_with_judge_passes_at_0_6(self):
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = MagicMock(
-            choices=[MagicMock(message=MagicMock(content='{"score": 0.6, "reason": "Adequate"}'))]
-        )
-        judge = LLMJudge(client=mock_client, model="mock")
-        ev = SemanticSimilarityEvaluator(judge=judge)
+    @patch("evaluators.language_performance.AnswerRelevancyMetric")
+    def test_with_model_passes_at_0_6(self, mock_metric_cls):
+        mock_metric_cls.return_value = MagicMock(score=0.6, reason="Adequate")
+        ev = SemanticSimilarityEvaluator(model=MagicMock())
         out = ev.evaluate("p", "r", "e")
         assert out.passed is True
 
-    def test_with_judge_fails_below_0_6(self):
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = MagicMock(
-            choices=[MagicMock(message=MagicMock(content='{"score": 0.4, "reason": "Weak"}'))]
-        )
-        judge = LLMJudge(client=mock_client, model="mock")
-        ev = SemanticSimilarityEvaluator(judge=judge)
+    @patch("evaluators.language_performance.AnswerRelevancyMetric")
+    def test_with_model_fails_below_0_6(self, mock_metric_cls):
+        mock_metric_cls.return_value = MagicMock(score=0.4, reason="Weak")
+        ev = SemanticSimilarityEvaluator(model=MagicMock())
         out = ev.evaluate("p", "r", "e")
         assert out.passed is False
+
+    @patch("evaluators.language_performance.AnswerRelevancyMetric")
+    def test_metric_error_falls_back_gracefully(self, mock_metric_cls):
+        mock_metric_cls.return_value.measure.side_effect = Exception("rate limited")
+        ev = SemanticSimilarityEvaluator(model=MagicMock())
+        out = ev.evaluate("p", "r", "e")
+        assert out.score == pytest.approx(0.5)
+        assert "unavailable" in out.reason.lower()
 
 
 # ── AnswerCompletenessEvaluator ───────────────────────────────────────────────
@@ -134,15 +137,44 @@ class TestAnswerCompletenessEvaluator:
         assert out.score == pytest.approx(0.0)
         assert out.passed is False
 
+    @patch("evaluators.language_performance.GEval")
+    def test_with_model_uses_deepeval_score(self, mock_geval_cls):
+        mock_geval_cls.return_value = MagicMock(score=0.75, reason="Most elements present")
+        ev = AnswerCompletenessEvaluator(model=MagicMock())
+        out = ev.evaluate("p", "r", "e")
+        assert out.score == pytest.approx(0.75)
+
+
+# ── FluencyEvaluator ───────────────────────────────────────────────────────────
+
+class TestFluencyEvaluator:
+
+    def test_stub_nonempty_response_scores_0_5(self):
+        ev = FluencyEvaluator()
+        out = ev.evaluate("p", "some answer", "expected")
+        assert out.score == pytest.approx(0.5)
+        assert out.passed is False  # 0.5 < 0.6 pass bar
+
     def test_with_judge_uses_llm_score(self):
         mock_client = MagicMock()
         mock_client.chat.completions.create.return_value = MagicMock(
-            choices=[MagicMock(message=MagicMock(content='{"score": 0.75, "reason": "Most elements present"}'))]
+            choices=[MagicMock(message=MagicMock(content='{"score": 0.9, "reason": "Fluent and natural"}'))]
         )
         judge = LLMJudge(client=mock_client, model="mock")
-        ev = AnswerCompletenessEvaluator(judge=judge)
+        ev = FluencyEvaluator(judge=judge)
+        out = ev.evaluate("p", "r", "e", context={"language": "yo"})
+        assert out.score == pytest.approx(0.9)
+        assert out.passed is True
+
+    def test_with_judge_fails_below_0_6(self):
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = MagicMock(
+            choices=[MagicMock(message=MagicMock(content='{"score": 0.4, "reason": "Awkward phrasing"}'))]
+        )
+        judge = LLMJudge(client=mock_client, model="mock")
+        ev = FluencyEvaluator(judge=judge)
         out = ev.evaluate("p", "r", "e")
-        assert out.score == pytest.approx(0.75)
+        assert out.passed is False
 
 
 # ── FaithfulnessEvaluator ─────────────────────────────────────────────────────
@@ -161,13 +193,10 @@ class TestFaithfulnessEvaluator:
         assert out.score == pytest.approx(0.4)
         assert out.passed is False
 
-    def test_with_judge_uses_llm_score(self):
-        mock_client = MagicMock()
-        mock_client.chat.completions.create.return_value = MagicMock(
-            choices=[MagicMock(message=MagicMock(content='{"score": 0.95, "reason": "Fully faithful"}'))]
-        )
-        judge = LLMJudge(client=mock_client, model="mock")
-        ev = FaithfulnessEvaluator(judge=judge)
+    @patch("evaluators.hallucination.FaithfulnessMetric")
+    def test_with_model_uses_deepeval_score(self, mock_metric_cls):
+        mock_metric_cls.return_value = MagicMock(score=0.95, reason="Fully faithful")
+        ev = FaithfulnessEvaluator(model=MagicMock())
         out = ev.evaluate("p", "r", "e", context={"domain": "mobile_money"})
         assert out.score == pytest.approx(0.95)
         assert out.passed is True
