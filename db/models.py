@@ -143,6 +143,7 @@ class ModelResponse(SQLModel, table=True):
 
     run: Optional[Run] = Relationship(back_populates="responses")
     metric_results: list["MetricResult"] = Relationship(back_populates="response")
+    reviews: list["ResponseReview"] = Relationship(back_populates="response")
 
 
 class MetricResult(SQLModel, table=True):
@@ -161,6 +162,32 @@ class MetricResult(SQLModel, table=True):
     extra: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
 
     response: Optional[ModelResponse] = Relationship(back_populates="metric_results")
+
+
+class ResponseReview(SQLModel, table=True):
+    """SME human review of one ModelResponse, calibrating against MetricResult scores."""
+    __tablename__ = "response_reviews"
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    response_id: uuid.UUID = Field(foreign_key="model_responses.id", index=True)
+    reviewer_id: str                          # SME email/identifier
+
+    language_performance_score: float | None = None        # 0.0–1.0
+    language_performance_rationale: str | None = None
+    cultural_appropriateness_score: float | None = None
+    cultural_appropriateness_rationale: str | None = None
+    hallucination_risk_score: float | None = None
+    hallucination_risk_rationale: str | None = None
+    bias_fairness_score: float | None = None
+    bias_fairness_rationale: str | None = None
+    code_switching_quality_score: float | None = None
+    code_switching_quality_rationale: str | None = None
+    safety_robustness_score: float | None = None
+    safety_robustness_rationale: str | None = None
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    response: Optional[ModelResponse] = Relationship(back_populates="reviews")
 
 
 # ── Scorecard ─────────────────────────────────────────────────────────────────
