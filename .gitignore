@@ -13,6 +13,7 @@ __pycache__/
 .Python
 build/
 dist/
+.deepeval/
 *.egg-info/
 .eggs/
 *.egg

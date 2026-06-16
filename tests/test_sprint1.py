@@ -232,6 +232,18 @@ class TestConnectorRouting:
             from ingestion.openai_connector import OpenAIConnector
             assert isinstance(connector, OpenAIConnector)
 
+    def test_anthropic_provider_returns_anthropic_connector(self):
+        from orchestration.dispatcher import _build_connector
+
+        cfg = MagicMock()
+        cfg.anthropic_api_key = "sk-ant-test"
+        cfg.anthropic_default_model = "claude-haiku-4-5-20251001"
+
+        with patch("ingestion.anthropic_connector.Anthropic"):
+            connector = _build_connector("anthropic", cfg)
+            from ingestion.anthropic_connector import AnthropicConnector
+            assert isinstance(connector, AnthropicConnector)
+
     def test_unknown_provider_raises(self):
         from orchestration.dispatcher import _build_connector
         with pytest.raises(ValueError, match="Unsupported model_provider"):

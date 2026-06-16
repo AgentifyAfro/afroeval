@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     azure_openai_api_version: str = "2025-01-01-preview"
     azure_openai_deployment_name: str = "gpt-4.1-mini"
 
+    anthropic_api_key: str = ""
+    anthropic_default_model: str = "claude-haiku-4-5-20251001"
+
     gemini_api_key: str = ""
 
     # Africa Intelligence Layer judge

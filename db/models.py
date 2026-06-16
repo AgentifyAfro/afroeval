@@ -23,6 +23,7 @@ class RunStatus(str, enum.Enum):
 class ModelProvider(str, enum.Enum):
     OPENAI = "openai"
     AZURE_OPENAI = "azure_openai"
+    ANTHROPIC = "anthropic"
     GEMINI = "gemini"
     JSONL_UPLOAD = "jsonl_upload"
 

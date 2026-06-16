@@ -21,7 +21,7 @@ class AssessmentCreate(BaseModel):
     name: str
     model_provider: ModelProvider
     model_identifier: str                   # e.g. "gpt-4o" or Azure deployment name
-    benchmark_pack_ids: list[str]           # UUIDs of packs to use
+    benchmark_pack_ids: list[str]           # pack identifiers, format: "<name>_v<version>" e.g. "customer_service_yo_v1.0.0"
     config: dict = {}                       # Optional overrides (weights, judge model, etc.)
 
 
