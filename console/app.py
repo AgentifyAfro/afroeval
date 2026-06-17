@@ -734,8 +734,12 @@ def render_run_evaluation() -> None:
     st.markdown("**Model Configuration**")
 
     def _sync_model_id() -> None:
-        prov = st.session_state.get("op_provider", "azure_openai")
-        st.session_state["op_model_id"] = PROVIDER_MODEL_DEFAULTS.get(prov, "")
+        prov  = st.session_state.get("op_provider", "azure_openai")
+        model = PROVIDER_MODEL_DEFAULTS.get(prov, "")
+        st.session_state["op_model_id"] = model
+        st.session_state["op_name"] = (
+            f"{model} — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')} UTC"
+        )
 
     mc1, mc2 = st.columns(2)
     with mc1:
@@ -756,8 +760,11 @@ def render_run_evaluation() -> None:
 
     st.divider()
 
-    default_name = f"{model_id} — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')} UTC"
-    assessment_name = st.text_input("Assessment Name", value=default_name, key="op_name")
+    if "op_name" not in st.session_state:
+        st.session_state["op_name"] = (
+            f"{model_id} — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')} UTC"
+        )
+    assessment_name = st.text_input("Assessment Name", key="op_name")
 
     st.divider()
 
