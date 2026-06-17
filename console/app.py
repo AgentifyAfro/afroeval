@@ -590,9 +590,29 @@ def _render_calibration_detail(cal_df: pd.DataFrame) -> None:
 
 def _launch_run(name: str, provider: str, model_id: str, pack_ids: list) -> None:
     """Create Assessment + Run rows in DB, then kick off the eval in a daemon thread."""
-    # Force a fresh settings read so Streamlit Cloud secrets are always picked up.
+    import os
     from api.settings import get_settings
+
+    # Streamlit Cloud exposes secrets via st.secrets AND as env vars, but the env-var
+    # injection can lag behind st.secrets in some edge cases. Explicitly sync here so
+    # the background thread's get_settings() call always sees the real values.
+    _SECRET_KEYS = [
+        "AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT",
+        "AZURE_OPENAI_DEPLOYMENT_NAME", "AZURE_OPENAI_API_VERSION",
+        "ANTHROPIC_API_KEY", "OPENAI_API_KEY",
+        "DATABASE_URL",
+    ]
+    for _k in _SECRET_KEYS:
+        try:
+            _v = st.secrets.get(_k)
+            if _v:
+                os.environ[_k] = _v
+        except Exception:
+            pass
+
+    # Clear stale cache and pre-populate with current env vars in the main thread.
     get_settings.cache_clear()
+    get_settings()  # populate lru_cache NOW — background thread will reuse this
 
     assessment_id = uuid.uuid4()
     run_id_uuid   = uuid.uuid4()
