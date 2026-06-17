@@ -9,9 +9,13 @@ Run:
 """
 
 import json
+import subprocess
 import sys
+import threading
+import time
 import uuid
 from collections import defaultdict
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -21,7 +25,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from benchmarks.ids import stable_item_uuid
 from benchmarks.loader import PACKS_DIR
-from db.models import Assessment, BenchmarkItem, MetricResult, ModelResponse, ResponseReview, Run, Scorecard
+from db.models import Assessment, BenchmarkItem, BenchmarkPack, MetricResult, ModelResponse, ResponseReview, Run, RunStatus, Scorecard
 from db.session import get_engine
 from sqlmodel import Session, col, select
 
@@ -55,6 +59,29 @@ LANGUAGE_NAMES = {
     "so":    "Somali",
     "sheng": "Sheng",
 }
+
+PACK_CATALOG = [
+    {"id": "mobile_money_sw_v1.0.0",      "label": "Mobile Money (Swahili)",        "language": "sw"},
+    {"id": "remittance_so_v1.0.0",         "label": "Remittance (Somali)",           "language": "so"},
+    {"id": "cross_border_trade_ha_v1.0.0", "label": "Cross-Border Trade (Hausa)",    "language": "ha"},
+    {"id": "community_health_am_v1.0.0",   "label": "Community Health (Amharic)",    "language": "am"},
+    {"id": "agriculture_om_v1.0.0",        "label": "Agriculture (Oromo)",           "language": "om"},
+    {"id": "agriculture_ha_v1.0.0",        "label": "Agriculture (Hausa)",           "language": "ha"},
+    {"id": "public_services_zu_v1.0.0",    "label": "Public Services (Zulu)",        "language": "zu"},
+    {"id": "customer_service_yo_v1.0.0",   "label": "Customer Service (Yoruba)",     "language": "yo"},
+    {"id": "urban_digital_sheng_v1.0.0",   "label": "Urban Digital (Sheng)",         "language": "sheng"},
+    {"id": "code_switching_mixed_v1.0.0",  "label": "Code Switching (mixed)",        "language": "mixed"},
+    {"id": "safety_mixed_v1.0.0",          "label": "Safety (mixed)",                "language": "mixed"},
+    {"id": "customer_service_en_v1.0.0",   "label": "Customer Service EN (baseline)","language": "en"},
+]
+
+PROVIDER_MODEL_DEFAULTS = {
+    "azure_openai": "gpt-4.1-mini",
+    "anthropic":    "claude-haiku-4-5-20251001",
+    "openai":       "gpt-4o",
+}
+
+PROJECT_ROOT = Path(__file__).parent.parent
 
 # ── Page config ───────────────────────────────────────────────────────────────
 
@@ -384,6 +411,14 @@ def load_language_breakdown(run_id_a: str, run_id_b: str) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+@st.cache_data(ttl=30)
+def load_seeded_pack_ids() -> set:
+    engine = get_engine()
+    with Session(engine) as session:
+        packs = session.exec(select(BenchmarkPack)).all()
+        return {f"{p.name}_{p.version}" for p in packs}
+
+
 # ── UI helpers ────────────────────────────────────────────────────────────────
 
 def _verdict_badge(verdict: str) -> str:
@@ -549,6 +584,289 @@ def _render_calibration_detail(cal_df: pd.DataFrame) -> None:
             "Rationale": st.column_config.TextColumn("SME Rationale"),
         },
     )
+
+
+# ── Operator helpers ──────────────────────────────────────────────────────────
+
+def _launch_run(name: str, provider: str, model_id: str, pack_ids: list) -> None:
+    """Create Assessment + Run rows in DB, then kick off the eval in a daemon thread."""
+    assessment_id = uuid.uuid4()
+    run_id_uuid   = uuid.uuid4()
+
+    with Session(get_engine()) as session:
+        session.add(Assessment(
+            id=assessment_id,
+            name=name,
+            model_provider=provider,
+            model_identifier=model_id,
+            benchmark_pack_ids=pack_ids,
+            config={},
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        ))
+        session.add(Run(
+            id=run_id_uuid,
+            assessment_id=assessment_id,
+            status=RunStatus.PENDING,
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        ))
+        session.commit()
+
+    run_id_str = str(run_id_uuid)
+
+    def _thread() -> None:
+        try:
+            import asyncio
+            from orchestration.dispatcher import dispatch_run
+            asyncio.run(dispatch_run(run_id_str))
+        except Exception as exc:
+            try:
+                with Session(get_engine()) as s:
+                    run = s.get(Run, uuid.UUID(run_id_str))
+                    if run and run.status not in ("completed",):
+                        run.status = RunStatus.FAILED
+                        run.error_message = str(exc)
+                        s.add(run)
+                        s.commit()
+            except Exception:
+                pass
+
+    threading.Thread(target=_thread, daemon=True).start()
+    st.session_state["op_active_run_id"] = run_id_str
+
+
+def _render_active_run(run_id: str) -> None:
+    """Poll and display an in-progress or just-completed run. Calls st.rerun() every 5 s."""
+    with Session(get_engine()) as session:
+        run = session.get(Run, uuid.UUID(run_id))
+        if not run:
+            st.error("Run not found in the database.")
+            del st.session_state["op_active_run_id"]
+            return
+        status    = run.status
+        started   = run.started_at
+        error_msg = getattr(run, "error_message", None)
+        scorecard = session.exec(
+            select(Scorecard).where(Scorecard.run_id == uuid.UUID(run_id))
+        ).first()
+
+    st.markdown(f"**Run ID:** `{run_id[:8]}…`")
+
+    if status in ("pending", "running"):
+        elapsed_str = ""
+        if started:
+            secs = (datetime.utcnow() - started).total_seconds()
+            elapsed_str = f" — {int(secs // 60)}m {int(secs % 60)}s elapsed"
+        st.info(f"Status: **{status.upper()}**{elapsed_str}. Polling every 5 s…")
+        col_detach, _ = st.columns([1, 3])
+        with col_detach:
+            if st.button("Detach (run continues)", key="op_detach"):
+                del st.session_state["op_active_run_id"]
+                st.rerun()
+        time.sleep(5)
+        st.rerun()
+
+    elif status == "completed" and scorecard:
+        st.success(
+            f"Complete — composite **{scorecard.composite_score:.1f} / 100** — {scorecard.verdict}"
+        )
+        col_view, col_new, _ = st.columns([1, 1, 2])
+        with col_view:
+            if st.button("View Scorecard", key="op_view_sc"):
+                del st.session_state["op_active_run_id"]
+                st.rerun()
+        with col_new:
+            if st.button("New Run", key="op_new_run"):
+                del st.session_state["op_active_run_id"]
+                st.rerun()
+
+    elif status == "failed":
+        st.error(f"Run failed: {error_msg or '(no details)'}")
+        if st.button("Clear", key="op_clear_failed"):
+            del st.session_state["op_active_run_id"]
+            st.rerun()
+
+    else:
+        st.warning(f"Unexpected status: {status}")
+        if st.button("Clear", key="op_clear_unk"):
+            del st.session_state["op_active_run_id"]
+            st.rerun()
+
+
+# ── Operator views ────────────────────────────────────────────────────────────
+
+def render_run_evaluation() -> None:
+    st.title("🌍 AfroEval Scorecard™ Console")
+    st.subheader("Run Evaluation")
+    st.caption("Configure and launch a new evaluation run against selected benchmark packs.")
+
+    active = st.session_state.get("op_active_run_id")
+    if active:
+        _render_active_run(active)
+        return
+
+    # ── Pack selection ────────────────────────────────────────────────────
+    st.markdown("**Select Benchmark Packs**")
+    btn1, btn2 = st.columns([1, 1])
+    with btn1:
+        if st.button("Select All", key="op_sel_all"):
+            for p in PACK_CATALOG:
+                st.session_state[f"op_pack_{p['id']}"] = True
+    with btn2:
+        if st.button("Deselect All", key="op_desel_all"):
+            for p in PACK_CATALOG:
+                st.session_state[f"op_pack_{p['id']}"] = False
+
+    selected_packs = []
+    pack_cols = st.columns(2)
+    for i, p in enumerate(PACK_CATALOG):
+        with pack_cols[i % 2]:
+            checked = st.checkbox(
+                p["label"],
+                value=st.session_state.get(f"op_pack_{p['id']}", False),
+                key=f"op_pack_{p['id']}",
+            )
+            if checked:
+                selected_packs.append(p["id"])
+
+    st.divider()
+
+    # ── Model configuration ───────────────────────────────────────────────
+    st.markdown("**Model Configuration**")
+    mc1, mc2 = st.columns(2)
+    with mc1:
+        provider = st.selectbox(
+            "Provider",
+            ["azure_openai", "anthropic", "openai"],
+            format_func=lambda v: PROVIDER_SHORT.get(v, v),
+            key="op_provider",
+        )
+    with mc2:
+        model_id = st.text_input(
+            "Model Identifier",
+            value=PROVIDER_MODEL_DEFAULTS.get(st.session_state.get("op_provider", "azure_openai"), "gpt-4.1-mini"),
+            key="op_model_id",
+        )
+
+    st.divider()
+
+    default_name = f"{model_id} — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')} UTC"
+    assessment_name = st.text_input("Assessment Name", value=default_name, key="op_name")
+
+    st.divider()
+
+    can_launch = len(selected_packs) > 0 and bool(model_id.strip())
+    if not selected_packs:
+        st.caption("Select at least one pack to enable Launch.")
+
+    if st.button("🚀 Launch Run", type="primary", disabled=not can_launch, key="op_launch"):
+        _launch_run(assessment_name, provider, model_id, selected_packs)
+        st.rerun()
+
+
+def render_pack_management() -> None:
+    st.title("🌍 AfroEval Scorecard™ Console")
+    st.subheader("Pack Management")
+    st.caption("Seed JSONL benchmark packs into the Supabase database. Idempotent — safe to re-run.")
+
+    with st.spinner("Checking DB…"):
+        seeded = load_seeded_pack_ids()
+
+    rows = []
+    for p in PACK_CATALOG:
+        rows.append({
+            "Pack":     p["label"],
+            "Language": LANGUAGE_NAMES.get(p["language"], p["language"]),
+            "Status":   "✅ Seeded" if p["id"] in seeded else "⬜ Not seeded",
+        })
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+    unseeded = [p["id"] for p in PACK_CATALOG if p["id"] not in seeded]
+    if not unseeded:
+        st.success("All 12 packs are in the database.")
+        return
+
+    st.warning(f"{len(unseeded)} pack(s) not yet seeded.")
+    if st.button("Seed All Packs", type="primary", key="op_seed"):
+        with st.spinner("Seeding packs — this takes ~10 s…"):
+            result = subprocess.run(
+                [sys.executable, "scripts/seed_packs_to_db.py"],
+                cwd=str(PROJECT_ROOT),
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+        if result.returncode == 0:
+            st.cache_data.clear()
+            st.success("Seeding complete.")
+            with st.expander("Script output"):
+                st.text(result.stdout or "(no output)")
+        else:
+            st.error("Seeding failed.")
+            st.text(result.stderr)
+        st.rerun()
+
+
+def render_hitl_management() -> None:
+    st.title("🌍 AfroEval Scorecard™ Console")
+    st.subheader("HITL Management")
+    st.caption(
+        "Export model responses to Label Studio for SME annotation, "
+        "then import completed reviews back into the database."
+    )
+
+    with Session(get_engine()) as session:
+        all_responses  = session.exec(select(ModelResponse)).all()
+        reviewed_ids   = {r.response_id for r in session.exec(select(ResponseReview)).all()}
+        total          = len(all_responses)
+        reviewed       = sum(1 for r in all_responses if r.id in reviewed_ids)
+
+    mc1, mc2, mc3 = st.columns(3)
+    mc1.metric("Total Responses", total)
+    mc2.metric("Reviewed", reviewed)
+    mc3.metric("Awaiting Review", total - reviewed)
+
+    st.divider()
+
+    st.markdown("### Export to Label Studio")
+    st.caption("Pushes unreviewed ModelResponse rows into the Label Studio annotation project.")
+    if st.button("📤 Export to Label Studio", type="primary", key="op_export"):
+        with st.spinner("Exporting…"):
+            result = subprocess.run(
+                [sys.executable, "scripts/hitl_export_tasks.py"],
+                cwd=str(PROJECT_ROOT),
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+        if result.returncode == 0:
+            st.success("Export complete.")
+            with st.expander("Script output"):
+                st.text(result.stdout or "(no output)")
+        else:
+            st.error("Export failed.")
+            st.text(result.stderr)
+
+    st.divider()
+
+    st.markdown("### Import from Label Studio")
+    st.caption("Pulls completed annotations from Label Studio and saves them as ResponseReview rows.")
+    if st.button("📥 Import Reviews", type="primary", key="op_import"):
+        with st.spinner("Importing…"):
+            result = subprocess.run(
+                [sys.executable, "scripts/hitl_import_reviews.py"],
+                cwd=str(PROJECT_ROOT),
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+        if result.returncode == 0:
+            st.cache_data.clear()
+            st.success("Import complete.")
+            with st.expander("Script output"):
+                st.text(result.stdout or "(no output)")
+        else:
+            st.error("Import failed.")
+            st.text(result.stderr)
 
 
 def render_calibration_view() -> None:
@@ -1041,15 +1359,42 @@ def render_language_breakdown() -> None:
 def main() -> None:
     with st.sidebar:
         st.header("View")
-        view = st.radio(
-            "View",
-            ["Run Scorecard", "Provider Comparison", "Language Breakdown", "SME Calibration"],
-            label_visibility="collapsed",
-        )
+
+        unlocked  = st.session_state.get("operator_unlocked", False)
+        reporting = ["Run Scorecard", "Provider Comparison", "Language Breakdown", "SME Calibration"]
+        operator  = ["Run Evaluation", "Pack Management", "HITL Management"]
+        all_views = reporting + (operator if unlocked else [])
+
+        view = st.radio("View", all_views, label_visibility="collapsed")
+
         if st.button("🔄 Refresh", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
+
         st.divider()
+
+        if not unlocked:
+            st.caption("🔐 OPERATOR MODE")
+            pwd = st.text_input(
+                "operator_pwd", type="password",
+                placeholder="Enter operator password",
+                label_visibility="collapsed",
+                key="op_pwd_input",
+            )
+            if pwd:
+                from api.settings import get_settings
+                correct = get_settings().operator_password
+                if correct and pwd == correct:
+                    st.session_state["operator_unlocked"] = True
+                    st.rerun()
+                else:
+                    st.error("Incorrect password")
+        else:
+            st.success("🔓 Operator mode active")
+            if st.button("🔒 Lock", key="op_lock", use_container_width=True):
+                st.session_state["operator_unlocked"] = False
+                st.session_state.pop("op_active_run_id", None)
+                st.rerun()
 
     if view == "Provider Comparison":
         render_provider_comparison()
@@ -1057,6 +1402,12 @@ def main() -> None:
         render_language_breakdown()
     elif view == "SME Calibration":
         render_calibration_view()
+    elif view == "Run Evaluation":
+        render_run_evaluation()
+    elif view == "Pack Management":
+        render_pack_management()
+    elif view == "HITL Management":
+        render_hitl_management()
     else:
         render_run_scorecard()
 

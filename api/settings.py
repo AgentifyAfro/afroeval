@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     label_studio_url: str = "http://localhost:8080"
     label_studio_api_key: str = ""
 
+    # Operator console
+    operator_password: str = ""
+
     @property
     def is_production(self) -> bool:
         return self.afroeval_env == "production"
