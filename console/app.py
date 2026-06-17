@@ -590,6 +590,10 @@ def _render_calibration_detail(cal_df: pd.DataFrame) -> None:
 
 def _launch_run(name: str, provider: str, model_id: str, pack_ids: list) -> None:
     """Create Assessment + Run rows in DB, then kick off the eval in a daemon thread."""
+    # Force a fresh settings read so Streamlit Cloud secrets are always picked up.
+    from api.settings import get_settings
+    get_settings.cache_clear()
+
     assessment_id = uuid.uuid4()
     run_id_uuid   = uuid.uuid4()
 
