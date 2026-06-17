@@ -44,6 +44,18 @@ PROVIDER_SHORT = {
     "jsonl_upload": "Upload",
 }
 
+LANGUAGE_NAMES = {
+    "en":    "English (US)",
+    "sw":    "Swahili",
+    "yo":    "Yoruba",
+    "am":    "Amharic",
+    "ha":    "Hausa",
+    "om":    "Oromo",
+    "zu":    "Zulu",
+    "so":    "Somali",
+    "sheng": "Sheng",
+}
+
 # ── Page config ───────────────────────────────────────────────────────────────
 
 st.set_page_config(
@@ -297,6 +309,80 @@ def load_provider_comparison() -> list[dict]:
                 "dimension_weights": scorecard.dimension_weights or {},
             })
     return rows
+
+
+@st.cache_data(ttl=30)
+def load_language_breakdown(run_id_a: str, run_id_b: str) -> pd.DataFrame:
+    """
+    Aggregate MetricResult scores per language for two runs.
+    Returns one row per (language, run_id) with per-dimension means (0–100) and a composite.
+    """
+    engine = get_engine()
+    rows = []
+
+    for run_id_str in [run_id_a, run_id_b]:
+        with Session(engine) as session:
+            run = session.get(Run, uuid.UUID(run_id_str))
+            if not run:
+                continue
+            assessment   = session.get(Assessment, run.assessment_id)
+            model_label  = assessment.model_identifier if assessment else run_id_str[:8]
+            provider     = assessment.model_provider if assessment else ""
+
+            responses = session.exec(
+                select(ModelResponse).where(ModelResponse.run_id == uuid.UUID(run_id_str))
+            ).all()
+            if not responses:
+                continue
+
+            response_ids = [r.id for r in responses]
+            item_ids     = [r.item_id for r in responses]
+
+            items = session.exec(
+                select(BenchmarkItem).where(col(BenchmarkItem.id).in_(item_ids))
+            ).all()
+            item_map = {str(item.id): item for item in items}
+
+            metrics = session.exec(
+                select(MetricResult).where(col(MetricResult.response_id).in_(response_ids))
+            ).all()
+
+            resp_to_lang: dict[str, str] = {}
+            lang_counts:  dict[str, int] = {}
+            lang_dim_scores: dict[str, dict[str, list[float]]] = {}
+
+            for r in responses:
+                item = item_map.get(str(r.item_id))
+                lang = item.language if item else "unknown"
+                resp_to_lang[str(r.id)] = lang
+                lang_counts[lang] = lang_counts.get(lang, 0) + 1
+                if lang not in lang_dim_scores:
+                    lang_dim_scores[lang] = {dim: [] for dim in DIM_SHORT}
+
+            for m in metrics:
+                lang = resp_to_lang.get(str(m.response_id), "unknown")
+                if m.dimension in lang_dim_scores.get(lang, {}):
+                    lang_dim_scores[lang][m.dimension].append(m.score)
+
+            for lang, dim_data in lang_dim_scores.items():
+                row: dict = {
+                    "language":   lang,
+                    "model":      model_label,
+                    "provider":   provider,
+                    "run_id":     run_id_str,
+                    "item_count": lang_counts.get(lang, 0),
+                }
+                dim_means = []
+                for dim, short in DIM_SHORT.items():
+                    scores = dim_data[dim]
+                    mean   = round(sum(scores) / len(scores) * 100, 1) if scores else None
+                    row[short] = mean
+                    if mean is not None:
+                        dim_means.append(mean)
+                row["composite"] = round(sum(dim_means) / len(dim_means), 1) if dim_means else None
+                rows.append(row)
+
+    return pd.DataFrame(rows)
 
 
 # ── UI helpers ────────────────────────────────────────────────────────────────
@@ -807,12 +893,158 @@ def render_provider_comparison() -> None:
         st.dataframe(pd.DataFrame(hist_rows), use_container_width=True, hide_index=True)
 
 
+def render_language_breakdown() -> None:
+    st.title("🌍 AfroEval Scorecard™ Console")
+    st.subheader("Language Breakdown")
+    st.caption(
+        "Per-language aggregate scores across two evaluation runs. "
+        "English (US) is the high-resource baseline — the gap between EN and African "
+        "language scores quantifies the equity deficit the models need to close."
+    )
+
+    all_rows = load_provider_comparison()
+    if not all_rows:
+        st.info("No completed scorecards found. Run evaluations first.")
+        return
+
+    run_options:     dict[str, str] = {}
+    run_model_labels: dict[str, str] = {}
+    azure_labels:    list[str] = []
+    anthropic_labels: list[str] = []
+
+    for r in all_rows:
+        key = f"{r['name']} — {r['model_identifier']} ({r['completed_at'][:10]})"
+        if key in run_options:
+            continue
+        run_options[key]      = r["run_id"]
+        run_model_labels[key] = r["model_identifier"]
+        if r["model_provider"] == "azure_openai":
+            azure_labels.append(key)
+        elif r["model_provider"] == "anthropic":
+            anthropic_labels.append(key)
+
+    run_labels = list(run_options.keys())
+    default_a  = run_labels.index(azure_labels[0])    if azure_labels    else 0
+    default_b  = run_labels.index(anthropic_labels[0]) if anthropic_labels else min(1, len(run_labels) - 1)
+
+    col_a, col_b = st.columns(2)
+    with col_a:
+        sel_a = st.selectbox("Run A", run_labels, index=default_a, key="lb_run_a")
+    with col_b:
+        sel_b = st.selectbox("Run B", run_labels, index=default_b, key="lb_run_b")
+
+    run_id_a = run_options[sel_a]
+    run_id_b = run_options[sel_b]
+    label_a  = run_model_labels[sel_a]
+    label_b  = run_model_labels[sel_b]
+
+    with st.spinner("Aggregating per-language scores…"):
+        df = load_language_breakdown(run_id_a, run_id_b)
+
+    if df.empty:
+        st.info("No item-level data found for these runs.")
+        return
+
+    # EN first, then African languages alphabetically
+    langs = sorted(df["language"].unique(), key=lambda l: (l != "en", l))
+
+    # ── Composite score table ──────────────────────────────────────────────
+    st.subheader("Composite Score by Language")
+    st.caption("Composite = equal-weight average of all six evaluation dimensions (0–100).")
+
+    delta_col = f"Δ ({label_b}−{label_a})"
+    pivot_rows = []
+    for lang in langs:
+        sub_a   = df[(df["language"] == lang) & (df["run_id"] == run_id_a)]
+        sub_b   = df[(df["language"] == lang) & (df["run_id"] == run_id_b)]
+        score_a = sub_a["composite"].values[0] if not sub_a.empty else None
+        score_b = sub_b["composite"].values[0] if not sub_b.empty else None
+        delta   = round(score_b - score_a, 1) if score_a is not None and score_b is not None else None
+        sign    = "+" if delta is not None and delta >= 0 else ""
+        lang_label = f"⭐ {LANGUAGE_NAMES.get(lang, lang)} ({lang})" if lang == "en" \
+                     else f"{LANGUAGE_NAMES.get(lang, lang)} ({lang})"
+        pivot_rows.append({
+            "Language": lang_label,
+            label_a:    f"{score_a:.1f}" if score_a is not None else "—",
+            label_b:    f"{score_b:.1f}" if score_b is not None else "—",
+            delta_col:  f"{sign}{delta:.1f}" if delta is not None else "—",
+            "Items":    f"{int(sub_a['item_count'].values[0]) if not sub_a.empty else 0}"
+                        f" / {int(sub_b['item_count'].values[0]) if not sub_b.empty else 0}",
+        })
+
+    st.dataframe(
+        pd.DataFrame(pivot_rows),
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Language": st.column_config.TextColumn("Language"),
+            label_a:    st.column_config.TextColumn(label_a, width="small"),
+            label_b:    st.column_config.TextColumn(label_b, width="small"),
+            delta_col:  st.column_config.TextColumn("Δ (B−A)", width="small"),
+            "Items":    st.column_config.TextColumn("Items (A/B)", width="small"),
+        },
+    )
+
+    # ── EN baseline gap ────────────────────────────────────────────────────
+    en_a_row = df[(df["language"] == "en") & (df["run_id"] == run_id_a)]
+    en_b_row = df[(df["language"] == "en") & (df["run_id"] == run_id_b)]
+    if not en_a_row.empty and not en_b_row.empty:
+        en_a = en_a_row["composite"].values[0]
+        en_b = en_b_row["composite"].values[0]
+        if en_a is not None and en_b is not None:
+            african_langs = [l for l in langs if l != "en"]
+            gaps_a, gaps_b = [], []
+            for lang in african_langs:
+                sa = df[(df["language"] == lang) & (df["run_id"] == run_id_a)]
+                sb = df[(df["language"] == lang) & (df["run_id"] == run_id_b)]
+                if not sa.empty and sa["composite"].values[0] is not None:
+                    gaps_a.append(en_a - sa["composite"].values[0])
+                if not sb.empty and sb["composite"].values[0] is not None:
+                    gaps_b.append(en_b - sb["composite"].values[0])
+
+            avg_gap_a = round(sum(gaps_a) / len(gaps_a), 1) if gaps_a else None
+            avg_gap_b = round(sum(gaps_b) / len(gaps_b), 1) if gaps_b else None
+
+            st.divider()
+            st.subheader("EN Baseline Gap")
+            st.caption(
+                "Points by which each model's EN score exceeds its mean African-language score. "
+                "A larger gap signals greater language-equity risk."
+            )
+            gc1, gc2 = st.columns(2)
+            with gc1:
+                st.metric(label_a, f"{avg_gap_a:+.1f} pts" if avg_gap_a is not None else "—")
+            with gc2:
+                st.metric(label_b, f"{avg_gap_b:+.1f} pts" if avg_gap_b is not None else "—")
+
+    # ── Dimension detail ───────────────────────────────────────────────────
+    st.divider()
+    with st.expander("Dimension breakdown per language"):
+        for dim, short in DIM_SHORT.items():
+            st.markdown(f"**{dim.replace('_', ' ').title()}**")
+            dim_rows = []
+            for lang in langs:
+                sa = df[(df["language"] == lang) & (df["run_id"] == run_id_a)]
+                sb = df[(df["language"] == lang) & (df["run_id"] == run_id_b)]
+                score_a = sa[short].values[0] if not sa.empty else None
+                score_b = sb[short].values[0] if not sb.empty else None
+                delta   = round(score_b - score_a, 1) if score_a is not None and score_b is not None else None
+                sign    = "+" if delta is not None and delta >= 0 else ""
+                dim_rows.append({
+                    "Language": LANGUAGE_NAMES.get(lang, lang),
+                    label_a:    f"{score_a:.1f}" if score_a is not None else "—",
+                    label_b:    f"{score_b:.1f}" if score_b is not None else "—",
+                    "Δ":        f"{sign}{delta:.1f}" if delta is not None else "—",
+                })
+            st.dataframe(pd.DataFrame(dim_rows), use_container_width=True, hide_index=True)
+
+
 def main() -> None:
     with st.sidebar:
         st.header("View")
         view = st.radio(
             "View",
-            ["Run Scorecard", "Provider Comparison", "SME Calibration"],
+            ["Run Scorecard", "Provider Comparison", "Language Breakdown", "SME Calibration"],
             label_visibility="collapsed",
         )
         if st.button("🔄 Refresh", use_container_width=True):
@@ -822,6 +1054,8 @@ def main() -> None:
 
     if view == "Provider Comparison":
         render_provider_comparison()
+    elif view == "Language Breakdown":
+        render_language_breakdown()
     elif view == "SME Calibration":
         render_calibration_view()
     else:
