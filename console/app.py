@@ -64,10 +64,14 @@ st.set_page_config(
     layout="wide",
 )
 
-# Hide GitHub and edit links by targeting only anchors pointing to this repo.
-# Sidebar toggle is a <button>, not an <a>, so it is unaffected.
+# Hide the Streamlit Cloud viewer action buttons (GitHub, edit, share, star, three-dot).
+# stToolbarActions is the Cloud-specific container; sidebar toggle lives elsewhere.
 st.markdown(
-    '<style>a[href*="github.com/AgentifyAfro"] { display: none !important; }</style>',
+    """
+    <style>
+    [data-testid="stToolbarActions"] { display: none !important; }
+    </style>
+    """,
     unsafe_allow_html=True,
 )
 
