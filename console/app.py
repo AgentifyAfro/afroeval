@@ -65,13 +65,17 @@ st.set_page_config(
 )
 
 # Hide the Streamlit Cloud viewer toolbar (GitHub link, edit button, share icons).
-# These are platform-level controls injected into the page header — not part of the app UI.
+# display:none on the full header also kills the sidebar toggle, so we target
+# only the toolbar div and any anchor tags inside the header instead.
 st.markdown(
     """
     <style>
-    header[data-testid="stHeader"] { display: none !important; }
-    .stMainBlockContainer { padding-top: 1rem !important; }
-    .block-container { padding-top: 1rem !important; }
+    header[data-testid="stHeader"] {
+        background: transparent !important;
+        border-bottom: none !important;
+    }
+    [data-testid="stToolbar"] { display: none !important; }
+    header[data-testid="stHeader"] a { display: none !important; }
     </style>
     """,
     unsafe_allow_html=True,
