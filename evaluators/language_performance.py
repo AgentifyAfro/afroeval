@@ -17,9 +17,17 @@ from __future__ import annotations
 
 import functools
 
-from deepeval.metrics import AnswerRelevancyMetric, GEval
-from deepeval.models import DeepEvalBaseLLM
-from deepeval.test_case import LLMTestCase, SingleTurnParams
+try:
+    from deepeval.metrics import AnswerRelevancyMetric, GEval
+    from deepeval.models import DeepEvalBaseLLM
+    from deepeval.test_case import LLMTestCase, SingleTurnParams
+except ImportError:
+    class DeepEvalBaseLLM:  # stub so type annotations resolve when deepeval is absent
+        pass
+    AnswerRelevancyMetric = None
+    GEval = None
+    LLMTestCase = None
+    SingleTurnParams = None
 
 from evaluators.base import BaseEvaluator, MetricOutput
 from evaluators.llm_judge import LLMJudge

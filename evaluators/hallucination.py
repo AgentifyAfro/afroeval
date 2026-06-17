@@ -17,9 +17,15 @@ The methodology doc originally named Ragas FaithfulnessMetric for this; Ragas
 so DeepEval's equivalent metric is used instead — same concept, no broken dep.
 """
 
-from deepeval.metrics import FaithfulnessMetric
-from deepeval.models import DeepEvalBaseLLM
-from deepeval.test_case import LLMTestCase
+try:
+    from deepeval.metrics import FaithfulnessMetric
+    from deepeval.models import DeepEvalBaseLLM
+    from deepeval.test_case import LLMTestCase
+except ImportError:
+    class DeepEvalBaseLLM:  # stub so type annotations resolve when deepeval is absent
+        pass
+    FaithfulnessMetric = None
+    LLMTestCase = None
 
 from evaluators.base import BaseEvaluator, MetricOutput
 

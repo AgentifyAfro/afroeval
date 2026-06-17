@@ -89,7 +89,11 @@ def _build_judge(cfg):
 
 def _build_deepeval_model(cfg):
     """Build the Azure-backed DeepEval model for AnswerRelevancy/GEval/Faithfulness. None if not configured."""
-    from deepeval.models import AzureOpenAIModel
+    try:
+        from deepeval.models import AzureOpenAIModel
+    except ImportError:
+        logger.warning("deepeval not installed — DeepEval-backed evaluators will use stub fallback")
+        return None
 
     if cfg.ail_judge_provider == "azure_openai" and cfg.azure_openai_api_key:
         return AzureOpenAIModel(
