@@ -64,6 +64,13 @@ st.set_page_config(
     layout="wide",
 )
 
+# Hide GitHub and edit links by targeting only anchors pointing to this repo.
+# Sidebar toggle is a <button>, not an <a>, so it is unaffected.
+st.markdown(
+    '<style>a[href*="github.com/AgentifyAfro"] { display: none !important; }</style>',
+    unsafe_allow_html=True,
+)
+
 
 # ── Cached data loaders ───────────────────────────────────────────────────────
 
