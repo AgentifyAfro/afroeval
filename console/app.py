@@ -708,6 +708,20 @@ def render_run_evaluation() -> None:
         _render_active_run(active)
         return
 
+    # ── Credential check ──────────────────────────────────────────────────
+    with st.expander("🔍 Check credentials (debug)"):
+        if st.button("Read settings now", key="op_cred_check"):
+            from api.settings import get_settings
+            get_settings.cache_clear()
+            s = get_settings()
+            st.json({
+                "azure_openai_api_key":       "✅ set" if s.azure_openai_api_key       else "❌ empty",
+                "azure_openai_endpoint":      "✅ set" if s.azure_openai_endpoint      else "❌ empty",
+                "azure_openai_deployment":    s.azure_openai_deployment_name           or "❌ empty",
+                "anthropic_api_key":          "✅ set" if s.anthropic_api_key          else "❌ empty",
+                "database_url":               "✅ set" if s.database_url               else "❌ empty",
+            })
+
     # ── Pack selection ────────────────────────────────────────────────────
     st.markdown("**Select Benchmark Packs**")
     btn1, btn2 = st.columns([1, 1])
