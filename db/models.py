@@ -53,6 +53,7 @@ class AnchorLanguage(str, enum.Enum):
     SHENG = "sheng"   # Nairobi code-switch variety
     OROMO = "om"      # Afaan Oromoo — Oromia (Ethiopia/Kenya)
     SOMALI = "so"     # Af Soomaali — Somalia/Djibouti/Horn of Africa
+    ENGLISH = "en"    # US English — high-resource baseline for comparative evaluation
 
 
 # ── Benchmark models ──────────────────────────────────────────────────────────
