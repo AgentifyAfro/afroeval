@@ -11,6 +11,7 @@ Run:
 import json
 import sys
 import uuid
+from collections import defaultdict
 from pathlib import Path
 
 import pandas as pd
@@ -33,6 +34,14 @@ DIM_SHORT = {
     "bias_fairness":            "BF",
     "code_switching_quality":   "CS",
     "safety_robustness":        "SR",
+}
+
+PROVIDER_SHORT = {
+    "azure_openai": "Azure",
+    "openai":       "OpenAI",
+    "anthropic":    "Anthropic",
+    "gemini":       "Gemini",
+    "jsonl_upload": "Upload",
 }
 
 # ── Page config ───────────────────────────────────────────────────────────────
@@ -241,6 +250,42 @@ def load_calibration_data() -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+@st.cache_data(ttl=30)
+def load_provider_comparison() -> list[dict]:
+    """All completed scorecards with assessment metadata, grouped for cross-provider comparison."""
+    engine = get_engine()
+    rows = []
+    with Session(engine) as session:
+        runs = session.exec(
+            select(Run).where(Run.status == "completed").order_by(Run.created_at.desc())
+        ).all()
+        for run in runs:
+            scorecard = session.exec(
+                select(Scorecard).where(Scorecard.run_id == run.id)
+            ).first()
+            if not scorecard:
+                continue
+            assessment = session.get(Assessment, run.assessment_id)
+            if not assessment:
+                continue
+            pack_ids = sorted(assessment.benchmark_pack_ids or [])
+            rows.append({
+                "run_id":           str(run.id),
+                "name":             assessment.name,
+                "model_provider":   assessment.model_provider,
+                "model_identifier": assessment.model_identifier,
+                "pack_ids":         pack_ids,
+                "pack_label":       " + ".join(pack_ids) if pack_ids else "(no packs)",
+                "completed_at":     run.completed_at.strftime("%Y-%m-%d %H:%M UTC") if run.completed_at else "",
+                "composite_score":  scorecard.composite_score,
+                "verdict":          scorecard.verdict,
+                "confidence_flag":  scorecard.confidence_flag,
+                "dimension_scores": scorecard.dimension_scores or {},
+                "dimension_weights": scorecard.dimension_weights or {},
+            })
+    return rows
+
+
 # ── UI helpers ────────────────────────────────────────────────────────────────
 
 def _verdict_badge(verdict: str) -> str:
@@ -261,6 +306,48 @@ def _render_remediation(roadmap: list[dict]) -> None:
         with st.expander(f"{priority_icon.get(p, '⚪')} [{p.upper()}] {dim}"):
             st.write(item.get("recommendation", ""))
             st.caption(f"Estimated effort: {item.get('estimated_effort', 'unknown')}")
+
+
+def _provider_short(provider: str) -> str:
+    return PROVIDER_SHORT.get(provider, provider)
+
+
+def _render_comparison_insight(row_a: dict, row_b: dict, dims: list[str]) -> None:
+    delta = row_b["composite_score"] - row_a["composite_score"]
+    winner = row_b if delta >= 0 else row_a
+    loser  = row_a if delta >= 0 else row_b
+    abs_delta = abs(delta)
+
+    if abs_delta < 2.0:
+        st.info(
+            "Composite scores are within 2 points — providers perform similarly on these packs. "
+            "Check dimension-level deltas for more nuance."
+        )
+        return
+
+    gains: list[tuple[str, float]] = []
+    for dim in dims:
+        d = row_b["dimension_scores"].get(dim, 0) - row_a["dimension_scores"].get(dim, 0)
+        if abs(d) >= 3.0:
+            gains.append((dim, d))
+    gains.sort(key=lambda x: abs(x[1]), reverse=True)
+
+    parts = [
+        f"**{_provider_short(winner['model_provider'])} ({winner['model_identifier']})** "
+        f"scores **{abs_delta:.1f} points higher** than "
+        f"**{_provider_short(loser['model_provider'])} ({loser['model_identifier']})**."
+    ]
+    if gains:
+        top_strs = []
+        for dim, d in gains[:3]:
+            sign = "+" if d >= 0 else ""
+            top_strs.append(f"{dim.replace('_', ' ').title()} ({sign}{d:.1f})")
+        parts.append(f"Largest dimension gaps: {', '.join(top_strs)}.")
+    parts.append(
+        f"**Recommendation:** For this pack combination, routing to "
+        f"**{_provider_short(winner['model_provider'])}** yields better results."
+    )
+    st.markdown("  \n\n".join(parts))
 
 
 def _agreement_badge(mean_delta: float) -> str:
@@ -571,18 +658,158 @@ def render_run_scorecard() -> None:
     _render_remediation(selected["remediation_roadmap"])
 
 
+def render_provider_comparison() -> None:
+    st.title("🌍 AfroEval Scorecard™ Console")
+    st.subheader("Provider Comparison")
+    st.caption(
+        "Side-by-side scorecard results across model providers running the same benchmark packs. "
+        "Validates routing decisions — e.g., whether Anthropic outperforms Azure on Oromo/Somali content."
+    )
+
+    with st.spinner("Loading scorecards…"):
+        all_rows = load_provider_comparison()
+
+    if not all_rows:
+        st.info("No completed scorecards found. Run evaluations first.")
+        return
+
+    by_packs: dict[str, list[dict]] = defaultdict(list)
+    for row in all_rows:
+        by_packs[row["pack_label"]].append(row)
+
+    pack_options = sorted(by_packs.keys())
+    selected_label = st.selectbox(
+        "Benchmark Pack Combination",
+        pack_options,
+        help="Select which pack(s) to compare across providers",
+    )
+
+    group = by_packs[selected_label]
+
+    # Latest completed run per provider (list is newest-first from query)
+    latest: dict[str, dict] = {}
+    for row in group:
+        if row["model_provider"] not in latest:
+            latest[row["model_provider"]] = row
+
+    providers = sorted(latest.keys())
+
+    if len(providers) < 2:
+        st.warning(
+            f"Only **{_provider_short(providers[0])}** has run against these packs. "
+            "Run the same packs with a second provider to enable comparison."
+        )
+        row = latest[providers[0]]
+        st.metric(row["model_identifier"], f"{row['composite_score']:.1f} / 100")
+        st.caption(_verdict_badge(row["verdict"]))
+        return
+
+    # ── Composite score header ──────────────────────────────────────────
+    st.subheader("Composite Scores")
+    hcols = st.columns(len(providers) + (1 if len(providers) == 2 else 0))
+    scores: dict[str, float] = {}
+
+    for i, prov in enumerate(providers):
+        row = latest[prov]
+        scores[prov] = row["composite_score"]
+        with hcols[i]:
+            st.metric(
+                label=f"{_provider_short(prov)} — {row['model_identifier']}",
+                value=f"{row['composite_score']:.1f} / 100",
+                help=f"Run: {row['run_id'][:8]}… | Completed: {row['completed_at']} | Confidence: {row['confidence_flag']}",
+            )
+            st.caption(_verdict_badge(row["verdict"]))
+
+    if len(providers) == 2:
+        p0, p1 = providers[0], providers[1]
+        delta = scores[p1] - scores[p0]
+        sign = "+" if delta >= 0 else ""
+        with hcols[-1]:
+            st.metric(
+                label=f"Δ ({_provider_short(p1)} − {_provider_short(p0)})",
+                value=f"{sign}{delta:.1f}",
+                delta=f"{sign}{delta:.1f}",
+                delta_color="normal" if delta >= 0 else "inverse",
+            )
+
+    st.divider()
+
+    # ── Dimension breakdown table ───────────────────────────────────────
+    st.subheader("Dimension Breakdown")
+
+    all_dims: set[str] = set()
+    for row in latest.values():
+        all_dims.update(row["dimension_scores"].keys())
+
+    ref_weights = latest[providers[0]]["dimension_weights"]
+    dims_sorted = sorted(all_dims, key=lambda d: ref_weights.get(d, 0), reverse=True)
+
+    table_rows = []
+    for dim in dims_sorted:
+        weight = ref_weights.get(dim, 0)
+        r: dict = {"Dimension": f"{dim.replace('_', ' ').title()} ({weight:.0%})"}
+        dim_scores: list[tuple[str, float]] = []
+        for prov in providers:
+            score = latest[prov]["dimension_scores"].get(dim)
+            r[_provider_short(prov)] = f"{score:.1f}" if score is not None else "—"
+            if score is not None:
+                dim_scores.append((prov, score))
+        if len(dim_scores) == 2:
+            d = dim_scores[1][1] - dim_scores[0][1]
+            sign = "+" if d >= 0 else ""
+            r["Δ"] = f"{sign}{d:.1f}"
+        else:
+            r["Δ"] = "—"
+        table_rows.append(r)
+
+    col_cfg: dict = {"Dimension": st.column_config.TextColumn("Dimension"), "Δ": st.column_config.TextColumn("Δ", width="small")}
+    for prov in providers:
+        col_cfg[_provider_short(prov)] = st.column_config.TextColumn(_provider_short(prov), width="small")
+
+    st.dataframe(
+        pd.DataFrame(table_rows),
+        use_container_width=True,
+        hide_index=True,
+        column_config=col_cfg,
+    )
+
+    # ── Interpretation ──────────────────────────────────────────────────
+    if len(providers) == 2:
+        st.divider()
+        st.subheader("Interpretation")
+        _render_comparison_insight(latest[providers[0]], latest[providers[1]], dims_sorted)
+
+    st.divider()
+
+    # ── Run history ─────────────────────────────────────────────────────
+    with st.expander(f"All runs against these packs ({len(group)} total)"):
+        hist_rows = [{
+            "Provider": _provider_short(r["model_provider"]),
+            "Model":    r["model_identifier"],
+            "Score":    f"{r['composite_score']:.1f}",
+            "Verdict":  _verdict_badge(r["verdict"]),
+            "Completed": r["completed_at"],
+            "Run ID":   r["run_id"][:8] + "…",
+        } for r in group]
+        st.dataframe(pd.DataFrame(hist_rows), use_container_width=True, hide_index=True)
+
+
 def main() -> None:
     with st.sidebar:
         st.header("View")
         view = st.radio(
-            "View", ["Run Scorecard", "SME Calibration"], label_visibility="collapsed"
+            "View",
+            ["Run Scorecard", "Provider Comparison", "SME Calibration"],
+            label_visibility="collapsed",
         )
         if st.button("🔄 Refresh", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
         st.divider()
 
-    if view == "SME Calibration":
+    if view == "Provider Comparison":
+        render_provider_comparison()
+    elif view == "SME Calibration":
         render_calibration_view()
     else:
         render_run_scorecard()
