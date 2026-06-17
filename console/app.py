@@ -52,6 +52,19 @@ st.set_page_config(
     layout="wide",
 )
 
+# Hide the Streamlit Cloud viewer toolbar (GitHub link, edit button, share icons).
+# These are platform-level controls injected into the page header — not part of the app UI.
+st.markdown(
+    """
+    <style>
+    header[data-testid="stHeader"] { display: none !important; }
+    .stMainBlockContainer { padding-top: 1rem !important; }
+    .block-container { padding-top: 1rem !important; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 # ── Cached data loaders ───────────────────────────────────────────────────────
 
 @st.cache_data(ttl=60)
