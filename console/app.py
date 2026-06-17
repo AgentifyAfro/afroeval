@@ -732,6 +732,11 @@ def render_run_evaluation() -> None:
 
     # ── Model configuration ───────────────────────────────────────────────
     st.markdown("**Model Configuration**")
+
+    def _sync_model_id() -> None:
+        prov = st.session_state.get("op_provider", "azure_openai")
+        st.session_state["op_model_id"] = PROVIDER_MODEL_DEFAULTS.get(prov, "")
+
     mc1, mc2 = st.columns(2)
     with mc1:
         provider = st.selectbox(
@@ -739,11 +744,13 @@ def render_run_evaluation() -> None:
             ["azure_openai", "anthropic", "openai"],
             format_func=lambda v: PROVIDER_SHORT.get(v, v),
             key="op_provider",
+            on_change=_sync_model_id,
         )
     with mc2:
+        if "op_model_id" not in st.session_state:
+            st.session_state["op_model_id"] = PROVIDER_MODEL_DEFAULTS.get(provider, "gpt-4.1-mini")
         model_id = st.text_input(
             "Model Identifier",
-            value=PROVIDER_MODEL_DEFAULTS.get(st.session_state.get("op_provider", "azure_openai"), "gpt-4.1-mini"),
             key="op_model_id",
         )
 

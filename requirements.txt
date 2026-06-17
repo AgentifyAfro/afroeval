@@ -4,3 +4,5 @@ sqlmodel==0.0.38
 psycopg2-binary==2.9.12
 pydantic-settings==2.14.1
 structlog==24.4.0
+openai==2.41.1
+anthropic==0.109.1
