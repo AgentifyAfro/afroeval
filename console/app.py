@@ -433,75 +433,86 @@ def load_provider_comparison() -> list[dict]:
 
 
 @st.cache_data(ttl=30)
-def load_language_breakdown(run_id_a: str, run_id_b: str) -> pd.DataFrame:
+def load_language_breakdown(run_ids_a: tuple[str, ...], run_ids_b: tuple[str, ...]) -> pd.DataFrame:
     """
-    Aggregate MetricResult scores per language for two runs.
-    Returns one row per (language, run_id) with per-dimension means (0–100) and a composite.
+    Aggregate MetricResult scores per language across ALL runs for two models.
+    Returns one row per (language, model-group) with per-dimension means (0–100) and a composite.
+    The first run_id in each tuple is stored as the row key so downstream _get lookups work.
     """
     engine = get_engine()
     rows = []
 
-    for run_id_str in [run_id_a, run_id_b]:
-        with Session(engine) as session:
-            run = session.get(Run, uuid.UUID(run_id_str))
-            if not run:
-                continue
-            assessment   = session.get(Assessment, run.assessment_id)
-            model_label  = assessment.model_identifier if assessment else run_id_str[:8]
-            provider     = assessment.model_provider if assessment else ""
+    for group_run_ids in [run_ids_a, run_ids_b]:
+        if not group_run_ids:
+            continue
 
-            responses = session.exec(
-                select(ModelResponse).where(ModelResponse.run_id == uuid.UUID(run_id_str))
-            ).all()
-            if not responses:
-                continue
+        model_label: str | None = None
+        provider: str = ""
+        lang_counts:    dict[str, int]                  = {}
+        lang_dim_scores: dict[str, dict[str, list[float]]] = {}
 
-            response_ids = [r.id for r in responses]
-            item_ids     = [r.item_id for r in responses]
+        for run_id_str in group_run_ids:
+            with Session(engine) as session:
+                run = session.get(Run, uuid.UUID(run_id_str))
+                if not run:
+                    continue
+                assessment = session.get(Assessment, run.assessment_id)
+                if model_label is None:
+                    model_label = assessment.model_identifier if assessment else run_id_str[:8]
+                    provider    = assessment.model_provider if assessment else ""
 
-            items = session.exec(
-                select(BenchmarkItem).where(col(BenchmarkItem.id).in_(item_ids))
-            ).all()
-            item_map = {str(item.id): item for item in items}
+                responses = session.exec(
+                    select(ModelResponse).where(ModelResponse.run_id == uuid.UUID(run_id_str))
+                ).all()
+                if not responses:
+                    continue
 
-            metrics = session.exec(
-                select(MetricResult).where(col(MetricResult.response_id).in_(response_ids))
-            ).all()
+                response_ids = [r.id for r in responses]
+                item_ids     = [r.item_id for r in responses]
 
-            resp_to_lang: dict[str, str] = {}
-            lang_counts:  dict[str, int] = {}
-            lang_dim_scores: dict[str, dict[str, list[float]]] = {}
+                items = session.exec(
+                    select(BenchmarkItem).where(col(BenchmarkItem.id).in_(item_ids))
+                ).all()
+                item_map = {str(item.id): item for item in items}
 
-            for r in responses:
-                item = item_map.get(str(r.item_id))
-                lang = item.language if item else "unknown"
-                resp_to_lang[str(r.id)] = lang
-                lang_counts[lang] = lang_counts.get(lang, 0) + 1
-                if lang not in lang_dim_scores:
-                    lang_dim_scores[lang] = {dim: [] for dim in DIM_SHORT}
+                metrics = session.exec(
+                    select(MetricResult).where(col(MetricResult.response_id).in_(response_ids))
+                ).all()
 
-            for m in metrics:
-                lang = resp_to_lang.get(str(m.response_id), "unknown")
-                if m.dimension in lang_dim_scores.get(lang, {}):
-                    lang_dim_scores[lang][m.dimension].append(m.score)
+                resp_to_lang: dict[str, str] = {}
+                for r in responses:
+                    item = item_map.get(str(r.item_id))
+                    lang = item.language if item else "unknown"
+                    resp_to_lang[str(r.id)] = lang
+                    lang_counts[lang] = lang_counts.get(lang, 0) + 1
+                    if lang not in lang_dim_scores:
+                        lang_dim_scores[lang] = {dim: [] for dim in DIM_SHORT}
 
-            for lang, dim_data in lang_dim_scores.items():
-                row: dict = {
-                    "language":   lang,
-                    "model":      model_label,
-                    "provider":   provider,
-                    "run_id":     run_id_str,
-                    "item_count": lang_counts.get(lang, 0),
-                }
-                dim_means = []
-                for dim, short in DIM_SHORT.items():
-                    scores = dim_data[dim]
-                    mean   = round(sum(scores) / len(scores) * 100, 1) if scores else None
-                    row[short] = mean
-                    if mean is not None:
-                        dim_means.append(mean)
-                row["composite"] = round(sum(dim_means) / len(dim_means), 1) if dim_means else None
-                rows.append(row)
+                for m in metrics:
+                    lang = resp_to_lang.get(str(m.response_id), "unknown")
+                    if m.dimension in lang_dim_scores.get(lang, {}):
+                        lang_dim_scores[lang][m.dimension].append(m.score)
+
+        # Use the most-recent run_id (group_run_ids[0]) as the row key so that
+        # _get(lang, run_id_a, col) lookups in render_language_breakdown resolve correctly.
+        key_run_id = group_run_ids[0]
+        for lang, dim_data in lang_dim_scores.items():
+            row: dict = {
+                "language":   lang,
+                "model":      model_label or "unknown",
+                "provider":   provider,
+                "run_id":     key_run_id,
+                "item_count": lang_counts.get(lang, 0),
+            }
+            dim_means = []
+            for dim, short in DIM_SHORT.items():
+                scores = dim_data[dim]
+                mean   = round(sum(scores) / len(scores) * 100, 1) if scores else None
+                row[short] = mean
+                if mean is not None:
+                    dim_means.append(mean)
+            row["composite"] = round(sum(dim_means) / len(dim_means), 1) if dim_means else None
+            rows.append(row)
 
     return pd.DataFrame(rows)
 
@@ -1371,14 +1382,15 @@ def render_language_breakdown() -> None:
         st.info("No completed scorecards found. Run evaluations first.")
         return
 
-    # ── Build model → most-recent-run map ─────────────────────────────────
-    model_run_map: dict[str, str] = {}
+    # ── Build model → all run ids map (most-recent first) ──────────────────
+    model_run_ids: dict[str, list[str]] = {}
     for r in sorted(all_rows, key=lambda x: x["completed_at"], reverse=True):
         mid = r["model_identifier"]
-        if mid not in model_run_map:
-            model_run_map[mid] = r["run_id"]
+        if mid not in model_run_ids:
+            model_run_ids[mid] = []
+        model_run_ids[mid].append(r["run_id"])
 
-    model_ids = list(model_run_map.keys())
+    model_ids = list(model_run_ids.keys())
     if not model_ids:
         st.info("No completed runs found.")
         return
@@ -1394,11 +1406,13 @@ def render_language_breakdown() -> None:
 
     model_b    = sel_b if sel_b != "(none)" and sel_b != model_a else None
     two_models = model_b is not None
-    run_id_a   = model_run_map[model_a]
-    run_id_b   = model_run_map[model_b] if two_models else run_id_a
+    run_ids_a  = tuple(model_run_ids[model_a])
+    run_ids_b  = tuple(model_run_ids[model_b]) if two_models else run_ids_a
+    run_id_a   = run_ids_a[0]   # most-recent run — used as DataFrame lookup key
+    run_id_b   = run_ids_b[0]
 
     with st.spinner("Aggregating per-language scores…"):
-        df = load_language_breakdown(run_id_a, run_id_b)
+        df = load_language_breakdown(run_ids_a, run_ids_b)
 
     if df.empty:
         st.info("No item-level data found for these models.")
