@@ -696,6 +696,7 @@ def _render_active_run(run_id: str) -> None:
         col_view, col_new, _ = st.columns([1, 1, 2])
         with col_view:
             if st.button("View Scorecard", key="op_view_sc"):
+                st.session_state["nav_view"] = "Run Scorecard"
                 del st.session_state["op_active_run_id"]
                 st.rerun()
         with col_new:
@@ -1417,7 +1418,7 @@ def main() -> None:
         operator  = ["Run Evaluation", "Pack Management", "HITL Management"]
         all_views = reporting + (operator if unlocked else [])
 
-        view = st.radio("View", all_views, label_visibility="collapsed")
+        view = st.radio("View", all_views, label_visibility="collapsed", key="nav_view")
 
         if st.button("🔄 Refresh", use_container_width=True):
             st.cache_data.clear()
