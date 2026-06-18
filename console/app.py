@@ -1348,9 +1348,9 @@ def render_language_breakdown() -> None:
     st.title("🌍 AfroEval Scorecard™ Console")
     st.subheader("Language Comparison")
     st.caption(
-        "Per-language aggregate scores across two evaluation runs. "
-        "English (US) is the high-resource baseline — the gap between EN and African "
-        "language scores quantifies the equity deficit the models need to close."
+        "Per-language aggregate scores across evaluation runs. English (US) is the "
+        "high-resource baseline — the gap between EN and African language scores "
+        "quantifies the equity deficit each model needs to close."
     )
 
     all_rows = load_provider_comparison()
@@ -1358,117 +1358,157 @@ def render_language_breakdown() -> None:
         st.info("No completed scorecards found. Run evaluations first.")
         return
 
-    run_options:     dict[str, str] = {}
-    run_model_labels: dict[str, str] = {}
-    azure_labels:    list[str] = []
-    anthropic_labels: list[str] = []
+    # ── Build model → most-recent-run map ─────────────────────────────────
+    model_run_map: dict[str, str] = {}
+    for r in sorted(all_rows, key=lambda x: x["completed_at"], reverse=True):
+        mid = r["model_identifier"]
+        if mid not in model_run_map:
+            model_run_map[mid] = r["run_id"]
 
-    for r in all_rows:
-        key = f"{r['name']} — {r['model_identifier']} ({r['completed_at'][:10]})"
-        if key in run_options:
-            continue
-        run_options[key]      = r["run_id"]
-        run_model_labels[key] = r["model_identifier"]
-        if r["model_provider"] == "azure_openai":
-            azure_labels.append(key)
-        elif r["model_provider"] == "anthropic":
-            anthropic_labels.append(key)
+    model_ids = list(model_run_map.keys())
+    if not model_ids:
+        st.info("No completed runs found.")
+        return
 
-    run_labels = list(run_options.keys())
-    default_a  = run_labels.index(azure_labels[0])    if azure_labels    else 0
-    default_b  = run_labels.index(anthropic_labels[0]) if anthropic_labels else min(1, len(run_labels) - 1)
-
+    # ── Model pickers ──────────────────────────────────────────────────────
     col_a, col_b = st.columns(2)
     with col_a:
-        sel_a = st.selectbox("Run A", run_labels, index=default_a, key="lb_run_a")
+        model_a = st.selectbox("Model A", model_ids, index=0, key="lc_model_a")
     with col_b:
-        sel_b = st.selectbox("Run B", run_labels, index=default_b, key="lb_run_b")
+        b_opts = ["(none)"] + model_ids
+        default_b_idx = 1 if len(model_ids) > 1 else 0
+        sel_b = st.selectbox("Model B (optional)", b_opts, index=default_b_idx, key="lc_model_b")
 
-    run_id_a = run_options[sel_a]
-    run_id_b = run_options[sel_b]
-    label_a  = run_model_labels[sel_a]
-    label_b  = run_model_labels[sel_b]
+    model_b    = sel_b if sel_b != "(none)" and sel_b != model_a else None
+    two_models = model_b is not None
+    run_id_a   = model_run_map[model_a]
+    run_id_b   = model_run_map[model_b] if two_models else run_id_a
 
     with st.spinner("Aggregating per-language scores…"):
         df = load_language_breakdown(run_id_a, run_id_b)
 
     if df.empty:
-        st.info("No item-level data found for these runs.")
+        st.info("No item-level data found for these models.")
         return
 
-    # EN first, then African languages alphabetically
     langs = sorted(df["language"].unique(), key=lambda l: (l != "en", l))
 
-    # ── Composite score table ──────────────────────────────────────────────
+    def _get(lang: str, run_id: str, col: str):
+        sub = df[(df["language"] == lang) & (df["run_id"] == run_id)]
+        if sub.empty:
+            return None
+        val = sub[col].values[0]
+        return float(val) if val is not None else None
+
+    # ── Table 1: Composite Score by Language × Model ───────────────────────
     st.subheader("Composite Score by Language")
-    st.caption("Composite = equal-weight average of all six evaluation dimensions (0–100).")
-
-    delta_col = f"Δ ({label_b}−{label_a})"
-    pivot_rows = []
-    for lang in langs:
-        sub_a   = df[(df["language"] == lang) & (df["run_id"] == run_id_a)]
-        sub_b   = df[(df["language"] == lang) & (df["run_id"] == run_id_b)]
-        score_a = sub_a["composite"].values[0] if not sub_a.empty else None
-        score_b = sub_b["composite"].values[0] if not sub_b.empty else None
-        delta   = round(score_b - score_a, 1) if score_a is not None and score_b is not None else None
-        sign    = "+" if delta is not None and delta >= 0 else ""
-        lang_label = f"⭐ {LANGUAGE_NAMES.get(lang, lang)} ({lang})" if lang == "en" \
-                     else f"{LANGUAGE_NAMES.get(lang, lang)} ({lang})"
-        pivot_rows.append({
-            "Language": lang_label,
-            label_a:    f"{score_a:.1f}" if score_a is not None else "—",
-            label_b:    f"{score_b:.1f}" if score_b is not None else "—",
-            delta_col:  f"{sign}{delta:.1f}" if delta is not None else "—",
-            "Items":    f"{int(sub_a['item_count'].values[0]) if not sub_a.empty else 0}"
-                        f" / {int(sub_b['item_count'].values[0]) if not sub_b.empty else 0}",
-        })
-
-    st.dataframe(
-        pd.DataFrame(pivot_rows),
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "Language": st.column_config.TextColumn("Language"),
-            label_a:    st.column_config.TextColumn(label_a, width="small"),
-            label_b:    st.column_config.TextColumn(label_b, width="small"),
-            delta_col:  st.column_config.TextColumn("Δ (B−A)", width="small"),
-            "Items":    st.column_config.TextColumn("Items (A/B)", width="small"),
-        },
+    st.caption(
+        "Δ vs EN = language composite minus English (US) composite for the same model. "
+        "Negative values indicate an equity deficit."
     )
 
-    # ── EN baseline gap ────────────────────────────────────────────────────
-    en_a_row = df[(df["language"] == "en") & (df["run_id"] == run_id_a)]
-    en_b_row = df[(df["language"] == "en") & (df["run_id"] == run_id_b)]
-    if not en_a_row.empty and not en_b_row.empty:
-        en_a = en_a_row["composite"].values[0]
-        en_b = en_b_row["composite"].values[0]
-        if en_a is not None and en_b is not None:
-            african_langs = [l for l in langs if l != "en"]
-            gaps_a, gaps_b = [], []
-            for lang in african_langs:
-                sa = df[(df["language"] == lang) & (df["run_id"] == run_id_a)]
-                sb = df[(df["language"] == lang) & (df["run_id"] == run_id_b)]
-                if not sa.empty and sa["composite"].values[0] is not None:
-                    gaps_a.append(en_a - sa["composite"].values[0])
-                if not sb.empty and sb["composite"].values[0] is not None:
-                    gaps_b.append(en_b - sb["composite"].values[0])
+    en_comp_a = _get("en", run_id_a, "composite")
+    en_comp_b = _get("en", run_id_b, "composite") if two_models else None
 
-            avg_gap_a = round(sum(gaps_a) / len(gaps_a), 1) if gaps_a else None
+    t1_rows = []
+    for lang in langs:
+        comp_a = _get(lang, run_id_a, "composite")
+        comp_b = _get(lang, run_id_b, "composite") if two_models else None
+        item_a = int(_get(lang, run_id_a, "item_count") or 0)
+        item_b = int(_get(lang, run_id_b, "item_count") or 0) if two_models else None
+
+        delta_a_en = (
+            round(comp_a - en_comp_a, 1)
+            if lang != "en" and comp_a is not None and en_comp_a is not None
+            else float("nan")
+        )
+        delta_b_en = (
+            round(comp_b - en_comp_b, 1)
+            if two_models and lang != "en" and comp_b is not None and en_comp_b is not None
+            else float("nan")
+        )
+        delta_ab = (
+            round(comp_b - comp_a, 1)
+            if two_models and comp_a is not None and comp_b is not None
+            else float("nan")
+        )
+
+        lang_label = (
+            f"⭐ {LANGUAGE_NAMES.get(lang, lang)} (EN baseline)"
+            if lang == "en"
+            else LANGUAGE_NAMES.get(lang, lang)
+        )
+        row: dict = {
+            "Language":    lang_label,
+            model_a:       comp_a if comp_a is not None else float("nan"),
+            "Δ vs EN (A)": delta_a_en,
+        }
+        if two_models:
+            row[model_b]         = comp_b if comp_b is not None else float("nan")
+            row["Δ vs EN (B)"]   = delta_b_en
+            row["Δ (B−A)"]       = delta_ab
+        row["Items"] = f"{item_a}" if not two_models else f"{item_a} / {item_b}"
+        t1_rows.append(row)
+
+    t1_df = pd.DataFrame(t1_rows)
+
+    # Color-code delta columns: red < -10, amber < 0, green > 0
+    delta_cols = ["Δ vs EN (A)"] + (["Δ vs EN (B)", "Δ (B−A)"] if two_models else [])
+    delta_cols = [c for c in delta_cols if c in t1_df.columns]
+
+    def _color_delta(v):
+        if pd.isna(v):
+            return ""
+        if v < -10:
+            return "color: #EF4444; font-weight: 600"
+        if v < 0:
+            return "color: #F59E0B; font-weight: 600"
+        if v > 0:
+            return "color: #10B981; font-weight: 600"
+        return "color: #6B7280"
+
+    score_fmt = lambda v: "—" if pd.isna(v) else f"{v:.1f}"
+    delta_fmt = lambda v: "—" if pd.isna(v) else (f"+{v:.1f}" if v > 0 else f"{v:.1f}")
+
+    fmt: dict = {c: score_fmt for c in [model_a] + ([model_b] if two_models else []) if c in t1_df.columns}
+    fmt.update({c: delta_fmt for c in delta_cols})
+
+    styled_t1 = t1_df.style.map(_color_delta, subset=delta_cols).format(fmt, na_rep="—")
+    st.dataframe(styled_t1, use_container_width=True, hide_index=True)
+
+    # ── EN Baseline Gap metrics ────────────────────────────────────────────
+    african_langs = [l for l in langs if l != "en"]
+    if en_comp_a is not None and african_langs:
+        gaps_a = []
+        for l in african_langs:
+            g = _get(l, run_id_a, "composite")
+            if g is not None:
+                gaps_a.append(en_comp_a - g)
+        avg_gap_a = round(sum(gaps_a) / len(gaps_a), 1) if gaps_a else None
+
+        avg_gap_b = None
+        if two_models and en_comp_b is not None:
+            gaps_b = []
+            for l in african_langs:
+                g = _get(l, run_id_b, "composite")
+                if g is not None:
+                    gaps_b.append(en_comp_b - g)
             avg_gap_b = round(sum(gaps_b) / len(gaps_b), 1) if gaps_b else None
 
-            st.divider()
-            st.subheader("EN Baseline Gap")
-            st.caption(
-                "Points by which each model's EN score exceeds its mean African-language score. "
-                "A larger gap signals greater language-equity risk."
-            )
-            gc1, gc2 = st.columns(2)
-            with gc1:
-                st.metric(label_a, f"{avg_gap_a:+.1f} pts" if avg_gap_a is not None else "—")
-            with gc2:
-                st.metric(label_b, f"{avg_gap_b:+.1f} pts" if avg_gap_b is not None else "—")
+        st.divider()
+        st.subheader("EN Baseline Gap")
+        st.caption(
+            "Points by which English score exceeds the mean African-language score for the same model. "
+            "A larger gap signals greater language-equity risk."
+        )
+        gc1, gc2 = st.columns(2)
+        with gc1:
+            st.metric(model_a, f"{avg_gap_a:+.1f} pts" if avg_gap_a is not None else "—")
+        with gc2:
+            if two_models:
+                st.metric(model_b, f"{avg_gap_b:+.1f} pts" if avg_gap_b is not None else "—")
 
-    # ── Dimension × Language comparison matrix ─────────────────────────────
+    # ── Table 2: Dimension × Language pivot ────────────────────────────────
     st.divider()
     st.subheader("Dimension × Language Comparison")
     st.caption(
@@ -1476,7 +1516,6 @@ def render_language_breakdown() -> None:
         "Gap = language score minus English baseline (negative = equity deficit)."
     )
 
-    # One column per (language, run_id) pair — dedup so same lang+run isn't doubled
     seen_pairs: set[tuple[str, str]] = set()
     lang_cols: list[tuple[str, str, str]] = []  # (display_label, lang_code, run_id)
     for _lang in langs:
@@ -1491,7 +1530,6 @@ def render_language_breakdown() -> None:
             _label = f"{LANGUAGE_NAMES.get(_lang, _lang)} ({_model})"
             lang_cols.append((_label, _lang, _rid))
 
-    # Detect EN column for Gap calculation
     en_col = next(((lbl, lc, rid) for lbl, lc, rid in lang_cols if lc == "en"), None)
 
     def _score(lang_code: str, run_id: str, col: str) -> float | None:
@@ -1501,10 +1539,9 @@ def render_language_breakdown() -> None:
         val = sub[col].values[0]
         return float(val) if val is not None else None
 
-    pivot_rows = []
+    t2_rows = []
 
-    # Composite row first
-    comp_row: dict = {"Dimension": "**Composite**", "Weight": "—"}
+    comp_row: dict = {"Dimension": "Composite", "Weight": "—"}
     en_comp = _score(en_col[1], en_col[2], "composite") if en_col else None
     for lbl, lc, rid in lang_cols:
         v = _score(lc, rid, "composite")
@@ -1516,10 +1553,9 @@ def render_language_breakdown() -> None:
             v = _score(lc, rid, "composite")
             gap = round(v - en_comp, 1) if v is not None and en_comp is not None else None
             sign = "+" if gap is not None and gap >= 0 else ""
-            comp_row[f"Gap vs EN"] = f"{sign}{gap:.1f}" if gap is not None else "—"
-    pivot_rows.append(comp_row)
+            comp_row["Gap vs EN"] = f"{sign}{gap:.1f}" if gap is not None else "—"
+    t2_rows.append(comp_row)
 
-    # One row per dimension
     for dim, short in DIM_SHORT.items():
         row: dict = {"Dimension": DIM_LABELS[dim], "Weight": DIM_WEIGHTS[dim]}
         en_val = _score(en_col[1], en_col[2], short) if en_col else None
@@ -1534,7 +1570,7 @@ def render_language_breakdown() -> None:
                 gap = round(v - en_val, 1) if v is not None and en_val is not None else None
                 sign = "+" if gap is not None and gap >= 0 else ""
                 row["Gap vs EN"] = f"{sign}{gap:.1f}" if gap is not None else "—"
-        pivot_rows.append(row)
+        t2_rows.append(row)
 
     col_cfg: dict = {
         "Dimension": st.column_config.TextColumn("Dimension", width="medium"),
@@ -1546,7 +1582,7 @@ def render_language_breakdown() -> None:
         col_cfg["Gap vs EN"] = st.column_config.TextColumn("Gap vs EN", width="small")
 
     st.dataframe(
-        pd.DataFrame(pivot_rows),
+        pd.DataFrame(t2_rows),
         use_container_width=True,
         hide_index=True,
         column_config=col_cfg,
