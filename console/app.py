@@ -881,7 +881,7 @@ def render_run_evaluation() -> None:
     st.divider()
 
     # Auto-name includes model + selected pack labels + a fixed timestamp.
-    # Refreshes whenever model or pack selection changes, but preserves manual edits.
+    # op_name_auto=None means new code has never run this session — always override then.
     if "op_name_ts" not in st.session_state:
         st.session_state["op_name_ts"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
     _ts       = st.session_state["op_name_ts"]
@@ -889,8 +889,9 @@ def render_run_evaluation() -> None:
                 or "(no packs)"
     _auto     = f"{model_id} — {_pack_str} — {_ts} UTC"
     _sel_key  = f"{model_id}|{','.join(sorted(selected_packs))}"
-    if _sel_key != st.session_state.get("op_name_sel_key", ""):
-        if st.session_state.get("op_name", "") in ("", st.session_state.get("op_name_auto", "")):
+    if _sel_key != st.session_state.get("op_name_sel_key"):
+        _prev_auto = st.session_state.get("op_name_auto")  # None = first run of new code
+        if _prev_auto is None or st.session_state.get("op_name", "") in ("", _prev_auto):
             st.session_state["op_name"] = _auto
         st.session_state["op_name_auto"]    = _auto
         st.session_state["op_name_sel_key"] = _sel_key
