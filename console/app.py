@@ -40,6 +40,24 @@ DIM_SHORT = {
     "safety_robustness":        "SR",
 }
 
+DIM_WEIGHTS = {
+    "language_performance":     "25%",
+    "cultural_appropriateness": "20%",
+    "hallucination_risk":       "20%",
+    "bias_fairness":            "15%",
+    "code_switching_quality":   "10%",
+    "safety_robustness":        "10%",
+}
+
+DIM_LABELS = {
+    "language_performance":     "Language Performance",
+    "cultural_appropriateness": "Cultural Appropriateness",
+    "hallucination_risk":       "Hallucination Risk",
+    "bias_fairness":            "Bias & Fairness",
+    "code_switching_quality":   "Code Switching Quality",
+    "safety_robustness":        "Safety Robustness",
+}
+
 PROVIDER_SHORT = {
     "azure_openai": "Azure",
     "openai":       "OpenAI",
@@ -1328,7 +1346,7 @@ def render_provider_comparison() -> None:
 
 def render_language_breakdown() -> None:
     st.title("🌍 AfroEval Scorecard™ Console")
-    st.subheader("Language Breakdown")
+    st.subheader("Language Comparison")
     st.caption(
         "Per-language aggregate scores across two evaluation runs. "
         "English (US) is the high-resource baseline — the gap between EN and African "
@@ -1450,26 +1468,89 @@ def render_language_breakdown() -> None:
             with gc2:
                 st.metric(label_b, f"{avg_gap_b:+.1f} pts" if avg_gap_b is not None else "—")
 
-    # ── Dimension detail ───────────────────────────────────────────────────
+    # ── Dimension × Language comparison matrix ─────────────────────────────
     st.divider()
-    with st.expander("Dimension breakdown per language"):
-        for dim, short in DIM_SHORT.items():
-            st.markdown(f"**{dim.replace('_', ' ').title()}**")
-            dim_rows = []
-            for lang in langs:
-                sa = df[(df["language"] == lang) & (df["run_id"] == run_id_a)]
-                sb = df[(df["language"] == lang) & (df["run_id"] == run_id_b)]
-                score_a = sa[short].values[0] if not sa.empty else None
-                score_b = sb[short].values[0] if not sb.empty else None
-                delta   = round(score_b - score_a, 1) if score_a is not None and score_b is not None else None
-                sign    = "+" if delta is not None and delta >= 0 else ""
-                dim_rows.append({
-                    "Language": LANGUAGE_NAMES.get(lang, lang),
-                    label_a:    f"{score_a:.1f}" if score_a is not None else "—",
-                    label_b:    f"{score_b:.1f}" if score_b is not None else "—",
-                    "Δ":        f"{sign}{delta:.1f}" if delta is not None else "—",
-                })
-            st.dataframe(pd.DataFrame(dim_rows), use_container_width=True, hide_index=True)
+    st.subheader("Dimension × Language Comparison")
+    st.caption(
+        "Rows = evaluation dimensions. Columns = each language found in the selected runs. "
+        "Gap = language score minus English baseline (negative = equity deficit)."
+    )
+
+    # One column per (language, run_id) pair — dedup so same lang+run isn't doubled
+    seen_pairs: set[tuple[str, str]] = set()
+    lang_cols: list[tuple[str, str, str]] = []  # (display_label, lang_code, run_id)
+    for _lang in langs:
+        for _rid in [run_id_a, run_id_b]:
+            if (_lang, _rid) in seen_pairs:
+                continue
+            _sub = df[(df["language"] == _lang) & (df["run_id"] == _rid)]
+            if _sub.empty:
+                continue
+            seen_pairs.add((_lang, _rid))
+            _model = _sub["model"].values[0]
+            _label = f"{LANGUAGE_NAMES.get(_lang, _lang)} ({_model})"
+            lang_cols.append((_label, _lang, _rid))
+
+    # Detect EN column for Gap calculation
+    en_col = next(((lbl, lc, rid) for lbl, lc, rid in lang_cols if lc == "en"), None)
+
+    def _score(lang_code: str, run_id: str, col: str) -> float | None:
+        sub = df[(df["language"] == lang_code) & (df["run_id"] == run_id)]
+        if sub.empty:
+            return None
+        val = sub[col].values[0]
+        return float(val) if val is not None else None
+
+    pivot_rows = []
+
+    # Composite row first
+    comp_row: dict = {"Dimension": "**Composite**", "Weight": "—"}
+    en_comp = _score(en_col[1], en_col[2], "composite") if en_col else None
+    for lbl, lc, rid in lang_cols:
+        v = _score(lc, rid, "composite")
+        comp_row[lbl] = f"{v:.1f}" if v is not None else "—"
+    if en_col:
+        for lbl, lc, rid in lang_cols:
+            if lc == "en":
+                continue
+            v = _score(lc, rid, "composite")
+            gap = round(v - en_comp, 1) if v is not None and en_comp is not None else None
+            sign = "+" if gap is not None and gap >= 0 else ""
+            comp_row[f"Gap vs EN"] = f"{sign}{gap:.1f}" if gap is not None else "—"
+    pivot_rows.append(comp_row)
+
+    # One row per dimension
+    for dim, short in DIM_SHORT.items():
+        row: dict = {"Dimension": DIM_LABELS[dim], "Weight": DIM_WEIGHTS[dim]}
+        en_val = _score(en_col[1], en_col[2], short) if en_col else None
+        for lbl, lc, rid in lang_cols:
+            v = _score(lc, rid, short)
+            row[lbl] = f"{v:.1f}" if v is not None else "—"
+        if en_col:
+            for lbl, lc, rid in lang_cols:
+                if lc == "en":
+                    continue
+                v = _score(lc, rid, short)
+                gap = round(v - en_val, 1) if v is not None and en_val is not None else None
+                sign = "+" if gap is not None and gap >= 0 else ""
+                row["Gap vs EN"] = f"{sign}{gap:.1f}" if gap is not None else "—"
+        pivot_rows.append(row)
+
+    col_cfg: dict = {
+        "Dimension": st.column_config.TextColumn("Dimension", width="medium"),
+        "Weight":    st.column_config.TextColumn("Weight", width="small"),
+    }
+    for lbl, _, _ in lang_cols:
+        col_cfg[lbl] = st.column_config.TextColumn(lbl, width="small")
+    if en_col and any(lc != "en" for _, lc, _ in lang_cols):
+        col_cfg["Gap vs EN"] = st.column_config.TextColumn("Gap vs EN", width="small")
+
+    st.dataframe(
+        pd.DataFrame(pivot_rows),
+        use_container_width=True,
+        hide_index=True,
+        column_config=col_cfg,
+    )
 
 
 def main() -> None:
@@ -1482,7 +1563,7 @@ def main() -> None:
         st.header("View")
 
         unlocked  = st.session_state.get("operator_unlocked", False)
-        reporting = ["Run Scorecard", "Provider Comparison", "Language Breakdown", "SME Calibration"]
+        reporting = ["Run Scorecard", "Provider Comparison", "Language Comparison", "SME Calibration"]
         operator  = ["Run Evaluation", "Pack Management", "HITL Management"]
         all_views = reporting + (operator if unlocked else [])
 
@@ -1526,7 +1607,7 @@ def main() -> None:
 
     if view == "Provider Comparison":
         render_provider_comparison()
-    elif view == "Language Breakdown":
+    elif view == "Language Comparison":
         render_language_breakdown()
     elif view == "SME Calibration":
         render_calibration_view()
