@@ -91,12 +91,89 @@ st.set_page_config(
     layout="wide",
 )
 
-# Hide the Streamlit Cloud viewer action buttons (GitHub, edit, share, star, three-dot).
-# stToolbarActions is the Cloud-specific container; sidebar toggle lives elsewhere.
+# Brand CSS — AgentifyAfro dark theme + Inter font + gradient accents.
 st.markdown(
     """
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    /* ── Base font ─────────────────────────────────────────────── */
+    html, body, [class*="css"] {
+        font-family: 'Inter', 'Segoe UI', system-ui, sans-serif !important;
+    }
+
+    /* ── Hide Cloud toolbar ─────────────────────────────────────── */
     [data-testid="stToolbarActions"] { display: none !important; }
+
+    /* ── Canvas ─────────────────────────────────────────────────── */
+    .stApp { background-color: #0A0A0F !important; }
+    .main .block-container { padding-top: 2rem; }
+
+    /* ── Sidebar ─────────────────────────────────────────────────── */
+    [data-testid="stSidebar"] {
+        background-color: #1A1A24 !important;
+        border-right: 1px solid #2D2D3D !important;
+    }
+
+    /* ── H1 — gradient title text ────────────────────────────────── */
+    h1 {
+        font-weight: 700 !important;
+        background: linear-gradient(90deg, #7C3AED 0%, #4169E1 50%, #00CFFF 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        letter-spacing: -0.02em;
+    }
+    h2, h3 { font-weight: 600 !important; }
+
+    /* ── Buttons — gradient primary ──────────────────────────────── */
+    .stButton > button {
+        background: linear-gradient(90deg, #7C3AED 0%, #4169E1 100%) !important;
+        color: #FFFFFF !important;
+        border: none !important;
+        font-weight: 600 !important;
+        border-radius: 6px !important;
+        transition: opacity 0.15s ease !important;
+    }
+    .stButton > button:hover { opacity: 0.85 !important; border: none !important; }
+    .stButton > button:active { opacity: 0.70 !important; }
+
+    /* ── Metric cards ─────────────────────────────────────────────── */
+    [data-testid="stMetric"] {
+        background-color: #1A1A24 !important;
+        border-radius: 8px !important;
+        padding: 1rem 1.25rem !important;
+        border: 1px solid #2D2D3D !important;
+    }
+    [data-testid="stMetricValue"] div { color: #00CFFF !important; font-weight: 700 !important; }
+    [data-testid="stMetricLabel"] div {
+        color: #6B7280 !important;
+        font-size: 0.72rem !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.06em !important;
+        font-weight: 500 !important;
+    }
+
+    /* ── Status alerts — brand palette ───────────────────────────── */
+    .stSuccess { background-color: rgba(16,185,129,0.10) !important; color: #10B981 !important; }
+    .stError   { background-color: rgba(239,68,68,0.10) !important; }
+    .stWarning { background-color: rgba(245,158,11,0.10) !important; }
+    .stInfo    { background-color: rgba(0,207,255,0.08) !important; }
+
+    /* ── Expanders ─────────────────────────────────────────────────── */
+    [data-testid="stExpander"] {
+        background-color: #1A1A24 !important;
+        border: 1px solid #2D2D3D !important;
+        border-radius: 8px !important;
+    }
+
+    /* ── Selectbox / text input ────────────────────────────────────── */
+    [data-testid="stSelectbox"] > div > div { border-color: #2D2D3D !important; border-radius: 6px !important; }
+    [data-testid="stTextInput"] > div > div > input {
+        background-color: #1A1A24 !important;
+        border-color: #2D2D3D !important;
+        border-radius: 6px !important;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -1397,6 +1474,11 @@ def render_language_breakdown() -> None:
 
 def main() -> None:
     with st.sidebar:
+        st.markdown(
+            '<div style="height:3px;background:linear-gradient(90deg,#7C3AED 0%,#4169E1 50%,#00CFFF 100%);'
+            'margin:-1rem -1rem 0.75rem -1rem;"></div>',
+            unsafe_allow_html=True,
+        )
         st.header("View")
 
         unlocked  = st.session_state.get("operator_unlocked", False)
