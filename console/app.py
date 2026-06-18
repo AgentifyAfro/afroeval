@@ -983,7 +983,7 @@ def render_hitl_management() -> None:
                 cwd=str(PROJECT_ROOT),
                 capture_output=True,
                 text=True,
-                timeout=120,
+                timeout=600,
             )
         if result.returncode == 0:
             st.success("Export complete.")
