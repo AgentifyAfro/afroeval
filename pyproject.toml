@@ -24,8 +24,8 @@ dependencies = [
     "psycopg2-binary>=2.9.9",
 
     # Evaluation — open-source base metrics
-    "deepeval>=1.4.0",
-    "ragas>=0.1.9",
+    # deepeval and ragas are optional heavy deps (pulled via [project.optional-dependencies] eval).
+    # On Streamlit Cloud they are intentionally absent; evaluators fall back to stub scores.
     "fairlearn>=0.10.0",
 
     # Data science
@@ -50,6 +50,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+eval = [
+    "deepeval>=1.4.0",
+    "ragas>=0.1.9",
+    "sentence-transformers>=2.0.0",
+]
 dev = [
     "pytest>=8.2.0",
     "pytest-asyncio>=0.23.7",

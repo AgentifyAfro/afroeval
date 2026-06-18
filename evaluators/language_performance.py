@@ -260,7 +260,7 @@ class ChrFEvaluator(BaseEvaluator):
 def _get_multilingual_model():
     """Load the multilingual sentence-transformer model once and cache it."""
     from sentence_transformers import SentenceTransformer  # noqa: PLC0415
-    return SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2")
+    return SentenceTransformer("paraphrase-multilingual-MiniLM-L6-v2")
 
 
 class MultilingualSimilarityEvaluator(BaseEvaluator):
