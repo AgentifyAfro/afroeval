@@ -857,9 +857,9 @@ def render_run_evaluation() -> None:
         prov  = st.session_state.get("op_provider", "azure_openai")
         model = PROVIDER_MODEL_DEFAULTS.get(prov, "")
         st.session_state["op_model_id"] = model
-        st.session_state["op_name"] = (
-            f"{model} — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')} UTC"
-        )
+        # Clear auto-name tracking so the next render regenerates it with the new model + packs
+        for _k in ("op_name", "op_name_auto", "op_name_sel_key"):
+            st.session_state.pop(_k, None)
 
     mc1, mc2 = st.columns(2)
     with mc1:
