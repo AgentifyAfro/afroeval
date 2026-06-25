@@ -29,6 +29,9 @@ from db.models import Assessment, BenchmarkItem, BenchmarkPack, MetricResult, Mo
 from db.session import get_engine
 from sqlmodel import Session, col, select
 
+from auth.client import AuthServiceUnavailableError, AuthUser, InvalidCredentialsError, SupabaseAuthClient
+from console.access import resolve_views
+
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 DIM_SHORT = {
@@ -1625,10 +1628,9 @@ def main() -> None:
         )
         st.header("View")
 
-        unlocked  = st.session_state.get("operator_unlocked", False)
-        reporting = ["Run Scorecard", "Provider Comparison", "Language Comparison", "SME Calibration"]
-        operator  = ["Run Evaluation", "Pack Management", "HITL Management"]
-        all_views = (reporting + operator) if unlocked else []
+        auth_user: AuthUser | None = st.session_state.get("auth_user")
+        unlocked = st.session_state.get("operator_unlocked", False)
+        all_views = resolve_views(auth_user, unlocked)
 
         if all_views:
             # nav_view is managed as plain session state (not a widget key) so it can
@@ -1640,7 +1642,7 @@ def main() -> None:
             st.session_state["nav_view"] = selected
             view = selected
         else:
-            st.caption("Enter the operator password to view the console.")
+            st.caption("Log in to view the console.")
             view = None
 
         if st.button("🔄 Refresh", use_container_width=True):
@@ -1649,32 +1651,61 @@ def main() -> None:
 
         st.divider()
 
-        if not unlocked:
-            st.caption("🔐 OPERATOR MODE")
-            pwd = st.text_input(
-                "operator_pwd", type="password",
-                placeholder="Enter operator password",
-                label_visibility="collapsed",
-                key="op_pwd_input",
-            )
-            if pwd:
-                from api.settings import get_settings
-                correct = get_settings().operator_password
-                if correct and pwd == correct:
-                    st.session_state["operator_unlocked"] = True
-                    st.rerun()
-                else:
-                    st.error("Incorrect password")
-        else:
-            st.success("🔓 Operator mode active")
-            if st.button("🔒 Lock", key="op_lock", use_container_width=True):
-                st.session_state["operator_unlocked"] = False
-                st.session_state.pop("op_active_run_id", None)
+        if auth_user is not None:
+            role_label = auth_user.role or "viewer"
+            st.success(f"🔓 Logged in as {auth_user.email} ({role_label})")
+            if st.button("Log out", key="auth_logout", use_container_width=True):
+                st.session_state.pop("auth_user", None)
                 st.rerun()
+        else:
+            st.caption("🔐 LOG IN")
+            login_email = st.text_input(
+                "login_email", placeholder="Email",
+                label_visibility="collapsed", key="login_email_input",
+            )
+            login_pwd = st.text_input(
+                "login_pwd", type="password", placeholder="Password",
+                label_visibility="collapsed", key="login_pwd_input",
+            )
+            if st.button("Log in", key="login_submit", use_container_width=True):
+                if login_email and login_pwd:
+                    try:
+                        user = SupabaseAuthClient().sign_in(login_email, login_pwd)
+                        st.session_state["auth_user"] = user
+                        st.rerun()
+                    except InvalidCredentialsError:
+                        st.error("Invalid email or password")
+                    except AuthServiceUnavailableError:
+                        st.error("Login service unavailable, try again")
+                else:
+                    st.error("Enter both email and password")
+
+        with st.expander("Admin override"):
+            if not unlocked:
+                pwd = st.text_input(
+                    "operator_pwd", type="password",
+                    placeholder="Enter operator password",
+                    label_visibility="collapsed",
+                    key="op_pwd_input",
+                )
+                if pwd:
+                    from api.settings import get_settings
+                    correct = get_settings().operator_password
+                    if correct and pwd == correct:
+                        st.session_state["operator_unlocked"] = True
+                        st.rerun()
+                    else:
+                        st.error("Incorrect password")
+            else:
+                st.success("🔓 Operator override active")
+                if st.button("🔒 Lock override", key="op_lock", use_container_width=True):
+                    st.session_state["operator_unlocked"] = False
+                    st.session_state.pop("op_active_run_id", None)
+                    st.rerun()
 
     if view is None:
         st.title("AfroEval Console")
-        st.info("🔐 This console is restricted. Enter the operator password in the sidebar to continue.")
+        st.info("🔐 This console is restricted. Log in, or use the admin override, in the sidebar to continue.")
     elif view == "Provider Comparison":
         render_provider_comparison()
     elif view == "Language Comparison":
