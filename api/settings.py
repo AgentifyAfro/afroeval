@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     # Operator console
     operator_password: str = ""
 
+    # Supabase Auth (console login)
+    supabase_url: str = ""
+    supabase_anon_key: str = ""
+
     @property
     def is_production(self) -> bool:
         return self.afroeval_env == "production"
