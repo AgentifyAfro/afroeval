@@ -1628,16 +1628,20 @@ def main() -> None:
         unlocked  = st.session_state.get("operator_unlocked", False)
         reporting = ["Run Scorecard", "Provider Comparison", "Language Comparison", "SME Calibration"]
         operator  = ["Run Evaluation", "Pack Management", "HITL Management"]
-        all_views = reporting + (operator if unlocked else [])
+        all_views = (reporting + operator) if unlocked else []
 
-        # nav_view is managed as plain session state (not a widget key) so it can
-        # be set from button callbacks without triggering StreamlitAPIException.
-        if st.session_state.get("nav_view") not in all_views:
-            st.session_state["nav_view"] = all_views[0]
-        _nav_idx = all_views.index(st.session_state["nav_view"])
-        selected = st.radio("View", all_views, label_visibility="collapsed", index=_nav_idx)
-        st.session_state["nav_view"] = selected
-        view = selected
+        if all_views:
+            # nav_view is managed as plain session state (not a widget key) so it can
+            # be set from button callbacks without triggering StreamlitAPIException.
+            if st.session_state.get("nav_view") not in all_views:
+                st.session_state["nav_view"] = all_views[0]
+            _nav_idx = all_views.index(st.session_state["nav_view"])
+            selected = st.radio("View", all_views, label_visibility="collapsed", index=_nav_idx)
+            st.session_state["nav_view"] = selected
+            view = selected
+        else:
+            st.caption("Enter the operator password to view the console.")
+            view = None
 
         if st.button("🔄 Refresh", use_container_width=True):
             st.cache_data.clear()
@@ -1668,7 +1672,10 @@ def main() -> None:
                 st.session_state.pop("op_active_run_id", None)
                 st.rerun()
 
-    if view == "Provider Comparison":
+    if view is None:
+        st.title("AfroEval Console")
+        st.info("🔐 This console is restricted. Enter the operator password in the sidebar to continue.")
+    elif view == "Provider Comparison":
         render_provider_comparison()
     elif view == "Language Comparison":
         render_language_breakdown()
