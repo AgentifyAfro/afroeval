@@ -39,7 +39,7 @@ dependencies = [
 
     # Operator console
     "streamlit>=1.36.0",
-    "supabase>=2.0.0",
+    "supabase==2.31.0",
 
     # Reporting (ADR-004: WeasyPrint was the original plan but requires native GTK
     # libs unavailable on Windows; reportlab is the documented fallback)
