@@ -201,6 +201,18 @@ st.markdown(
 )
 
 
+def render_console_header() -> None:
+    """Brand header: globe emoji in its natural color (kept outside the h1's gradient-clip)
+    + gradient-text title, used at the top of every console view."""
+    st.markdown(
+        '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem;">'
+        '<span style="font-size:2rem;line-height:1;">\U0001F30D</span>'
+        '<h1 style="margin:0;">AfroEval Scorecard&trade; Console</h1>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+
 # ── Cached data loaders ───────────────────────────────────────────────────────
 
 @st.cache_data(ttl=60)
@@ -829,7 +841,7 @@ def _render_active_run(run_id: str) -> None:
 # ── Operator views ────────────────────────────────────────────────────────────
 
 def render_run_evaluation() -> None:
-    st.title("🌍 AfroEval Scorecard™ Console")
+    render_console_header()
     st.subheader("Run Evaluation")
     st.caption("Configure and launch a new evaluation run against selected benchmark packs.")
 
@@ -925,7 +937,7 @@ def render_run_evaluation() -> None:
 
 
 def render_pack_management() -> None:
-    st.title("🌍 AfroEval Scorecard™ Console")
+    render_console_header()
     st.subheader("Pack Management")
     st.caption("Seed JSONL benchmark packs into the Supabase database. Idempotent — safe to re-run.")
 
@@ -968,7 +980,7 @@ def render_pack_management() -> None:
 
 
 def render_hitl_management() -> None:
-    st.title("🌍 AfroEval Scorecard™ Console")
+    render_console_header()
     st.subheader("HITL Management")
     st.caption(
         "Export model responses to Label Studio for SME annotation, "
@@ -1031,7 +1043,7 @@ def render_hitl_management() -> None:
 
 
 def render_calibration_view() -> None:
-    st.title("🌍 AfroEval Scorecard™ Console")
+    render_console_header()
     st.subheader("SME Calibration")
     st.caption(
         "Compares SME ResponseReview scores (Label Studio HITL pipeline) against the automated "
@@ -1057,7 +1069,7 @@ def render_calibration_view() -> None:
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def render_run_scorecard() -> None:
-    st.title("🌍 AfroEval Scorecard™ Console")
+    render_console_header()
 
     # Sidebar: run selector
     with st.sidebar:
@@ -1236,7 +1248,7 @@ def render_run_scorecard() -> None:
 
 
 def render_provider_comparison() -> None:
-    st.title("🌍 AfroEval Scorecard™ Console")
+    render_console_header()
     st.subheader("Provider Comparison")
     st.caption(
         "Side-by-side scorecard results across model providers running the same benchmark packs. "
@@ -1372,7 +1384,7 @@ def render_provider_comparison() -> None:
 
 
 def render_language_breakdown() -> None:
-    st.title("🌍 AfroEval Scorecard™ Console")
+    render_console_header()
     st.subheader("Language Comparison")
     st.caption(
         "Per-language aggregate scores across evaluation runs. English (US) is the "
@@ -1704,7 +1716,7 @@ def main() -> None:
                     st.rerun()
 
     if view is None:
-        st.title("AfroEval Console")
+        render_console_header()
         st.info("🔐 This console is restricted. Log in, or use the admin override, in the sidebar to continue.")
     elif view == "Provider Comparison":
         render_provider_comparison()
