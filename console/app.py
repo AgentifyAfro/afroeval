@@ -265,9 +265,27 @@ def load_runs_summary() -> list[dict]:
                 "remediation_roadmap": scorecard.remediation_roadmap if scorecard else [],
                 "pack_ids":            assessment.benchmark_pack_ids if assessment else [],
                 "model":               assessment.model_identifier if assessment else "",
-                "pdf_path":            scorecard.pdf_path if scorecard else None,
             })
     return rows
+
+
+@st.cache_data(ttl=60)
+def _scorecard_pdf_bytes(run_id: str) -> bytes | None:
+    """Render the scorecard PDF on demand from DB rows — no disk path to go
+    stale, survives restarts/redeploys since Postgres is the only durable state.
+    """
+    from reporting.generator import generate_scorecard_pdf_bytes
+
+    engine = get_engine()
+    with Session(engine) as session:
+        run = session.get(Run, uuid.UUID(run_id))
+        if run is None:
+            return None
+        scorecard = session.exec(select(Scorecard).where(Scorecard.run_id == run.id)).first()
+        assessment = session.get(Assessment, run.assessment_id)
+        if scorecard is None or assessment is None:
+            return None
+        return generate_scorecard_pdf_bytes(scorecard, run, assessment)
 
 
 @st.cache_data(ttl=30)
@@ -1101,18 +1119,17 @@ def render_run_scorecard() -> None:
     c4.metric("Model", selected["model"])
     c5.metric("Packs", len(selected["pack_ids"]))
 
-    pdf_path = selected.get("pdf_path")
-    if pdf_path and Path(pdf_path).exists():
-        with open(pdf_path, "rb") as f:
-            st.download_button(
-                "Download Scorecard PDF",
-                data=f.read(),
-                file_name=f"afroeval_scorecard_{run_id[:8]}.pdf",
-                mime="application/pdf",
-                key="op_download_pdf",
-            )
+    pdf_bytes = _scorecard_pdf_bytes(run_id)
+    if pdf_bytes:
+        st.download_button(
+            "Download Scorecard PDF",
+            data=pdf_bytes,
+            file_name=f"afroeval_scorecard_{run_id[:8]}.pdf",
+            mime="application/pdf",
+            key="op_download_pdf",
+        )
     else:
-        st.caption("No PDF artefact found for this run yet.")
+        st.caption("Scorecard data not found for this run.")
 
     st.divider()
 

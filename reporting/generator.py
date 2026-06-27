@@ -19,6 +19,7 @@ Usage:
 from __future__ import annotations
 
 import enum
+import io
 import json
 from datetime import datetime
 from pathlib import Path
@@ -94,6 +95,16 @@ def generate_scorecard_pdf(
     pdf_path = out / f"{run.id}.pdf"
     _build_pdf(scorecard, run, assessment, pdf_path)
     return str(pdf_path)
+
+
+def generate_scorecard_pdf_bytes(scorecard, run, assessment) -> bytes:
+    """Build the PDF straight into memory — no disk write, no cached path to go
+    stale. Scorecard/Run/Assessment rows in Postgres are the only durable state
+    this needs, so it survives restarts/redeploys where local disk doesn't.
+    """
+    buf = io.BytesIO()
+    _build_pdf(scorecard, run, assessment, buf)
+    return buf.getvalue()
 
 
 def generate_scorecard_json(
@@ -183,10 +194,10 @@ def _styles():
     }
 
 
-def _build_pdf(scorecard, run, assessment, out_path: Path) -> None:
+def _build_pdf(scorecard, run, assessment, out: Path | io.BytesIO) -> None:
     s = _styles()
     doc = SimpleDocTemplate(
-        str(out_path),
+        str(out) if isinstance(out, Path) else out,
         pagesize=letter,
         leftMargin=0.75 * inch,
         rightMargin=0.75 * inch,
