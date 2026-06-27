@@ -18,6 +18,7 @@ Usage:
 
 from __future__ import annotations
 
+import enum
 import json
 from datetime import datetime
 from pathlib import Path
@@ -30,6 +31,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import (
     HRFlowable,
+    Image as RLImage,
     Paragraph,
     SimpleDocTemplate,
     Spacer,
@@ -37,22 +39,30 @@ from reportlab.platypus import (
     TableStyle,
 )
 
-# ── Brand palette ─────────────────────────────────────────────────────────────
-NAVY   = colors.HexColor("#0f3460")
-CORAL  = colors.HexColor("#e94560")
-SLATE  = colors.HexColor("#a8b2d8")
-WHITE  = colors.white
-NEAR_WHITE = colors.HexColor("#F4F6FB")
-LIGHT_BLUE = colors.HexColor("#D9E6F7")
-MID_GREY   = colors.HexColor("#CCCCCC")
-TEXT_DARK  = colors.HexColor("#1a1a2e")
+# ── AgentifyAfro brand palette (agentifyafro-brand-guidelines.md, Section 5) ──
+PURPLE     = colors.HexColor("#7C3AED")
+BLUE       = colors.HexColor("#4169E1")
+CYAN       = colors.HexColor("#00CFFF")
+WHITE      = colors.white
+CHARCOAL   = colors.HexColor("#1A1A24")   # near-black wordmark / header fill
+NEAR_BLACK = colors.HexColor("#0A0A0F")
+SLATE      = colors.HexColor("#6B7280")   # secondary text / captions
+LIGHT_GRAY = colors.HexColor("#E5E7EB")   # hairlines / borders
+OFF_WHITE  = colors.HexColor("#F8F9FB")   # document canvas (print-heavy report)
 
-# ── Verdict colours ───────────────────────────────────────────────────────────
+SUCCESS = colors.HexColor("#10B981")
+WARNING = colors.HexColor("#F59E0B")
+ERROR   = colors.HexColor("#EF4444")
+
+SUCCESS_TINT = colors.HexColor("#E7F8F1")
+ERROR_TINT   = colors.HexColor("#FDECEC")
+
+# ── Verdict colours/icons (VerdictBand values → functional status colours) ───
 _VERDICT_COLOUR = {
-    "Deployment-Ready": colors.HexColor("#1a7a4a"),
-    "Conditional":      colors.HexColor("#d97706"),
-    "Not-Ready":        colors.HexColor("#c05621"),
-    "High-Risk":        CORAL,
+    "Deployment-Ready": SUCCESS,
+    "Conditional":      WARNING,
+    "Not-Ready":        ERROR,
+    "High-Risk":        ERROR,
 }
 _VERDICT_ICON = {
     "Deployment-Ready": "✓",
@@ -60,6 +70,12 @@ _VERDICT_ICON = {
     "Not-Ready":        "✗",
     "High-Risk":        "⛔",
 }
+
+# Brand mark asset — cropped + alpha-keyed from assets/agentifyafro-logo.png.
+# Never recreate the mark; if this file is missing, layouts fall back to text-only.
+_ASSETS_DIR = Path(__file__).parent.parent / "assets"
+_LOGO_MARK = _ASSETS_DIR / "agentifyafro-mark.png"
+_MARK_ASPECT = 261 / 283  # width / height of the cropped mark asset
 
 # Default output dir — sibling of this file's parent package, inside project root
 _DEFAULT_OUTPUT_DIR = Path(__file__).parent.parent / "output" / "scorecards"
@@ -102,48 +118,67 @@ def _ensure_output_dir(output_dir: str | Path | None) -> Path:
     return out
 
 
+def _verdict_str(verdict) -> str:
+    """scorecard.verdict may arrive as a VerdictBand enum member or a plain str.
+
+    Enum.__str__ (even on a str-subclassed Enum) renders "VerdictBand.CONDITIONAL"
+    instead of "Conditional" — always resolve to the underlying value for display.
+    """
+    return verdict.value if isinstance(verdict, enum.Enum) else str(verdict)
+
+
 def _styles():
     base = getSampleStyleSheet()
     return {
+        "wordmark": ParagraphStyle(
+            "afro_wordmark", parent=base["Normal"],
+            fontName="Helvetica-Bold", fontSize=13, leading=16, textColor=CHARCOAL,
+            alignment=TA_LEFT,
+        ),
         "title": ParagraphStyle(
             "afro_title", parent=base["Normal"],
-            fontName="Helvetica-Bold", fontSize=22, textColor=NAVY,
-            alignment=TA_CENTER, spaceAfter=4,
+            fontName="Helvetica-Bold", fontSize=22, leading=26, textColor=CHARCOAL,
+            alignment=TA_CENTER, spaceBefore=2, spaceAfter=4,
         ),
         "subtitle": ParagraphStyle(
             "afro_subtitle", parent=base["Normal"],
-            fontName="Helvetica", fontSize=10, textColor=SLATE,
+            fontName="Helvetica", fontSize=10, leading=13, textColor=SLATE,
             alignment=TA_CENTER, spaceAfter=2,
         ),
         "score_hero": ParagraphStyle(
             "afro_score_hero", parent=base["Normal"],
-            fontName="Helvetica-Bold", fontSize=48, textColor=NAVY,
-            alignment=TA_CENTER, spaceAfter=0,
+            fontName="Helvetica-Bold", fontSize=48, leading=58, textColor=PURPLE,
+            alignment=TA_CENTER, spaceBefore=6, spaceAfter=2,
         ),
         "verdict_label": ParagraphStyle(
             "afro_verdict_label", parent=base["Normal"],
-            fontName="Helvetica-Bold", fontSize=14,
-            alignment=TA_CENTER, spaceAfter=4,
+            fontName="Helvetica-Bold", fontSize=14, leading=18,
+            alignment=TA_CENTER, spaceBefore=2, spaceAfter=4,
         ),
         "section_head": ParagraphStyle(
             "afro_section_head", parent=base["Normal"],
-            fontName="Helvetica-Bold", fontSize=12, textColor=NAVY,
+            fontName="Helvetica-Bold", fontSize=12, leading=16, textColor=PURPLE,
             spaceBefore=14, spaceAfter=6,
         ),
         "body": ParagraphStyle(
             "afro_body", parent=base["Normal"],
-            fontName="Helvetica", fontSize=9, textColor=TEXT_DARK,
-            spaceAfter=4, leading=13,
+            fontName="Helvetica", fontSize=9, leading=13, textColor=CHARCOAL,
+            spaceAfter=4,
         ),
         "meta": ParagraphStyle(
             "afro_meta", parent=base["Normal"],
-            fontName="Helvetica", fontSize=8, textColor=SLATE,
+            fontName="Helvetica", fontSize=8, leading=11, textColor=SLATE,
             alignment=TA_CENTER, spaceAfter=2,
+        ),
+        "packs": ParagraphStyle(
+            "afro_packs", parent=base["Normal"],
+            fontName="Helvetica", fontSize=7.5, leading=11, textColor=SLATE,
+            alignment=TA_LEFT, spaceAfter=2,
         ),
         "small": ParagraphStyle(
             "afro_small", parent=base["Normal"],
-            fontName="Helvetica", fontSize=8, textColor=TEXT_DARK,
-            spaceAfter=2, leading=11,
+            fontName="Helvetica", fontSize=8, leading=11, textColor=CHARCOAL,
+            spaceAfter=2,
         ),
     }
 
@@ -155,7 +190,7 @@ def _build_pdf(scorecard, run, assessment, out_path: Path) -> None:
         pagesize=letter,
         leftMargin=0.75 * inch,
         rightMargin=0.75 * inch,
-        topMargin=0.75 * inch,
+        topMargin=0.95 * inch,
         bottomMargin=0.75 * inch,
         title=f"AfroEval Scorecard™ — {assessment.name}",
         author="AgentifyAfro.ai",
@@ -173,65 +208,135 @@ def _build_pdf(scorecard, run, assessment, out_path: Path) -> None:
     doc.build(story, onFirstPage=_draw_page_chrome, onLaterPages=_draw_page_chrome)
 
 
+def _lerp_color(c1, c2, t: float):
+    return colors.Color(
+        c1.red + (c2.red - c1.red) * t,
+        c1.green + (c2.green - c1.green) * t,
+        c1.blue + (c2.blue - c1.blue) * t,
+    )
+
+
+def _draw_gradient_bar(canvas, x, y, width, height, steps: int = 120):
+    """Draw the signature purple→blue→cyan gradient as adjacent thin rects —
+    ReportLab's pdfgen canvas has no native linear-gradient fill for plain rects.
+    """
+    seg_w = width / steps
+    for i in range(steps):
+        t = i / (steps - 1)
+        c = _lerp_color(PURPLE, BLUE, t / 0.5) if t < 0.5 else _lerp_color(BLUE, CYAN, (t - 0.5) / 0.5)
+        canvas.setFillColor(c)
+        canvas.rect(x + i * seg_w, y, seg_w + 0.5, height, fill=1, stroke=0)
+
+
 def _draw_page_chrome(canvas, doc):
-    """Header/footer lines drawn on every page via canvas (outside flowable flow)."""
+    """Header/footer chrome drawn on every page via canvas (outside flowable flow)."""
     w, h = letter
     canvas.saveState()
 
-    # Top bar
-    canvas.setFillColor(NAVY)
-    canvas.rect(0, h - 0.45 * inch, w, 0.45 * inch, fill=1, stroke=0)
+    # Document canvas — off-white, per brand guideline 7.1 for print-heavy reports
+    canvas.setFillColor(OFF_WHITE)
+    canvas.rect(0, 0, w, h, fill=1, stroke=0)
+
+    # Top bar (dark — signature presentation per guideline 4.3)
+    bar_h = 0.55 * inch
+    canvas.setFillColor(NEAR_BLACK)
+    canvas.rect(0, h - bar_h, w, bar_h, fill=1, stroke=0)
+    _draw_gradient_bar(canvas, 0, h - bar_h - 2, w, 2)
+
+    text_x = 0.75 * inch
+    if _LOGO_MARK.exists():
+        mark_h = 0.3 * inch
+        mark_w = mark_h * _MARK_ASPECT
+        canvas.drawImage(
+            str(_LOGO_MARK),
+            0.75 * inch, h - bar_h / 2 - mark_h / 2,
+            width=mark_w, height=mark_h,
+            preserveAspectRatio=True, mask="auto",
+        )
+        text_x = 0.75 * inch + mark_w + 0.12 * inch
+
     canvas.setFillColor(WHITE)
     canvas.setFont("Helvetica-Bold", 10)
-    canvas.drawString(0.75 * inch, h - 0.30 * inch, "AfroEval Scorecard™")
-    canvas.setFont("Helvetica", 9)
-    canvas.drawRightString(w - 0.75 * inch, h - 0.30 * inch, "AgentifyAfro.ai | Confidential")
+    canvas.drawString(text_x, h - bar_h / 2 - 3.5, "AfroEval Scorecard™")
+    canvas.setFont("Helvetica", 8)
+    canvas.setFillColor(LIGHT_GRAY)
+    canvas.drawRightString(w - 0.75 * inch, h - bar_h / 2 - 3.5, "AgentifyAfro.ai · Confidential")
 
     # Bottom bar
-    canvas.setFillColor(NAVY)
-    canvas.rect(0, 0, w, 0.35 * inch, fill=1, stroke=0)
-    canvas.setFillColor(CORAL)
+    bottom_h = 0.35 * inch
+    canvas.setFillColor(NEAR_BLACK)
+    canvas.rect(0, 0, w, bottom_h, fill=1, stroke=0)
+    canvas.setFillColor(LIGHT_GRAY)
     canvas.setFont("Helvetica", 8)
-    canvas.drawString(0.75 * inch, 0.12 * inch, f"© 2026 AgentifyAfro.ai")
-    canvas.setFillColor(WHITE)
-    canvas.drawCentredString(w / 2, 0.12 * inch, "Africa-first AI evaluation")
-    canvas.drawRightString(w - 0.75 * inch, 0.12 * inch, f"Page {doc.page}")
+    canvas.drawString(0.75 * inch, bottom_h / 2 - 3, "© 2026 AgentifyAfro.ai")
+    canvas.drawCentredString(w / 2, bottom_h / 2 - 3, "Africa-first AI evaluation")
+    canvas.drawRightString(w - 0.75 * inch, bottom_h / 2 - 3, f"Page {doc.page}")
 
     canvas.restoreState()
 
 
 def _cover_block(scorecard, run, assessment, s):
-    verdict = scorecard.verdict
-    verdict_colour = _VERDICT_COLOUR.get(verdict, TEXT_DARK)
+    verdict = _verdict_str(scorecard.verdict)
+    verdict_colour = _VERDICT_COLOUR.get(verdict, CHARCOAL)
     verdict_icon   = _VERDICT_ICON.get(verdict, "")
     _run_ts = run.completed_at or getattr(run, "started_at", None) or getattr(run, "created_at", None)
     run_date = _run_ts.strftime("%B %d, %Y") if _run_ts else "—"
 
-    story = [Spacer(1, 0.3 * inch)]
+    story = [Spacer(1, 0.1 * inch)]
+
+    # Lockup: approved mark asset + real wordmark text (black-on-light per
+    # guideline 4.3 — the supplied asset's white wordmark only works on dark).
+    if _LOGO_MARK.exists():
+        mark_h = 0.3 * inch
+        mark_w = mark_h * _MARK_ASPECT
+        logo_row = Table(
+            [[RLImage(str(_LOGO_MARK), width=mark_w, height=mark_h), Paragraph("AgentifyAfro.ai", s["wordmark"])]],
+            colWidths=[mark_w + 0.1 * inch, 2.2 * inch],
+            hAlign="CENTER",
+        )
+        logo_row.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        story.append(logo_row)
+        story.append(Spacer(1, 0.18 * inch))
+
     story.append(Paragraph("AfroEval Scorecard™", s["title"]))
     story.append(Paragraph(assessment.name, s["subtitle"]))
-    story.append(Spacer(1, 0.15 * inch))
+    story.append(Spacer(1, 0.12 * inch))
+    story.append(HRFlowable(width="100%", thickness=0.75, color=LIGHT_GRAY, spaceAfter=0.15 * inch))
 
-    # Metadata row
-    meta_data = [
-        [
-            Paragraph(f"<b>Model</b><br/>{assessment.model_identifier}", s["meta"]),
-            Paragraph(f"<b>Provider</b><br/>{assessment.model_provider}", s["meta"]),
-            Paragraph(f"<b>Pack(s)</b><br/>{scorecard.benchmark_pack_version}", s["meta"]),
-            Paragraph(f"<b>Date</b><br/>{run_date}", s["meta"]),
-            Paragraph(f"<b>Methodology</b><br/>{scorecard.methodology_version}", s["meta"]),
-        ]
-    ]
-    meta_tbl = Table(meta_data, colWidths=[1.2 * inch] * 5)
+    # Metadata row — short fields only; long lists never belong in a fixed-width cell
+    meta_data = [[
+        Paragraph(f"<b>MODEL</b><br/>{assessment.model_identifier}", s["meta"]),
+        Paragraph(f"<b>PROVIDER</b><br/>{assessment.model_provider}", s["meta"]),
+        Paragraph(f"<b>DATE</b><br/>{run_date}", s["meta"]),
+        Paragraph(f"<b>METHODOLOGY</b><br/>{scorecard.methodology_version}", s["meta"]),
+    ]]
+    meta_tbl = Table(meta_data, colWidths=[1.6 * inch] * 4)
     meta_tbl.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, -1), LIGHT_BLUE),
-        ("GRID",       (0, 0), (-1, -1), 0.5, MID_GREY),
+        ("BACKGROUND", (0, 0), (-1, -1), WHITE),
+        ("BOX",        (0, 0), (-1, -1), 0.5, LIGHT_GRAY),
+        ("INNERGRID",  (0, 0), (-1, -1), 0.5, LIGHT_GRAY),
         ("VALIGN",     (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 6),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
     ]))
     story.append(meta_tbl)
-    story.append(Spacer(1, 0.25 * inch))
+
+    # Benchmark packs — wrapped list below the table, never crammed into a cell
+    packs = [p.strip() for p in (scorecard.benchmark_pack_version or "").split(",") if p.strip()]
+    if packs:
+        story.append(Spacer(1, 0.08 * inch))
+        story.append(Paragraph(
+            f"<b>BENCHMARK PACKS ({len(packs)})</b>&nbsp;&nbsp;" + " · ".join(packs),
+            s["packs"],
+        ))
+
+    story.append(Spacer(1, 0.3 * inch))
 
     # Composite score hero
     story.append(Paragraph(f"{scorecard.composite_score:.1f}", s["score_hero"]))
@@ -243,11 +348,9 @@ def _cover_block(scorecard, run, assessment, s):
 
     confidence_display = "Standard Confidence" if scorecard.confidence_flag == "standard" else "⚠ Low Coverage"
     story.append(Paragraph(confidence_display, s["meta"]))
-    story.append(Spacer(1, 0.1 * inch))
+    story.append(Spacer(1, 0.15 * inch))
 
-    story.append(HRFlowable(
-        width="100%", thickness=2, color=CORAL, spaceAfter=0.15 * inch,
-    ))
+    story.append(HRFlowable(width="100%", thickness=0.75, color=LIGHT_GRAY, spaceAfter=0.1 * inch))
     return story
 
 
@@ -280,13 +383,13 @@ def _dimension_table(scorecard, s):
     tbl = Table(rows, colWidths=col_widths)
 
     style_cmds = [
-        ("BACKGROUND",   (0, 0), (-1, 0), NAVY),
+        ("BACKGROUND",   (0, 0), (-1, 0), CHARCOAL),
         ("TEXTCOLOR",    (0, 0), (-1, 0), WHITE),
         ("FONTNAME",     (0, 0), (-1, 0), "Helvetica-Bold"),
         ("FONTSIZE",     (0, 0), (-1, -1), 9),
         ("FONTNAME",     (0, 1), (-1, -1), "Helvetica"),
-        ("GRID",         (0, 0), (-1, -1), 0.5, MID_GREY),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [NEAR_WHITE, WHITE]),
+        ("GRID",         (0, 0), (-1, -1), 0.5, LIGHT_GRAY),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [OFF_WHITE, WHITE]),
         ("VALIGN",       (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING",   (0, 0), (-1, -1), 5),
         ("BOTTOMPADDING",(0, 0), (-1, -1), 5),
@@ -295,7 +398,7 @@ def _dimension_table(scorecard, s):
     # Colour status column cells individually
     for i, dim in enumerate(dims_sorted, start=1):
         score = dim_scores.get(dim, 0.0)
-        cell_colour = colors.HexColor("#e6f4ea") if score >= 60 else colors.HexColor("#fce8e8")
+        cell_colour = SUCCESS_TINT if score >= 60 else ERROR_TINT
         style_cmds.append(("BACKGROUND", (3, i), (3, i), cell_colour))
 
     tbl.setStyle(TableStyle(style_cmds))
@@ -341,7 +444,7 @@ def _failing_section(scorecard, s):
 def _footer_block(scorecard, run, s):
     return [
         Spacer(1, 0.2 * inch),
-        HRFlowable(width="100%", thickness=0.5, color=MID_GREY, spaceAfter=0.1 * inch),
+        HRFlowable(width="100%", thickness=0.5, color=LIGHT_GRAY, spaceAfter=0.1 * inch),
         Paragraph(
             f"Run ID: {run.id} | Generated: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
             s["meta"],
@@ -376,7 +479,7 @@ def _build_json_payload(scorecard, run, assessment) -> dict:
         "scorecard": {
             "id":                    str(scorecard.id),
             "composite_score":       scorecard.composite_score,
-            "verdict":               scorecard.verdict,
+            "verdict":               _verdict_str(scorecard.verdict),
             "confidence_flag":       scorecard.confidence_flag,
             "benchmark_pack_version": scorecard.benchmark_pack_version,
             "dimension_scores":      scorecard.dimension_scores,
