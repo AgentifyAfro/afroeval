@@ -136,7 +136,7 @@ Gold tasks are hidden benchmark items seeded into your regular work queue. You w
 - Detect drift (if your scores become less accurate over a period)
 - Flag any systemic quality issues early
 
-**Your gold task scores do not reduce your pay.** They are used for quality monitoring only. If your gold task pass rate drops below 75% over two consecutive weeks, the lead linguist will schedule a calibration session with you.
+**Your gold task scores do not reduce your pay.** They are used for quality monitoring only. If your gold task pass rate drops below 80% over two consecutive weeks, the lead linguist will schedule a calibration session with you.
 
 ---
 

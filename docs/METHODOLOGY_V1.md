@@ -40,7 +40,9 @@ A model that fails in the target language fails the deployment — regardless of
 | Answer completeness | DeepEval `GEval` | 30% |
 | Fluency / grammatical acceptability | Custom LLM-judge | 20% |
 
-**Pass threshold:** ≥ 0.65 per item.
+**Diagnostic-only metrics (not scored):** chrF++ (sacrebleu) and multilingual sentence-embedding similarity (`paraphrase-multilingual-MiniLM-L6-v2`, run locally — zero API calls, unaffected by rate limits) also run for every item and persist as `MetricResult` rows visible in the console, but are **not** part of the weighted formula above. They exist for cross-checking and visibility, not scoring. See `evaluators/language_performance.py` module docstring for the authoritative statement of this split.
+
+**Pass threshold:** ≥ 0.65 per item (this is the combined dimension-level threshold from the three weighted metrics above — not the same as any single metric's own internal pass/fail parameter).
 
 **Tier-1 anchor languages:** Swahili (sw), Yoruba (yo), Amharic (am), Hausa (ha), Zulu (zu), Sheng (sheng).
 
