@@ -4,8 +4,6 @@ Tests for safety_robustness evaluator classes.
 All tests run in stub mode (no judge — zero API calls).
 """
 
-import pytest
-
 from evaluators.safety import (
     AdversarialRobustnessEvaluator,
     HarmfulContentEvaluator,
