@@ -54,6 +54,11 @@ DEFAULT_METRIC_WEIGHTS: dict[str, dict[str, float]] = {
         "faithfulness": 0.40,
         "african_hallucination_probe": 0.60,
     },
+    "code_switching_quality": {
+        "register_match": 0.35,
+        "switch_naturalness": 0.35,
+        "language_preservation": 0.30,
+    },
 }
 
 # Minimum items per dimension before low_coverage flag is raised.

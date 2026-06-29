@@ -140,6 +140,17 @@ def test_weighted_dimension_average_renormalizes_missing_metric():
     assert avg == pytest.approx(1.0)
 
 
+def test_weighted_dimension_average_matches_code_switching_weights():
+    # code_switching_quality: register_match 35%, switch_naturalness 35%, language_preservation 30%
+    metric_scores = {
+        "register_match": [1.0],
+        "switch_naturalness": [1.0],
+        "language_preservation": [0.0],
+    }
+    avg = _weighted_dimension_average(metric_scores, DEFAULT_METRIC_WEIGHTS["code_switching_quality"])
+    assert avg == pytest.approx(0.70)  # 1.0*0.35 + 1.0*0.35 + 0.0*0.30
+
+
 def test_compute_composite_score_uses_metric_weights_when_provided():
     scores = {dim: [0.5] for dim in DEFAULT_WEIGHTS}  # flat fallback for other dimensions
     metric_scores = {

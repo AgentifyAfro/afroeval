@@ -217,7 +217,11 @@ async def dispatch_run(run_id: str) -> None:
                 )
 
                 # ── Step 4: Evaluate each response (parallel via asyncio.gather) ──
-                from ail.code_switching import CodeSwitchingEvaluator
+                from ail.code_switching import (
+                    LanguagePreservationEvaluator,
+                    RegisterMatchEvaluator,
+                    SwitchNaturalnessEvaluator,
+                )
                 from ail.cultural_appropriateness import CulturalAppropriatenessEvaluator
                 from ail.hallucination_probes import AfricanHallucinationProbeEvaluator
                 from evaluators.bias_fairness import CohortDisparityEvaluator
@@ -245,7 +249,9 @@ async def dispatch_run(run_id: str) -> None:
                     CohortDisparityEvaluator(),
                     SafetyEvaluator(),
                     CulturalAppropriatenessEvaluator(judge=judge),
-                    CodeSwitchingEvaluator(),
+                    RegisterMatchEvaluator(judge=judge),
+                    SwitchNaturalnessEvaluator(judge=judge),
+                    LanguagePreservationEvaluator(judge=judge),
                 ]
 
                 dimension_scores: dict[str, list[float]] = {dim: [] for dim in DEFAULT_WEIGHTS}
