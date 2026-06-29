@@ -24,10 +24,33 @@ from hitl.client import LabelStudioClient
 from hitl.label_config import PROJECT_TITLE, build_calibration_label_config
 
 
+# Metric names whose current implementation is a placeholder stub — the score
+# is a fixed constant that ignores the actual model response, not a real
+# measurement. Shown as "not yet implemented" instead of a misleadingly
+# specific number until the real evaluator (see docs/METHODOLOGY_V1.md) lands.
+_STUB_METRIC_NAMES = {
+    "cohort_disparity",             # CohortDisparityEvaluator — always 0.75
+    "cultural_rubric_score",        # CulturalAppropriatenessEvaluator — always 0.6
+    "code_switching_score",         # CodeSwitchingEvaluator — always 0.6
+    "african_hallucination_probe",  # only 2 hardcoded fabrication topics, not a real probe set
+}
+
+
 def _format_automated_scores(metric_results: list[MetricResult]) -> str:
     if not metric_results:
         return "(no automated scores recorded for this response)"
-    lines = [f"{m.dimension}: {m.score:.2f} ({'pass' if m.passed else 'fail'}) — {m.reason}" for m in metric_results]
+    lines = []
+    for m in metric_results:
+        if m.metric_name in _STUB_METRIC_NAMES:
+            lines.append(
+                f"{m.dimension} ({m.metric_name}): automated scoring not yet implemented — "
+                "rely on your own independent judgment for this dimension."
+            )
+        else:
+            lines.append(
+                f"{m.dimension} ({m.metric_name}): {m.score:.2f} "
+                f"({'pass' if m.passed else 'fail'}) — {m.reason}"
+            )
     return "\n".join(lines)
 
 

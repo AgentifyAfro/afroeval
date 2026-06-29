@@ -53,3 +53,7 @@ Thumbs.db
 # Keep versions directory but not SQLite test DBs
 *.db
 *.sqlite3
+
+# ── Agentic worktree scratch space — never commit worktree contents ─────────
+.claude/worktrees/
+.superpowers/
