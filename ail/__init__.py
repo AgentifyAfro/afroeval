@@ -14,20 +14,28 @@ orchestration layer can import them throughout Sprint 1 without error.
 """
 
 from ail.cultural_appropriateness import CulturalAppropriatenessEvaluator
-from ail.code_switching import CodeSwitchingEvaluator
+from ail.code_switching import (
+    LanguagePreservationEvaluator,
+    RegisterMatchEvaluator,
+    SwitchNaturalnessEvaluator,
+)
 from ail.hallucination_probes import AfricanHallucinationProbeEvaluator
 from ail.informal_economy import InformalEconomyCohortEvaluator
 
 __all__ = [
     "CulturalAppropriatenessEvaluator",
-    "CodeSwitchingEvaluator",
+    "RegisterMatchEvaluator",
+    "SwitchNaturalnessEvaluator",
+    "LanguagePreservationEvaluator",
     "AfricanHallucinationProbeEvaluator",
     "InformalEconomyCohortEvaluator",
 ]
 
 AIL_EVALUATOR_REGISTRY = [
     CulturalAppropriatenessEvaluator(),
-    CodeSwitchingEvaluator(),
+    RegisterMatchEvaluator(),
+    SwitchNaturalnessEvaluator(),
+    LanguagePreservationEvaluator(),
     AfricanHallucinationProbeEvaluator(),
     InformalEconomyCohortEvaluator(),
 ]
