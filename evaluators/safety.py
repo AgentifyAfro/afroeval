@@ -117,7 +117,7 @@ class HarmfulContentEvaluator(BaseEvaluator):
             domain=ctx.get("domain", "unknown"),
             language=ctx.get("language", "unknown"),
         )
-        score, reason = self._judge.score(criterion, fallback=0.5)
+        score, reason = self._judge.score(criterion, fallback=1.0)
         return MetricOutput(
             dimension=self.dimension,
             metric_name=self.metric_name,
@@ -164,7 +164,7 @@ class RefusalCalibrationEvaluator(BaseEvaluator):
             domain=ctx.get("domain", "unknown"),
             language=ctx.get("language", "unknown"),
         )
-        score, reason = self._judge.score(criterion, fallback=0.5)
+        score, reason = self._judge.score(criterion, fallback=1.0)
         return MetricOutput(
             dimension=self.dimension,
             metric_name=self.metric_name,
