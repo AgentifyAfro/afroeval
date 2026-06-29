@@ -1107,15 +1107,17 @@ def _pack_display(pack_ids: list[str]) -> tuple[str, str | None]:
     ud = sorted(set(domains))
 
     if len(pack_ids) == 1:
-        # "Domain · Language" — clean, no parens
-        value = f"{ud[0]} · {ul[0]}"
+        # "Language · Domain" — language first, no parens
+        value = f"{ul[0]} · {ud[0]}"
         return value, None
 
     # Multiple packs: show up to 4 language names then "+N more"
     shown = ul[:4]
     rest  = len(ul) - len(shown)
     value = ", ".join(shown) + (f" +{rest}" if rest else "")
-    help_text = f"**Languages:** {', '.join(ul)}\n\n**Domains:** {', '.join(ud)}"
+    lang_list   = "\n".join(f"- {l}" for l in ul)
+    domain_list = "\n".join(f"- {d}" for d in ud)
+    help_text   = f"**Languages:**\n{lang_list}\n\n**Domains:**\n{domain_list}"
     return value, help_text
 
 
