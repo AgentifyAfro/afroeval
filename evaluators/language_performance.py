@@ -260,7 +260,9 @@ class ChrFEvaluator(BaseEvaluator):
 def _get_multilingual_model():
     """Load the multilingual sentence-transformer model once and cache it."""
     from sentence_transformers import SentenceTransformer  # noqa: PLC0415
-    return SentenceTransformer("paraphrase-multilingual-MiniLM-L6-v2")
+    # token=False forces anonymous HuggingFace download even if HF_TOKEN is set
+    # in the environment — prevents 401s from expired/invalid ambient tokens.
+    return SentenceTransformer("paraphrase-multilingual-MiniLM-L6-v2", token=False)
 
 
 class MultilingualSimilarityEvaluator(BaseEvaluator):

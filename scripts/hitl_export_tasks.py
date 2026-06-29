@@ -30,6 +30,17 @@ from hitl.label_config import PROJECT_TITLE, build_calibration_label_config
 # specific number until the real evaluator (see docs/METHODOLOGY_V1.md) lands.
 _STUB_METRIC_NAMES: set[str] = set()
 
+# Reason-string prefixes that indicate a transient infrastructure error (rate
+# limits, auth failures, network timeouts). SMEs should never see raw exception
+# text — replace with a clean "unavailable" message instead.
+_ERROR_REASON_PREFIXES = (
+    "AnswerRelevancyMetric unavailable:",
+    "GEval unavailable:",
+    "FaithfulnessMetric unavailable:",
+    "Multilingual similarity unavailable:",
+    "chrF unavailable:",
+)
+
 
 def _format_automated_scores(metric_results: list[MetricResult]) -> str:
     if not metric_results:
@@ -39,6 +50,11 @@ def _format_automated_scores(metric_results: list[MetricResult]) -> str:
         if m.metric_name in _STUB_METRIC_NAMES:
             lines.append(
                 f"{m.dimension} ({m.metric_name}): automated scoring not yet implemented — "
+                "rely on your own independent judgment for this dimension."
+            )
+        elif any(m.reason.startswith(prefix) for prefix in _ERROR_REASON_PREFIXES):
+            lines.append(
+                f"{m.dimension} ({m.metric_name}): automated scoring unavailable — "
                 "rely on your own independent judgment for this dimension."
             )
         else:

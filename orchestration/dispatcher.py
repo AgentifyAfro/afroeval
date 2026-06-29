@@ -35,8 +35,13 @@ def _parse_pack_id(pack_id: str) -> tuple[str, str]:
     return pack_id[:idx], pack_id[idx + 1:]
 
 
-def _build_connector(model_provider: str, cfg):
-    """Return the right ingestion connector for the given provider."""
+def _build_connector(model_provider: str, cfg, model_override: str | None = None):
+    """Return the right ingestion connector for the given provider.
+
+    model_override, when set, takes precedence over the config default — this is
+    how multi-model runs work: the assessment stores the intended model_identifier
+    and the dispatcher passes it through so each run actually calls a different model.
+    """
     from ingestion.anthropic_connector import AnthropicConnector
     from ingestion.azure_openai_connector import AzureOpenAIConnector
     from ingestion.openai_connector import OpenAIConnector
@@ -45,18 +50,24 @@ def _build_connector(model_provider: str, cfg):
         return AzureOpenAIConnector(
             api_key=cfg.azure_openai_api_key,
             endpoint=cfg.azure_openai_endpoint,
-            deployment_name=cfg.azure_openai_deployment_name,
+            deployment_name=model_override or cfg.azure_openai_deployment_name,
             api_version=cfg.azure_openai_api_version,
         )
     elif model_provider == "openai":
         return OpenAIConnector(
             api_key=cfg.openai_api_key,
-            model=cfg.openai_default_model,
+            model=model_override or cfg.openai_default_model,
         )
     elif model_provider == "anthropic":
         return AnthropicConnector(
             api_key=cfg.anthropic_api_key,
-            model=cfg.anthropic_default_model,
+            model=model_override or cfg.anthropic_default_model,
+        )
+    elif model_provider == "gemini":
+        from ingestion.gemini_connector import GeminiConnector
+        return GeminiConnector(
+            api_key=cfg.gemini_api_key,
+            model=model_override or "gemini-2.0-flash",
         )
     elif model_provider == "jsonl_upload":
         raise ValueError(
@@ -182,7 +193,10 @@ async def dispatch_run(run_id: str) -> None:
                     )
 
                 # ── Step 3: Get model responses (parallel via ThreadPoolExecutor) ──
-                connector = _build_connector(assessment.model_provider, cfg)
+                connector = _build_connector(
+                    assessment.model_provider, cfg,
+                    model_override=assessment.model_identifier or None,
+                )
                 # Run connector in a thread so the event loop stays responsive.
                 raw_responses = await asyncio.to_thread(connector.get_responses, all_items)
 

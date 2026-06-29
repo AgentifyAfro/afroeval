@@ -102,7 +102,7 @@ async def _run(run_id: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--assessment-name", default="SME Calibration v2 — all packs")
-    parser.add_argument("--model-provider", default="azure_openai", choices=["azure_openai", "anthropic", "openai"])
+    parser.add_argument("--model-provider", default="azure_openai", choices=["azure_openai", "anthropic", "openai", "gemini"])
     parser.add_argument("--model-id", default="gpt-4.1-mini")
     parser.add_argument("--packs", nargs="+", default=_DEFAULT_PACKS)
     parser.add_argument("--project-title", default=_DEFAULT_PROJECT_TITLE)
