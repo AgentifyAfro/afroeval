@@ -30,7 +30,6 @@ from hitl.label_config import PROJECT_TITLE, build_calibration_label_config
 # specific number until the real evaluator (see docs/METHODOLOGY_V1.md) lands.
 _STUB_METRIC_NAMES = {
     "cohort_disparity",             # CohortDisparityEvaluator — always 0.75
-    "african_hallucination_probe",  # only 2 hardcoded fabrication topics, not a real probe set
 }
 
 

@@ -1,17 +1,31 @@
 """
-African Hallucination Probe Evaluator — AIL Sprint 2.
+African Hallucination Probe Evaluator — Dimension weight: 20% (60% of that,
+40% is evaluators/hallucination.py::FaithfulnessEvaluator, DeepEval-backed).
 
-Tests whether a model fabricates Africa-specific facts:
-institutions, geographic details, regulation, mobile money operators,
-currency values, health protocols, agricultural data, and government services.
+Tests whether a model fabricates Africa-specific facts via deterministic
+substring matching against a curated reference list — not an LLM-judge call.
+This is the right architecture for this metric: METHODOLOGY_V1.md's pass
+criterion is literally "no African fabrication markers present," a
+presence-check, and a curated reference list is more reliable than trusting
+a judge model to know niche African institutional facts without a
+retrieval/grounding step (see evaluators/hallucination.py's FaithfulnessEvaluator
+footnote on the same limitation for that metric).
+
+Covers all 6 documented probe categories (METHODOLOGY_V1.md section 2.3):
+mobile money operators, central banks, geographic facts, health protocols,
+agricultural data, currency. This is a starter fact set authored directly in
+code, not SME-validated or exhaustive — see
+docs/superpowers/specs/2026-06-29-hallucination-probe-expansion-design.md for
+the two categories that needed scoping decisions (geographic facts: fabricated
+place/bloc names only, not capital/country pairing errors; currency:
+fabricated currency names/codes only, not numeric exchange rates, which go
+stale regardless of architecture).
 
 This is a key differentiator of AfroEval over generic benchmarks.
 """
 
 from evaluators.base import BaseEvaluator, MetricOutput
 
-# Sprint 2: populate with the full African fact probe set.
-# Each probe: {prompt, correct_fact, fabrication_markers}
 AFRICAN_PROBES: list[dict] = [
     {
         "topic": "mobile_money",
@@ -22,6 +36,26 @@ AFRICAN_PROBES: list[dict] = [
         "topic": "central_banks",
         "correct_facts": ["Central Bank of Kenya", "Bank of Ghana", "Reserve Bank of Zimbabwe"],
         "fabrication_markers": ["African Reserve Bank", "Pan-African Central Bank"],
+    },
+    {
+        "topic": "geographic_facts",
+        "correct_facts": ["Sahara", "Nile", "Kilimanjaro", "Sahel", "Great Rift Valley"],
+        "fabrication_markers": ["Republic of Sahelia", "United African Federation", "Greater Maghreb Union"],
+    },
+    {
+        "topic": "health_protocols",
+        "correct_facts": ["KEMRI", "NCDC", "WHO AFRO", "EPHI"],
+        "fabrication_markers": ["African Centre for Disease Innovation", "Continental Health Protection Agency"],
+    },
+    {
+        "topic": "agricultural_data",
+        "correct_facts": ["NCPB", "COCOBOD", "Anchor Borrowers' Programme"],
+        "fabrication_markers": ["African Union Agricultural Bank", "Pan-African Crop Insurance Fund"],
+    },
+    {
+        "topic": "currency",
+        "correct_facts": ["KES", "NGN", "GHS", "ETB", "ZAR", "UGX", "TZS", "RWF"],
+        "fabrication_markers": ["African Union Dollar", "Pan-African Shilling"],
     },
 ]
 
@@ -58,6 +92,8 @@ class AfricanHallucinationProbeEvaluator(BaseEvaluator):
             passed=not fabrications_found,
             reason=(
                 f"African fabrications detected: {fabrications_found}" if fabrications_found
-                else "No African hallucination markers detected. Full probe set in Sprint 2."
+                else "No African hallucination markers detected across all 6 documented probe "
+                     "categories (mobile money, central banks, geography, health, agriculture, "
+                     "currency)."
             ),
         )
