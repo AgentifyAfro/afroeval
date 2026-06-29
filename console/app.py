@@ -93,8 +93,10 @@ PACK_CATALOG = [
     {"id": "urban_digital_sheng_v1.0.0",   "label": "Urban Digital (Sheng)",         "language": "sheng"},
     {"id": "code_switching_mixed_v1.0.0",  "label": "Code Switching (mixed)",        "language": "mixed"},
     {"id": "safety_mixed_v1.0.0",          "label": "Safety (mixed)",                "language": "mixed"},
-    {"id": "customer_service_en_v1.0.0",   "label": "Customer Service EN (baseline)","language": "en"},
+    {"id": "customer_service_en_v1.0.0",   "label": "Customer Service (English)",    "language": "en"},
 ]
+
+_PACK_META: dict[str, str] = {p["id"]: p["label"] for p in PACK_CATALOG}
 
 PROVIDER_MODEL_DEFAULTS = {
     "azure_openai": "gpt-4.1-mini",
@@ -1085,6 +1087,38 @@ def render_calibration_view() -> None:
     _render_calibration_detail(cal_df)
 
 
+def _pack_display(pack_ids: list[str]) -> tuple[str, str | None]:
+    """Return (metric_value, help_text_or_None) for the Packs KPI card."""
+    if not pack_ids:
+        return "—", None
+
+    labels = [_PACK_META.get(pid, pid) for pid in pack_ids]
+    langs, domains = [], []
+    for lbl in labels:
+        if " (" in lbl:
+            dom, lang_part = lbl.rsplit(" (", 1)
+            langs.append(lang_part.rstrip(")"))
+            domains.append(dom)
+        else:
+            langs.append(lbl)
+            domains.append(lbl)
+
+    ul = list(dict.fromkeys(langs))   # unique, order-preserving
+    ud = sorted(set(domains))
+
+    if len(pack_ids) == 1:
+        # "Domain · Language" — clean, no parens
+        value = f"{ud[0]} · {ul[0]}"
+        return value, None
+
+    # Multiple packs: show up to 4 language names then "+N more"
+    shown = ul[:4]
+    rest  = len(ul) - len(shown)
+    value = ", ".join(shown) + (f" +{rest}" if rest else "")
+    help_text = f"**Languages:** {', '.join(ul)}\n\n**Domains:** {', '.join(ud)}"
+    return value, help_text
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def render_run_scorecard() -> None:
@@ -1117,7 +1151,8 @@ def render_run_scorecard() -> None:
     c2.metric("Verdict", _verdict_badge(selected["verdict"]))
     c3.metric("Confidence", selected["confidence_flag"])
     c4.metric("Model", selected["model"])
-    c5.metric("Packs", len(selected["pack_ids"]))
+    _pack_val, _pack_help = _pack_display(selected["pack_ids"])
+    c5.metric("Language & Domain", _pack_val, help=_pack_help)
 
     pdf_bytes = _scorecard_pdf_bytes(run_id)
     if pdf_bytes:

@@ -82,10 +82,11 @@ def _create_assessment_and_run(
         session.commit()
 
         run_id = str(run.id)
+        assessment_id = str(assessment.id)
 
     logger.info(
         "Assessment and run created",
-        assessment_id=str(assessment.id),
+        assessment_id=assessment_id,
         assessment_name=assessment_name,
         run_id=run_id,
         packs=pack_ids,
