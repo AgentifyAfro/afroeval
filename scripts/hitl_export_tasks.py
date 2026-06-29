@@ -68,10 +68,10 @@ def _already_exported_response_ids(client: LabelStudioClient, project_id: int) -
     }
 
 
-def export(run_id: uuid.UUID | None = None) -> None:
+def export(run_id: uuid.UUID | None = None, project_title: str = PROJECT_TITLE) -> None:
     engine = get_engine()
     client = LabelStudioClient()
-    project = client.get_or_create_project(PROJECT_TITLE, build_calibration_label_config())
+    project = client.get_or_create_project(project_title, build_calibration_label_config())
     already_exported = _already_exported_response_ids(client, project["id"])
 
     with Session(engine) as session:
@@ -98,11 +98,12 @@ def export(run_id: uuid.UUID | None = None) -> None:
             })
 
     result = client.import_tasks(project["id"], tasks)
-    print(f"Exported {len(tasks)} task(s) to project '{PROJECT_TITLE}' (id={project['id']}): {result}")
+    print(f"Exported {len(tasks)} task(s) to project '{project_title}' (id={project['id']}): {result}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--run-id", type=str, default=None, help="Only export responses from this Run UUID")
+    parser.add_argument("--project-title", type=str, default=PROJECT_TITLE, help="Label Studio project name (creates new project if it doesn't exist)")
     args = parser.parse_args()
-    export(run_id=uuid.UUID(args.run_id) if args.run_id else None)
+    export(run_id=uuid.UUID(args.run_id) if args.run_id else None, project_title=args.project_title)
