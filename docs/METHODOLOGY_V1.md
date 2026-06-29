@@ -70,8 +70,13 @@ A technically correct response that violates local norms, uses inappropriate reg
 **Metrics:**
 | Metric | Tool | Weight within dimension |
 |---|---|---|
-| Cultural rubric score (1–5) | LLM-judge + SME calibration | 70% |
-| Register appropriateness | LLM-judge | 30% |
+| Cultural rubric score (1–5), holistic | LLM-judge + SME calibration | 100% |
+
+Register appropriateness is assessed as part of this single holistic score — not as
+a separate, independently-averaged sub-metric. The rubric's domain checklists and
+Register Guide already incorporate register as one of several things the judge
+considers when assigning the one rubric score. See
+`ail/cultural_appropriateness.py` for the implementation.
 
 **Rubric scale:**
 

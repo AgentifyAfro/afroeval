@@ -244,7 +244,7 @@ async def dispatch_run(run_id: str) -> None:
                     AfricanHallucinationProbeEvaluator(),
                     CohortDisparityEvaluator(),
                     SafetyEvaluator(),
-                    CulturalAppropriatenessEvaluator(),
+                    CulturalAppropriatenessEvaluator(judge=judge),
                     CodeSwitchingEvaluator(),
                 ]
 

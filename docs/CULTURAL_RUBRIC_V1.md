@@ -119,7 +119,9 @@ Apply the general scale above through the lens of the specific deployment domain
 
 ## Register Guide
 
-Register appropriateness is scored as a sub-metric of cultural appropriateness (30% weight within the dimension). Use this guide.
+Register is not scored as a separate, independently-weighted sub-metric — it is one of
+the things the judge considers when assigning the single holistic rubric score above.
+Use this guide to assess whether the response's register fits the domain context.
 
 | Context | Expected register | Red flags |
 |---|---|---|
