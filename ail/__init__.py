@@ -7,10 +7,15 @@ contract but contain Africa-specific logic that no generic benchmark replicates:
   - cultural_appropriateness.py  — rubric-based LLM-judge, calibrated to SME judgment
   - code_switching.py            — Sheng / Pidgin / mixed-language quality scoring
   - hallucination_probes.py      — African-specific fabrication detection
-  - informal_economy.py          — cohort logic for informal-sector users
 
 Sprint 2 implements these evaluators. This __init__ exports stubs so the
 orchestration layer can import them throughout Sprint 1 without error.
+
+Note: informal_economy.py (cohort logic for informal-sector users) was
+archived 2026-06-29 — see ail/informal_economy.archive.py. Its real logic
+was rebuilt into evaluators/bias_fairness.py::CohortDisparityEvaluator
+instead, since it was never wired into orchestration/dispatcher.py and
+would have competed with that implementation of the same dimension.
 """
 
 from ail.cultural_appropriateness import CulturalAppropriatenessEvaluator
@@ -20,7 +25,6 @@ from ail.code_switching import (
     SwitchNaturalnessEvaluator,
 )
 from ail.hallucination_probes import AfricanHallucinationProbeEvaluator
-from ail.informal_economy import InformalEconomyCohortEvaluator
 
 __all__ = [
     "CulturalAppropriatenessEvaluator",
@@ -28,7 +32,6 @@ __all__ = [
     "SwitchNaturalnessEvaluator",
     "LanguagePreservationEvaluator",
     "AfricanHallucinationProbeEvaluator",
-    "InformalEconomyCohortEvaluator",
 ]
 
 AIL_EVALUATOR_REGISTRY = [
@@ -37,5 +40,4 @@ AIL_EVALUATOR_REGISTRY = [
     SwitchNaturalnessEvaluator(),
     LanguagePreservationEvaluator(),
     AfricanHallucinationProbeEvaluator(),
-    InformalEconomyCohortEvaluator(),
 ]

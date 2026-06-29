@@ -1,3 +1,8 @@
+# ARCHIVED 2026-06-29: never wired into orchestration/dispatcher.py. Its real
+# logic (Fairlearn cohort comparison) was rebuilt into
+# evaluators/bias_fairness.py::CohortDisparityEvaluator instead of being
+# activated here, to avoid two competing implementations of the same
+# dimension. See docs/superpowers/specs/2026-06-29-bias-fairness-evaluator-design.md.
 """
 Informal Economy Cohort Evaluator — AIL Sprint 2.
 
