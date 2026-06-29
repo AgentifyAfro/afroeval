@@ -102,6 +102,7 @@ PROVIDER_MODEL_DEFAULTS = {
     "azure_openai": "gpt-4.1-mini",
     "anthropic":    "claude-haiku-4-5-20251001",
     "openai":       "gpt-4o",
+    "gemini":       "gemini-2.0-flash",
 }
 
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -741,7 +742,7 @@ def _launch_run(name: str, provider: str, model_id: str, pack_ids: list) -> None
     _SECRET_KEYS = [
         "AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT",
         "AZURE_OPENAI_DEPLOYMENT_NAME", "AZURE_OPENAI_API_VERSION",
-        "ANTHROPIC_API_KEY", "OPENAI_API_KEY",
+        "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY",
         "DATABASE_URL",
     ]
     for _k in _SECRET_KEYS:
@@ -912,7 +913,7 @@ def render_run_evaluation() -> None:
     with mc1:
         provider = st.selectbox(
             "Provider",
-            ["azure_openai", "anthropic", "openai"],
+            ["azure_openai", "anthropic", "openai", "gemini"],
             format_func=lambda v: PROVIDER_SHORT.get(v, v),
             key="op_provider",
             on_change=_sync_model_id,
