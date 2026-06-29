@@ -45,7 +45,7 @@ def test_no_judge_configured_stub_behavior(evaluator_cls):
         context={"language": "sheng"},
     )
     assert result.score == 0.5
-    assert result.passed is True
+    assert result.passed is False
     assert "not configured" in result.reason.lower()
 
 

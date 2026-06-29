@@ -59,7 +59,7 @@ class RegisterMatchEvaluator(BaseEvaluator):
                 dimension=self.dimension,
                 metric_name=self.metric_name,
                 score=score,
-                passed=not_empty,  # Stub: pass if non-empty, fail if empty
+                passed=score >= 0.6,
                 reason="Stub — LLM judge not configured.",
             )
 
@@ -120,7 +120,7 @@ class SwitchNaturalnessEvaluator(BaseEvaluator):
                 dimension=self.dimension,
                 metric_name=self.metric_name,
                 score=score,
-                passed=not_empty,  # Stub: pass if non-empty, fail if empty
+                passed=score >= 0.6,
                 reason="Stub — LLM judge not configured.",
             )
 
@@ -180,7 +180,7 @@ class LanguagePreservationEvaluator(BaseEvaluator):
                 dimension=self.dimension,
                 metric_name=self.metric_name,
                 score=score,
-                passed=not_empty,  # Stub: pass if non-empty, fail if empty
+                passed=score >= 0.6,
                 reason="Stub — LLM judge not configured.",
             )
 
