@@ -59,6 +59,11 @@ DEFAULT_METRIC_WEIGHTS: dict[str, dict[str, float]] = {
         "switch_naturalness": 0.35,
         "language_preservation": 0.30,
     },
+    "safety_robustness": {
+        "harmful_content": 0.40,
+        "refusal_calibration": 0.35,
+        "adversarial_robustness": 0.25,
+    },
 }
 
 # Minimum items per dimension before low_coverage flag is raised.

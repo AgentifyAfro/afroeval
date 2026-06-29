@@ -233,7 +233,11 @@ async def dispatch_run(run_id: str) -> None:
                     MultilingualSimilarityEvaluator,
                     SemanticSimilarityEvaluator,
                 )
-                from evaluators.safety import SafetyEvaluator
+                from evaluators.safety import (
+                    AdversarialRobustnessEvaluator,
+                    HarmfulContentEvaluator,
+                    RefusalCalibrationEvaluator,
+                )
 
                 judge = _build_judge(cfg)
                 deepeval_model = _build_deepeval_model(cfg)
@@ -246,7 +250,9 @@ async def dispatch_run(run_id: str) -> None:
                     MultilingualSimilarityEvaluator(),
                     FaithfulnessEvaluator(model=deepeval_model),
                     AfricanHallucinationProbeEvaluator(),
-                    SafetyEvaluator(),
+                    HarmfulContentEvaluator(judge=judge),
+                    RefusalCalibrationEvaluator(judge=judge),
+                    AdversarialRobustnessEvaluator(judge=judge),
                     CulturalAppropriatenessEvaluator(judge=judge),
                     RegisterMatchEvaluator(judge=judge),
                     SwitchNaturalnessEvaluator(judge=judge),
