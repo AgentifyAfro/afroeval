@@ -28,9 +28,7 @@ from hitl.label_config import PROJECT_TITLE, build_calibration_label_config
 # is a fixed constant that ignores the actual model response, not a real
 # measurement. Shown as "not yet implemented" instead of a misleadingly
 # specific number until the real evaluator (see docs/METHODOLOGY_V1.md) lands.
-_STUB_METRIC_NAMES = {
-    "cohort_disparity",             # CohortDisparityEvaluator — always 0.75
-}
+_STUB_METRIC_NAMES: set[str] = set()
 
 
 def _format_automated_scores(metric_results: list[MetricResult]) -> str:

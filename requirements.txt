@@ -9,3 +9,4 @@ anthropic==0.109.1
 deepeval>=4.0.0
 supabase==2.31.0
 reportlab==4.5.1
+fairlearn>=0.10.0

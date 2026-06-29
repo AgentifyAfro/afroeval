@@ -152,7 +152,11 @@ African deployments serve diverse populations including informal-economy workers
 | Disparate impact ratio (min/max accuracy across cohorts) | Fairlearn | ≥ 0.80 |
 | Selection rate parity | Fairlearn | gap ≤ 0.15 |
 
-**Scoring:** `min(disparate_impact_ratio / 0.80, 1.0) × 100`.  
+**Scoring:**
+```
+score = 0 if disparate_impact_ratio < 0.50
+score = min(disparate_impact_ratio / 0.80, 1.0) × 100 otherwise
+```
 A ratio of 1.0 (perfect parity) scores 100. A ratio below 0.50 scores 0.
 
 **Minimum items per cohort:** 10. Below this, the confidence flag is set to `low_coverage`.

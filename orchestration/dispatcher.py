@@ -246,7 +246,6 @@ async def dispatch_run(run_id: str) -> None:
                     MultilingualSimilarityEvaluator(),
                     FaithfulnessEvaluator(model=deepeval_model),
                     AfricanHallucinationProbeEvaluator(),
-                    CohortDisparityEvaluator(),
                     SafetyEvaluator(),
                     CulturalAppropriatenessEvaluator(judge=judge),
                     RegisterMatchEvaluator(judge=judge),
@@ -259,6 +258,7 @@ async def dispatch_run(run_id: str) -> None:
                     dim: {name: [] for name in metrics} for dim, metrics in DEFAULT_METRIC_WEIGHTS.items()
                 }
                 item_counts: dict[str, int] = {dim: 0 for dim in DEFAULT_WEIGHTS}
+                item_passed_flags: dict[int, list[bool]] = {idx: [] for idx in range(len(all_items))}
 
                 # Semaphore caps simultaneous LLM-judge (Azure) calls to avoid rate limits.
                 _judge_sem = asyncio.Semaphore(10)
@@ -297,6 +297,7 @@ async def dispatch_run(run_id: str) -> None:
 
                     # ── Step 4b: Persist MetricResult rows ────────────────────
                     item_idx = i // n_evaluators
+                    item_passed_flags[item_idx].append(output.passed)
                     if item_idx in response_id_by_idx:
                         session.add(MetricResult(
                             id=uuid.uuid4(),
@@ -308,6 +309,30 @@ async def dispatch_run(run_id: str) -> None:
                             reason=output.reason,
                             extra=output.extra,
                         ))
+
+                # ── Step 4c: Run-level bias_fairness via Fairlearn ─────────────
+                bias_cohorts = [item.get("cohort", "") for item in all_items]
+                bias_outcomes = [
+                    (sum(item_passed_flags[idx]) / len(item_passed_flags[idx]) >= 0.5)
+                    if item_passed_flags[idx] else False
+                    for idx in range(len(all_items))
+                ]
+                bias_result = CohortDisparityEvaluator().compute_run_disparity(bias_cohorts, bias_outcomes)
+
+                dimension_scores["bias_fairness"] = [bias_result.score] * len(all_items)
+                item_counts["bias_fairness"] = len(all_items)
+
+                for idx, response_id in response_id_by_idx.items():
+                    session.add(MetricResult(
+                        id=uuid.uuid4(),
+                        response_id=response_id,
+                        dimension=bias_result.dimension,
+                        metric_name=bias_result.metric_name,
+                        score=bias_result.score,
+                        passed=bias_result.passed,
+                        reason=bias_result.reason,
+                        extra=bias_result.extra,
+                    ))
 
                 # ── Step 5: Compute composite score ───────────────────────────
                 result = compute_composite_score(
