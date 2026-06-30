@@ -288,6 +288,7 @@ async def dispatch_run(run_id: str) -> None:
                         "language": item.get("language", ""),
                         "domain": item.get("domain", ""),
                         "cohort": item.get("cohort", ""),
+                        "tags": item.get("tags", []),
                     }
                     async with _judge_sem:
                         return await asyncio.to_thread(
@@ -307,6 +308,16 @@ async def dispatch_run(run_id: str) -> None:
 
                 n_evaluators = len(evaluators)
                 for i, output in enumerate(all_outputs):
+                    # item_idx must be derived from position (fixed evaluator grid),
+                    # so compute it before any skip to keep the mapping intact.
+                    item_idx = i // n_evaluators
+
+                    # Not-applicable metrics (e.g. code-switching on a monolingual
+                    # item) are dropped entirely: they don't score, don't count
+                    # toward coverage or the bias pass-rate, and aren't persisted.
+                    if not output.applicable:
+                        continue
+
                     if output.dimension in dimension_scores:
                         dimension_scores[output.dimension].append(output.score)
                         item_counts[output.dimension] += 1
@@ -316,7 +327,6 @@ async def dispatch_run(run_id: str) -> None:
                         dim_metrics[output.metric_name].append(output.score)
 
                     # ── Step 4b: Persist MetricResult rows ────────────────────
-                    item_idx = i // n_evaluators
                     item_passed_flags[item_idx].append(output.passed)
                     if item_idx in response_id_by_idx:
                         session.add(MetricResult(

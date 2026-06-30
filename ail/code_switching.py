@@ -28,6 +28,44 @@ from evaluators.llm_judge import LLMJudge
 
 _PRIMARY_VARIETIES = "Sheng (Nairobi), Nigerian Pidgin, Kinyarwanda-French, Darija (Moroccan Arabic-French)"
 
+# Languages that are inherently code-switched varieties. An item in one of these
+# always involves code-switching, regardless of tags.
+_CODE_SWITCH_LANGUAGES = {"sheng", "pidgin", "darija", "kinyarwanda-french"}
+
+# Tags that mark an item as a code-switching item even when its `language` field
+# is a monolingual anchor (e.g. a Yoruba-Pidgin item is language="yo" + "pidgin"
+# tag, or a deliberate code-switch probe seeded into the monolingual sw pack).
+_CODE_SWITCH_TAGS = {"code_switching", "pidgin", "sheng"}
+
+
+def _is_code_switching_item(context: dict | None) -> bool:
+    """
+    True if this item actually involves code-switching, so the dimension applies.
+
+    Root-cause fix: the three code-switching evaluators used to run on every item
+    in a run, including the ~83% drawn from monolingual packs. switch_naturalness
+    then scored a correct monolingual answer 0.0 ("no attempt at code-switching"),
+    collapsing the dimension to ~0 uniformly across all languages. We now score
+    only genuine code-switching items; everything else is marked not-applicable
+    and dropped by the dispatcher before it reaches the score.
+    """
+    ctx = context or {}
+    tags = {str(t).lower() for t in (ctx.get("tags") or [])}
+    language = str(ctx.get("language", "")).lower()
+    return bool(tags & _CODE_SWITCH_TAGS) or language in _CODE_SWITCH_LANGUAGES
+
+
+def _not_applicable(dimension: str, metric_name: str) -> MetricOutput:
+    """Sentinel result for an item that does not involve code-switching."""
+    return MetricOutput(
+        dimension=dimension,
+        metric_name=metric_name,
+        score=0.0,
+        passed=False,
+        reason="Not a code-switching item — dimension not applicable to monolingual prompts.",
+        applicable=False,
+    )
+
 
 class RegisterMatchEvaluator(BaseEvaluator):
     """Does the response match the input's register (formal/informal/mixed)?"""
@@ -51,6 +89,9 @@ class RegisterMatchEvaluator(BaseEvaluator):
         context: dict | None = None,
     ) -> MetricOutput:
         ctx = context or {}
+
+        if not _is_code_switching_item(ctx):
+            return _not_applicable(self.dimension, self.metric_name)
 
         if not self._judge:
             not_empty = bool(model_response.strip())
@@ -113,6 +154,9 @@ class SwitchNaturalnessEvaluator(BaseEvaluator):
     ) -> MetricOutput:
         ctx = context or {}
 
+        if not _is_code_switching_item(ctx):
+            return _not_applicable(self.dimension, self.metric_name)
+
         if not self._judge:
             not_empty = bool(model_response.strip())
             score = 0.5 if not_empty else 0.0
@@ -172,6 +216,9 @@ class LanguagePreservationEvaluator(BaseEvaluator):
         context: dict | None = None,
     ) -> MetricOutput:
         ctx = context or {}
+
+        if not _is_code_switching_item(ctx):
+            return _not_applicable(self.dimension, self.metric_name)
 
         if not self._judge:
             not_empty = bool(model_response.strip())

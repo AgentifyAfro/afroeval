@@ -20,6 +20,9 @@ class MetricOutput:
     passed: bool
     reason: str = ""          # Human-readable evidence
     extra: dict = field(default_factory=dict)
+    applicable: bool = True   # False = this metric does not apply to this item;
+                              # the dispatcher drops it before scoring/persistence
+                              # (e.g. code-switching metrics on a monolingual item).
 
 
 class BaseEvaluator(ABC):

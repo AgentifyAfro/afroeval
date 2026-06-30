@@ -149,3 +149,71 @@ def test_context_fields_appear_in_prompt(evaluator_cls):
     assert "Test prompt text" in criterion_sent
     assert "Test response text" in criterion_sent
     assert "Test expected text" in criterion_sent
+
+
+# ── Applicability scoping ────────────────────────────────────────────────────
+# The code-switching dimension must only score items that actually involve
+# code-switching. Running it on monolingual items (the majority of packs) made
+# switch_naturalness collapse to ~0 for every language, because the judge sees
+# a correct monolingual answer as "no attempt at code-switching" and scores 0.0.
+# Applicability rule: "code_switching"/"pidgin"/"sheng" tag, OR a code-switched
+# language (sheng / pidgin / darija / kinyarwanda-french).
+
+
+def test_metric_output_applicable_defaults_true():
+    from evaluators.base import MetricOutput
+
+    out = MetricOutput(dimension="d", metric_name="m", score=0.5, passed=True)
+    assert out.applicable is True
+
+
+@pytest.mark.parametrize("evaluator_cls", ALL_EVALUATOR_CLASSES)
+def test_monolingual_item_not_applicable_skips_judge(evaluator_cls):
+    judge = _fake_judge(score=1.0)
+    evaluator = evaluator_cls(judge=judge)
+    result = evaluator.evaluate(
+        prompt="Niambie jinsi ya kutuma pesa kwa M-Pesa.",
+        model_response="Eleza hatua za kutuma pesa kwa M-Pesa kwa PIN yako.",
+        expected_behavior="Explain the M-Pesa send-money steps in Swahili.",
+        context={"language": "sw", "tags": ["send_money", "m-pesa", "swahili"]},
+    )
+    assert result.applicable is False
+    judge.score.assert_not_called()
+
+
+@pytest.mark.parametrize("evaluator_cls", ALL_EVALUATOR_CLASSES)
+def test_sheng_language_item_is_applicable(evaluator_cls):
+    judge = _fake_judge(score=0.8)
+    evaluator = evaluator_cls(judge=judge)
+    result = evaluator.evaluate(
+        prompt="p", model_response="r", expected_behavior="e",
+        context={"language": "sheng", "tags": ["sheng", "airtime"]},
+    )
+    assert result.applicable is True
+    judge.score.assert_called_once()
+
+
+@pytest.mark.parametrize("evaluator_cls", ALL_EVALUATOR_CLASSES)
+def test_code_switching_tag_overrides_monolingual_language(evaluator_cls):
+    # A code-switch probe deliberately seeded into a monolingual (sw) pack.
+    judge = _fake_judge(score=0.8)
+    evaluator = evaluator_cls(judge=judge)
+    result = evaluator.evaluate(
+        prompt="p", model_response="r", expected_behavior="e",
+        context={"language": "sw", "tags": ["code_switching", "m-pesa"]},
+    )
+    assert result.applicable is True
+    judge.score.assert_called_once()
+
+
+@pytest.mark.parametrize("evaluator_cls", ALL_EVALUATOR_CLASSES)
+def test_pidgin_tag_with_yoruba_language_is_applicable(evaluator_cls):
+    # code_switching_mixed pidgin items carry language="yo" + a pidgin tag.
+    judge = _fake_judge(score=0.8)
+    evaluator = evaluator_cls(judge=judge)
+    result = evaluator.evaluate(
+        prompt="p", model_response="r", expected_behavior="e",
+        context={"language": "yo", "tags": ["code_switching", "pidgin", "mtn"]},
+    )
+    assert result.applicable is True
+    judge.score.assert_called_once()

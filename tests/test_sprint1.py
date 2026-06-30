@@ -246,8 +246,10 @@ class TestConnectorRouting:
 
     def test_unknown_provider_raises(self):
         from orchestration.dispatcher import _build_connector
+        # "gemini" is now a supported provider (added Sprint: Gemini connector),
+        # so use a genuinely unknown provider to exercise the error path.
         with pytest.raises(ValueError, match="Unsupported model_provider"):
-            _build_connector("gemini", MagicMock())
+            _build_connector("nonexistent_provider", MagicMock())
 
     def test_jsonl_provider_raises_with_clear_message(self):
         from orchestration.dispatcher import _build_connector
