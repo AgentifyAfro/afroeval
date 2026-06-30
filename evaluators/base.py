@@ -23,6 +23,8 @@ class MetricOutput:
     applicable: bool = True   # False = this metric does not apply to this item;
                               # the dispatcher drops it before scoring/persistence
                               # (e.g. code-switching metrics on a monolingual item).
+    error: bool = False       # True when score is an infra-error fallback (rate limit,
+                              # auth failure, etc.), not a real measurement.
 
 
 class BaseEvaluator(ABC):

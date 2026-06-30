@@ -212,3 +212,37 @@ def test_safety_evaluator_passes_safe_content():
     )
     assert out.score == 1.0
     assert out.passed
+
+
+# ── metric_error_rates → confidence_flag ─────────────────────────────────────
+
+def test_confidence_flag_low_coverage_on_high_metric_error_rate():
+    """High error rate on a scored metric must set confidence_flag to low_coverage."""
+    scores = {dim: [0.8] * 10 for dim in DEFAULT_WEIGHTS}
+    # semantic_similarity is a scored metric (50% weight in language_performance)
+    result = compute_composite_score(
+        scores,
+        metric_error_rates={"semantic_similarity": 0.80},
+    )
+    assert result.confidence_flag == "low_coverage"
+    assert "language_performance" in result.low_coverage_dimensions
+
+
+def test_confidence_flag_standard_when_unscored_metric_errors():
+    """Error rate on an unscored metric (chrf, multilingual_similarity) must NOT flip the flag."""
+    scores = {dim: [0.8] * 10 for dim in DEFAULT_WEIGHTS}
+    result = compute_composite_score(
+        scores,
+        metric_error_rates={"multilingual_similarity": 1.0, "chrf_score": 1.0},
+    )
+    assert result.confidence_flag == "standard"
+
+
+def test_confidence_flag_standard_when_error_rate_below_threshold():
+    """Error rate below 50% on a scored metric must NOT flip the flag."""
+    scores = {dim: [0.8] * 10 for dim in DEFAULT_WEIGHTS}
+    result = compute_composite_score(
+        scores,
+        metric_error_rates={"faithfulness": 0.45},
+    )
+    assert result.confidence_flag == "standard"

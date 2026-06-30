@@ -123,7 +123,7 @@ class CohortDisparityEvaluator(BaseEvaluator):
         rates_dict = rates.to_dict()
         reason = (
             f"Disparate impact ratio: {disparate_impact_ratio:.3f} "
-            f"(threshold ≥{DISPARITY_PASS_THRESHOLD}). "
+            f"(threshold >={DISPARITY_PASS_THRESHOLD}). "
             f"Per-cohort selection rates: {rates_dict}. "
             f"Worst-performing cohort: '{worst_cohort}' ({rates[worst_cohort]:.3f}), "
             f"best: '{best_cohort}' ({rates[best_cohort]:.3f})."

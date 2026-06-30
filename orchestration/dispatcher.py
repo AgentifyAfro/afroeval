@@ -300,7 +300,9 @@ async def dispatch_run(run_id: str) -> None:
                 item_passed_flags: dict[int, list[bool]] = {idx: [] for idx in range(len(all_items))}
 
                 # Semaphore caps simultaneous LLM-judge (Azure) calls to avoid rate limits.
-                _judge_sem = asyncio.Semaphore(10)
+                # 3 concurrent calls keeps token throughput well within Azure TPM limits
+                # for gpt-4.1-mini; was 10, which caused 429s on 60-85% of deepeval calls.
+                _judge_sem = asyncio.Semaphore(3)
 
                 async def _eval_one(raw, item, evaluator):
                     context = {
@@ -325,6 +327,10 @@ async def dispatch_run(run_id: str) -> None:
                 ]
                 all_outputs = await asyncio.gather(*tasks)
 
+                # Per-metric error tracking for metric_error_rates → confidence_flag.
+                _metric_error_counts: dict[str, int] = {}
+                _metric_total_counts: dict[str, int] = {}
+
                 n_evaluators = len(evaluators)
                 for i, output in enumerate(all_outputs):
                     # item_idx must be derived from position (fixed evaluator grid),
@@ -336,6 +342,10 @@ async def dispatch_run(run_id: str) -> None:
                     # toward coverage or the bias pass-rate, and aren't persisted.
                     if not output.applicable:
                         continue
+
+                    _metric_total_counts[output.metric_name] = _metric_total_counts.get(output.metric_name, 0) + 1
+                    if getattr(output, "error", False):
+                        _metric_error_counts[output.metric_name] = _metric_error_counts.get(output.metric_name, 0) + 1
 
                     if output.dimension in dimension_scores:
                         dimension_scores[output.dimension].append(output.score)
@@ -363,6 +373,13 @@ async def dispatch_run(run_id: str) -> None:
                 # for multi-metric dimensions and after applicability filtering.
                 item_counts.update(_distinct_item_counts(all_outputs, n_evaluators))
 
+                # Compute per-metric error rates for the confidence_flag check.
+                metric_error_rates = {
+                    metric: _metric_error_counts.get(metric, 0) / count
+                    for metric, count in _metric_total_counts.items()
+                    if count > 0
+                }
+
                 # ── Step 4c: Run-level bias_fairness via Fairlearn ─────────────
                 bias_cohorts = [item.get("cohort", "") for item in all_items]
                 bias_outcomes = [
@@ -375,10 +392,13 @@ async def dispatch_run(run_id: str) -> None:
                 dimension_scores["bias_fairness"] = [bias_result.score] * len(all_items)
                 item_counts["bias_fairness"] = len(all_items)
 
-                for idx, response_id in response_id_by_idx.items():
+                # Write a single bias_fairness MetricResult row per run (not one per
+                # response), so we don't persist the same run-level aggregate 80× times.
+                if response_id_by_idx:
+                    first_response_id = next(iter(response_id_by_idx.values()))
                     session.add(MetricResult(
                         id=uuid.uuid4(),
-                        response_id=response_id,
+                        response_id=first_response_id,
                         dimension=bias_result.dimension,
                         metric_name=bias_result.metric_name,
                         score=bias_result.score,
@@ -392,6 +412,7 @@ async def dispatch_run(run_id: str) -> None:
                     dimension_raw_scores=dimension_scores,
                     item_counts=item_counts,
                     dimension_metric_scores=dimension_metric_scores,
+                    metric_error_rates=metric_error_rates,
                 )
                 logger.info(
                     "Scoring complete",
@@ -416,6 +437,9 @@ async def dispatch_run(run_id: str) -> None:
                     methodology_version=result.methodology_version,
                 )
                 # ── Step 6b: Generate PDF and JSON artefacts ──────────────────
+                # Set completed_at before artefact generation so the timestamp
+                # serialized into the JSON reflects the real completion time.
+                run.completed_at = datetime.utcnow()
                 try:
                     from reporting.generator import generate_scorecard_json, generate_scorecard_pdf
                     scorecard.pdf_path  = generate_scorecard_pdf(scorecard, run, assessment)

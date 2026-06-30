@@ -334,3 +334,49 @@ class TestAuthMiddleware:
     def test_correct_key_allows_access(self, client):
         resp = client.get("/v1/assessments")
         assert resp.status_code == 200
+
+
+# ── Rate-limit error flag propagation ────────────────────────────────────────
+
+def test_semantic_similarity_rate_limit_sets_error_flag():
+    """Rate-limit fallback must set error=True, not silently write 0.5 as a real score."""
+    from unittest.mock import MagicMock, patch
+    from evaluators.language_performance import SemanticSimilarityEvaluator
+    mock_model = MagicMock()
+    ev = SemanticSimilarityEvaluator(model=mock_model)
+    rate_exc = Exception("RetryError[<Future raised RateLimitError>]")
+    with patch("evaluators.language_performance.AnswerRelevancyMetric") as MockMetric, \
+         patch("evaluators.language_performance._time.sleep"):  # skip real waits in tests
+        MockMetric.return_value.measure.side_effect = rate_exc
+        result = ev.evaluate("p", "r", "e")
+    assert result.error is True
+    assert result.score == 0.5
+
+
+def test_faithfulness_rate_limit_sets_error_flag():
+    """FaithfulnessEvaluator rate-limit fallback must set error=True."""
+    from unittest.mock import MagicMock, patch
+    from evaluators.hallucination import FaithfulnessEvaluator
+    mock_model = MagicMock()
+    ev = FaithfulnessEvaluator(model=mock_model)
+    rate_exc = Exception("RetryError[<Future raised RateLimitError>]")
+    with patch("evaluators.hallucination.FaithfulnessMetric") as MockMetric, \
+         patch("evaluators.hallucination._time.sleep"):  # skip real waits in tests
+        MockMetric.return_value.measure.side_effect = rate_exc
+        result = ev.evaluate("p", "r", "e")
+    assert result.error is True
+    assert result.score == 0.5
+
+
+# ── MetricOutput.error field ──────────────────────────────────────────────────
+
+def test_metric_output_error_field_defaults_false():
+    from evaluators.base import MetricOutput
+    out = MetricOutput(dimension="d", metric_name="m", score=0.5, passed=False, reason="r")
+    assert out.error is False
+
+
+def test_metric_output_error_field_can_be_set():
+    from evaluators.base import MetricOutput
+    out = MetricOutput(dimension="d", metric_name="m", score=0.5, passed=False, reason="r", error=True)
+    assert out.error is True

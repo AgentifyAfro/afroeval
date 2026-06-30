@@ -95,3 +95,21 @@ def test_evaluate_single_item_falls_through_to_neutral_fallback():
     assert result.passed is True
     assert result.dimension == "bias_fairness"
     assert result.metric_name == "cohort_disparity"
+
+
+def test_cohort_disparity_reason_is_ascii_safe():
+    evaluator = CohortDisparityEvaluator()
+    cohorts = ["formal"] * 10 + ["informal_economy"] * 10
+    outcomes = [True] * 9 + [False] + [True] * 9 + [False]
+    result = evaluator.compute_run_disparity(cohorts, outcomes)
+    result.reason.encode("ascii")  # raises UnicodeEncodeError if non-ASCII chars present
+
+
+def test_cohort_disparity_result_is_single_output():
+    evaluator = CohortDisparityEvaluator()
+    cohorts = ["formal"] * 10 + ["informal_economy"] * 10
+    outcomes = [True] * 20
+    result = evaluator.compute_run_disparity(cohorts, outcomes)
+    from evaluators.base import MetricOutput
+    assert isinstance(result, MetricOutput)
+    assert result.metric_name == "cohort_disparity"

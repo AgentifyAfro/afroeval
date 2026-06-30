@@ -16,6 +16,8 @@ weight table above, so they don't count toward the dimension score.
 from __future__ import annotations
 
 import functools
+import random
+import time as _time
 
 try:
     from deepeval.metrics import AnswerRelevancyMetric, GEval
@@ -31,6 +33,18 @@ except ImportError:
 
 from evaluators.base import BaseEvaluator, MetricOutput
 from evaluators.llm_judge import LLMJudge
+
+# Deepeval metrics use tenacity internally and exhaust their own retries before
+# propagating the error. These constants add an outer retry layer that waits
+# long enough for the Azure rate-limit window to reset before retrying.
+_DEEPEVAL_OUTER_RETRIES = 2
+_DEEPEVAL_RETRY_BASE_S  = 20.0   # 20s first wait, 40s second — lets the window reset
+
+
+def _is_rate_limit_error(exc: Exception) -> bool:
+    """Detect rate-limit errors surfaced via deepeval's tenacity RetryError."""
+    s = str(exc).lower()
+    return "ratelimiterror" in s or "rate limit" in s or "429" in s
 
 
 class SemanticSimilarityEvaluator(BaseEvaluator):
@@ -59,14 +73,23 @@ class SemanticSimilarityEvaluator(BaseEvaluator):
         context: dict | None = None,
     ) -> MetricOutput:
         if self._model:
-            try:
-                metric = AnswerRelevancyMetric(threshold=0.6, model=self._model, async_mode=False)
-                test_case = LLMTestCase(input=prompt, actual_output=model_response)
-                metric.measure(test_case)
-                score = metric.score
-                reason = metric.reason or "No reason provided."
-            except Exception as exc:
-                score, reason = 0.5, f"AnswerRelevancyMetric unavailable: {exc}"
+            score, reason, error = 0.5, "AnswerRelevancyMetric unavailable: not yet run", False
+            for attempt in range(_DEEPEVAL_OUTER_RETRIES + 1):
+                try:
+                    metric = AnswerRelevancyMetric(threshold=0.6, model=self._model, async_mode=False)
+                    test_case = LLMTestCase(input=prompt, actual_output=model_response)
+                    metric.measure(test_case)
+                    score = metric.score
+                    reason = metric.reason or "No reason provided."
+                    error = False
+                    break
+                except Exception as exc:
+                    if _is_rate_limit_error(exc) and attempt < _DEEPEVAL_OUTER_RETRIES:
+                        delay = _DEEPEVAL_RETRY_BASE_S * (2 ** attempt) + random.uniform(0, 5)
+                        _time.sleep(delay)
+                        continue
+                    score, reason, error = 0.5, f"AnswerRelevancyMetric unavailable: {exc}", True
+                    break
         else:
             # Stub fallback — token overlap (used when no model is configured)
             expected_tokens = set(expected_behavior.lower().split())
@@ -74,6 +97,7 @@ class SemanticSimilarityEvaluator(BaseEvaluator):
             overlap = len(expected_tokens & response_tokens)
             score = min(overlap / max(len(expected_tokens), 1), 1.0)
             reason = f"Token overlap: {overlap}/{len(expected_tokens)} expected tokens matched."
+            error = False
 
         return MetricOutput(
             dimension=self.dimension,
@@ -81,6 +105,7 @@ class SemanticSimilarityEvaluator(BaseEvaluator):
             score=score,
             passed=score >= 0.6,
             reason=reason,
+            error=error,
         )
 
 
@@ -113,35 +138,45 @@ class AnswerCompletenessEvaluator(BaseEvaluator):
         context: dict | None = None,
     ) -> MetricOutput:
         if self._model:
-            try:
-                metric = GEval(
-                    name="answer_completeness",
-                    criteria=(
-                        "Does the actual output completely address all required elements "
-                        "of the expected output, in the appropriate language?"
-                    ),
-                    evaluation_steps=self._EVALUATION_STEPS,
-                    evaluation_params=[
-                        SingleTurnParams.INPUT,
-                        SingleTurnParams.ACTUAL_OUTPUT,
-                        SingleTurnParams.EXPECTED_OUTPUT,
-                    ],
-                    model=self._model,
-                    threshold=0.5,
-                    async_mode=False,
-                )
-                test_case = LLMTestCase(
-                    input=prompt, actual_output=model_response, expected_output=expected_behavior
-                )
-                metric.measure(test_case)
-                score = metric.score
-                reason = metric.reason or "No reason provided."
-            except Exception as exc:
-                score, reason = 0.5, f"GEval unavailable: {exc}"
+            score, reason, error = 0.5, "GEval unavailable: not yet run", False
+            for attempt in range(_DEEPEVAL_OUTER_RETRIES + 1):
+                try:
+                    metric = GEval(
+                        name="answer_completeness",
+                        criteria=(
+                            "Does the actual output completely address all required elements "
+                            "of the expected output, in the appropriate language?"
+                        ),
+                        evaluation_steps=self._EVALUATION_STEPS,
+                        evaluation_params=[
+                            SingleTurnParams.INPUT,
+                            SingleTurnParams.ACTUAL_OUTPUT,
+                            SingleTurnParams.EXPECTED_OUTPUT,
+                        ],
+                        model=self._model,
+                        threshold=0.5,
+                        async_mode=False,
+                    )
+                    test_case = LLMTestCase(
+                        input=prompt, actual_output=model_response, expected_output=expected_behavior
+                    )
+                    metric.measure(test_case)
+                    score = metric.score
+                    reason = metric.reason or "No reason provided."
+                    error = False
+                    break
+                except Exception as exc:
+                    if _is_rate_limit_error(exc) and attempt < _DEEPEVAL_OUTER_RETRIES:
+                        delay = _DEEPEVAL_RETRY_BASE_S * (2 ** attempt) + random.uniform(0, 5)
+                        _time.sleep(delay)
+                        continue
+                    score, reason, error = 0.5, f"GEval unavailable: {exc}", True
+                    break
         else:
             not_empty = bool(model_response.strip())
             score = 0.5 if not_empty else 0.0
             reason = "Stub — DeepEval model not configured."
+            error = False
 
         return MetricOutput(
             dimension=self.dimension,
@@ -149,6 +184,7 @@ class AnswerCompletenessEvaluator(BaseEvaluator):
             score=score,
             passed=score >= 0.5,
             reason=reason,
+            error=error,
         )
 
 
@@ -290,6 +326,8 @@ class MultilingualSimilarityEvaluator(BaseEvaluator):
         expected_behavior: str,
         context: dict | None = None,
     ) -> MetricOutput:
+        import logging as _logging
+        _logger = _logging.getLogger(__name__)
         try:
             import numpy as np  # noqa: PLC0415
             model = _get_multilingual_model()
@@ -303,14 +341,37 @@ class MultilingualSimilarityEvaluator(BaseEvaluator):
             score = max(0.0, round(score, 4))   # clamp negative values to 0
             lang = (context or {}).get("language", "?")
             reason = f"Multilingual embedding cosine similarity = {score:.3f} (lang={lang})"
+            return MetricOutput(
+                dimension=self.dimension,
+                metric_name=self.metric_name,
+                score=score,
+                passed=score >= 0.5,
+                reason=reason,
+            )
         except Exception as exc:
-            score = 0.0
-            reason = f"Multilingual similarity unavailable: {exc}"
-
-        return MetricOutput(
-            dimension=self.dimension,
-            metric_name=self.metric_name,
-            score=score,
-            passed=score >= 0.5,
-            reason=reason,
-        )
+            exc_str = str(exc)
+            is_auth_error = "401" in exc_str or "unauthorized" in exc_str.lower()
+            if is_auth_error:
+                _logger.warning(
+                    "MultilingualSimilarityEvaluator: 401 auth error from HuggingFace — "
+                    "check HF_TOKEN in .env (remove it or set a valid token from "
+                    "huggingface.co/settings/tokens). Skipping metric row."
+                )
+                return MetricOutput(
+                    dimension=self.dimension,
+                    metric_name=self.metric_name,
+                    score=0.0,
+                    passed=False,
+                    reason="Auth error (401) — HF_TOKEN invalid or expired. No score recorded.",
+                    applicable=False,
+                    error=True,
+                )
+            # Non-auth errors: keep the row, flag as error, score=0.0
+            return MetricOutput(
+                dimension=self.dimension,
+                metric_name=self.metric_name,
+                score=0.0,
+                passed=False,
+                reason=f"Multilingual similarity unavailable: {exc}",
+                error=True,
+            )
