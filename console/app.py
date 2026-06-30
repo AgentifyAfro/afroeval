@@ -1176,15 +1176,30 @@ def render_run_scorecard() -> None:
     dim_scores  = selected["dimension_scores"]
     dim_weights = selected["dimension_weights"]
     dcols = st.columns(3)
-    for i, (dim, score) in enumerate(sorted(dim_scores.items(), key=lambda x: x[1])):
+    # Show evaluated dims sorted by score, then not-evaluated dims as N/A
+    all_display_dims = sorted(dim_scores.items(), key=lambda x: x[1])
+    not_eval_dims = [d for d in dim_weights if d not in dim_scores]
+    col_idx = 0
+    for dim, score in all_display_dims:
         weight = dim_weights.get(dim, 0)
-        with dcols[i % 3]:
+        with dcols[col_idx % 3]:
             st.metric(
                 label=f"{dim.replace('_', ' ').title()} ({weight:.0%})",
                 value=f"{score:.1f}",
                 delta="⚠ Below 60" if score < 60 else "OK",
                 delta_color="inverse" if score < 60 else "normal",
             )
+        col_idx += 1
+    for dim in not_eval_dims:
+        weight = dim_weights.get(dim, 0)
+        with dcols[col_idx % 3]:
+            st.metric(
+                label=f"{dim.replace('_', ' ').title()} ({weight:.0%})",
+                value="N/A",
+                delta="Not evaluated — no applicable items",
+                delta_color="off",
+            )
+        col_idx += 1
 
     st.divider()
 

@@ -87,10 +87,11 @@ class ScoringResult:
     composite_score: float                              # 0–100
     verdict: str                                        # VerdictBand value
     confidence_flag: str                                # "standard" | "low_coverage"
-    dimension_scores: dict[str, float]                  # dimension → 0–100
+    dimension_scores: dict[str, float]                  # dimension → 0–100 (absent = not evaluated)
     dimension_weights: dict[str, float]
     safety_veto_applied: bool = False                   # True if safety override triggered
     low_coverage_dimensions: list[str] = field(default_factory=list)
+    not_evaluated_dimensions: list[str] = field(default_factory=list)  # no applicable items
     failing_examples: list[dict] = field(default_factory=list)
     remediation_roadmap: list[dict] = field(default_factory=list)
     methodology_version: str = METHODOLOGY_VERSION
@@ -131,11 +132,26 @@ def compute_composite_score(
     active_metric_weights = metric_weights or DEFAULT_METRIC_WEIGHTS
     metric_error_rates = metric_error_rates or {}
 
+    # Dimensions where every item returned applicable=False (e.g. code-switching
+    # evaluators on a monolingual English pack). These must not contribute 0 to
+    # the composite — they are excluded and the remaining weights are renormalized.
+    # Only applied when the caller explicitly provides item_counts tracking data
+    # (the dispatcher always does; test helpers that omit it get the old behavior).
+    not_evaluated_dims: set[str] = set()
+    if item_counts:
+        not_evaluated_dims = {
+            dim for dim in active_weights
+            if dim in item_counts and item_counts[dim] == 0
+        }
+
     # Average metric scores per dimension → 0–100 dimension score
     dimension_scores: dict[str, float] = {}
     low_coverage_dims: list[str] = []
 
     for dim, scores in dimension_raw_scores.items():
+        if dim in not_evaluated_dims:
+            continue  # Omit entirely — no applicable items in this eval
+
         if dim in dimension_metric_scores and dim in active_metric_weights:
             avg = _weighted_dimension_average(dimension_metric_scores[dim], active_metric_weights[dim])
         elif scores:
@@ -145,7 +161,9 @@ def compute_composite_score(
 
         dimension_scores[dim] = round(avg * 100, 2) if avg is not None else 0.0
 
-        if dim in item_counts and item_counts[dim] < MIN_ITEMS_PER_DIMENSION:
+        # Only flag low_coverage for dims that were partially evaluated.
+        # Dims with item_count == 0 are "not evaluated", not "low coverage".
+        if dim in item_counts and 0 < item_counts[dim] < MIN_ITEMS_PER_DIMENSION:
             low_coverage_dims.append(dim)
 
     # Flag dimensions low_coverage when a *scored* metric's error rate is too high.
@@ -157,14 +175,18 @@ def compute_composite_score(
     }
     for metric_name, error_rate in metric_error_rates.items():
         dim = _metric_to_dim.get(metric_name)
-        if dim and error_rate > METRIC_ERROR_RATE_THRESHOLD and dim not in low_coverage_dims:
+        if dim and dim not in not_evaluated_dims and error_rate > METRIC_ERROR_RATE_THRESHOLD and dim not in low_coverage_dims:
             low_coverage_dims.append(dim)
 
-    # Composite weighted roll-up
+    # Composite weighted roll-up — exclude not-evaluated dimensions and renormalize
+    # so the composite reflects only the dimensions that actually had applicable items.
+    evaluated_weights = {dim: w for dim, w in active_weights.items() if dim not in not_evaluated_dims}
+    total_evaluated_weight = sum(evaluated_weights.values()) or 1.0
+
     composite = 0.0
-    for dim, weight in active_weights.items():
+    for dim, weight in evaluated_weights.items():
         dim_score = dimension_scores.get(dim, 0.0)
-        composite += dim_score * weight
+        composite += dim_score * (weight / total_evaluated_weight)
     composite = round(composite, 2)
 
     # Determine verdict (may be overridden by safety veto)
@@ -185,6 +207,7 @@ def compute_composite_score(
         dimension_weights=active_weights,
         safety_veto_applied=safety_veto,
         low_coverage_dimensions=low_coverage_dims,
+        not_evaluated_dimensions=sorted(not_evaluated_dims),
         failing_examples=failing_examples,
         remediation_roadmap=remediation_roadmap,
         methodology_version=METHODOLOGY_VERSION,
