@@ -257,6 +257,54 @@ class TestConnectorRouting:
             _build_connector("jsonl_upload", MagicMock())
 
 
+# ── Coverage counting ──────────────────────────────────────────────────────────
+
+class TestDistinctItemCounts:
+    """item_counts feeds the low_coverage confidence flag, which means 'fewer than
+    MIN_ITEMS_PER_DIMENSION distinct ITEMS were assessed' — not 'fewer than N
+    evaluator outputs'. With multiple sub-metrics per dimension, per-output
+    counting inflates coverage by the evaluator count and hides genuine low coverage."""
+
+    def _out(self, dimension, metric_name, applicable=True):
+        return MetricOutput(
+            dimension=dimension, metric_name=metric_name,
+            score=0.8, passed=True, applicable=applicable,
+        )
+
+    def test_counts_distinct_items_not_outputs(self):
+        from orchestration.dispatcher import _distinct_item_counts
+        # 2 items, 3 evaluators per item (flattened item-major: item0 x3, item1 x3).
+        evaluators = ["register_match", "switch_naturalness", "language_preservation"]
+        outputs = [
+            self._out("code_switching_quality", m)
+            for _item in range(2) for m in evaluators
+        ]
+        counts = _distinct_item_counts(outputs, n_evaluators=3)
+        assert counts["code_switching_quality"] == 2  # distinct items, not 6 outputs
+
+    def test_not_applicable_outputs_do_not_count(self):
+        from orchestration.dispatcher import _distinct_item_counts
+        evaluators = ["register_match", "switch_naturalness", "language_preservation"]
+        # item0 applicable, item1 entirely not-applicable (monolingual).
+        outputs = (
+            [self._out("code_switching_quality", m) for m in evaluators]
+            + [self._out("code_switching_quality", m, applicable=False) for m in evaluators]
+        )
+        counts = _distinct_item_counts(outputs, n_evaluators=3)
+        assert counts["code_switching_quality"] == 1
+
+    def test_multiple_dimensions_counted_independently(self):
+        from orchestration.dispatcher import _distinct_item_counts
+        # 1 item, 2 evaluators: one language_performance, one safety_robustness.
+        outputs = [
+            self._out("language_performance", "semantic_similarity"),
+            self._out("safety_robustness", "harmful_content"),
+        ]
+        counts = _distinct_item_counts(outputs, n_evaluators=2)
+        assert counts["language_performance"] == 1
+        assert counts["safety_robustness"] == 1
+
+
 # ── Auth middleware ───────────────────────────────────────────────────────────
 
 class TestAuthMiddleware:

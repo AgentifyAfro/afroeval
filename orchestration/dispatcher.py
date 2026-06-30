@@ -118,6 +118,25 @@ def _build_deepeval_model(cfg):
     return None
 
 
+def _distinct_item_counts(all_outputs: list, n_evaluators: int) -> dict[str, int]:
+    """
+    Count the number of distinct ITEMS that produced at least one applicable score
+    per dimension. Feeds item_counts → the low_coverage confidence flag.
+
+    all_outputs is the flattened item-major (item × evaluator) grid, so the item a
+    given output belongs to is `index // n_evaluators`. Counting outputs directly
+    would inflate coverage by the evaluator count (e.g. language_performance has 5
+    sub-metrics, so 8 items would look like 40), masking genuine low coverage.
+    Not-applicable outputs (e.g. code-switching on a monolingual item) don't count.
+    """
+    seen: dict[str, set[int]] = {}
+    for i, output in enumerate(all_outputs):
+        if not getattr(output, "applicable", True):
+            continue
+        seen.setdefault(output.dimension, set()).add(i // n_evaluators)
+    return {dim: len(items) for dim, items in seen.items()}
+
+
 def _fail(session, run, message: str) -> None:
     from db.models import RunStatus
 
@@ -320,7 +339,6 @@ async def dispatch_run(run_id: str) -> None:
 
                     if output.dimension in dimension_scores:
                         dimension_scores[output.dimension].append(output.score)
-                        item_counts[output.dimension] += 1
 
                     dim_metrics = dimension_metric_scores.get(output.dimension)
                     if dim_metrics is not None and output.metric_name in dim_metrics:
@@ -339,6 +357,11 @@ async def dispatch_run(run_id: str) -> None:
                             reason=output.reason,
                             extra=output.extra,
                         ))
+
+                # Coverage = distinct items assessed per dimension (not evaluator
+                # outputs), so the low_coverage flag reflects real item counts even
+                # for multi-metric dimensions and after applicability filtering.
+                item_counts.update(_distinct_item_counts(all_outputs, n_evaluators))
 
                 # ── Step 4c: Run-level bias_fairness via Fairlearn ─────────────
                 bias_cohorts = [item.get("cohort", "") for item in all_items]
