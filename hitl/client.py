@@ -86,6 +86,11 @@ class LabelStudioClient:
                 params={"project": project_id, "page": page, "page_size": page_size},
                 timeout=30,
             )
+            # Label Studio returns 404 for a page past the last one (so a task
+            # count that is an exact multiple of page_size triggers a spurious
+            # 404 on the next page). Treat that as the end of pagination.
+            if resp.status_code == 404 and page > 1:
+                break
             resp.raise_for_status()
             body = resp.json()
             batch = body["tasks"]

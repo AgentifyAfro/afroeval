@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 import structlog
 from openai import APIStatusError, APITimeoutError, AzureOpenAI, BadRequestError
 
-from ingestion.base import ModelConnector, ModelResponseRaw
+from ingestion.base import ModelConnector, ModelResponseRaw, retry_on_rate_limit
 
 logger = structlog.get_logger(__name__)
 
@@ -55,7 +55,7 @@ class AzureOpenAIConnector(ModelConnector):
         prompt = item.get("prompt", "")
         try:
             start = time.monotonic()
-            completion = self._client.chat.completions.create(
+            completion = retry_on_rate_limit(lambda: self._client.chat.completions.create(
                 model=self.deployment_name,
                 messages=[
                     {"role": "system", "content": _EVAL_SYSTEM_PROMPT},
@@ -63,7 +63,7 @@ class AzureOpenAIConnector(ModelConnector):
                 ],
                 max_tokens=self.max_tokens,
                 temperature=0.0,
-            )
+            ))
             latency = int((time.monotonic() - start) * 1000)
             raw_output = completion.choices[0].message.content or ""
             tokens_used = completion.usage.total_tokens if completion.usage else None

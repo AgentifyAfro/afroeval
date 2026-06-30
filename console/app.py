@@ -102,7 +102,7 @@ PROVIDER_MODEL_DEFAULTS = {
     "azure_openai": "gpt-4.1-mini",
     "anthropic":    "claude-haiku-4-5-20251001",
     "openai":       "gpt-4o",
-    "gemini":       "gemini-2.0-flash",
+    "gemini":       "gemini-2.5-flash",
 }
 
 PROJECT_ROOT = Path(__file__).parent.parent

@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 import structlog
 from anthropic import Anthropic, APIStatusError, APITimeoutError, RateLimitError
 
-from ingestion.base import ModelConnector, ModelResponseRaw
+from ingestion.base import ModelConnector, ModelResponseRaw, retry_on_rate_limit
 
 logger = structlog.get_logger(__name__)
 
@@ -40,13 +40,13 @@ class AnthropicConnector(ModelConnector):
         prompt = item.get("prompt", "")
         try:
             start = time.monotonic()
-            message = self._client.messages.create(
+            message = retry_on_rate_limit(lambda: self._client.messages.create(
                 model=self.model,
                 max_tokens=self.max_tokens,
                 system=_EVAL_SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.0,
-            )
+            ))
             latency = int((time.monotonic() - start) * 1000)
             raw_output = message.content[0].text if message.content else ""
             tokens_used = (

@@ -10,7 +10,7 @@ import structlog
 from google import genai
 from google.genai import types
 
-from ingestion.base import ModelConnector, ModelResponseRaw
+from ingestion.base import ModelConnector, ModelResponseRaw, retry_on_rate_limit
 
 logger = structlog.get_logger(__name__)
 
@@ -25,7 +25,7 @@ _MAX_WORKERS = 5
 
 class GeminiConnector(ModelConnector):
 
-    def __init__(self, api_key: str, model: str = "gemini-2.0-flash", max_tokens: int = 512):
+    def __init__(self, api_key: str, model: str = "gemini-2.5-flash", max_tokens: int = 512):
         if not api_key:
             raise ValueError("GEMINI_API_KEY is not set. Check your .env file.")
         self.model_name = model
@@ -46,11 +46,11 @@ class GeminiConnector(ModelConnector):
         prompt = item.get("prompt", "")
         try:
             start = time.monotonic()
-            response = self._client.models.generate_content(
+            response = retry_on_rate_limit(lambda: self._client.models.generate_content(
                 model=self.model_name,
                 contents=prompt,
                 config=self._gen_config,
-            )
+            ))
             latency = int((time.monotonic() - start) * 1000)
             raw_output = response.text or ""
             usage = getattr(response, "usage_metadata", None)

@@ -67,7 +67,7 @@ def _build_connector(model_provider: str, cfg, model_override: str | None = None
         from ingestion.gemini_connector import GeminiConnector
         return GeminiConnector(
             api_key=cfg.gemini_api_key,
-            model=model_override or "gemini-2.0-flash",
+            model=model_override or "gemini-2.5-flash",
         )
     elif model_provider == "jsonl_upload":
         raise ValueError(

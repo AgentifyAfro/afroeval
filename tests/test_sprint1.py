@@ -305,6 +305,63 @@ class TestDistinctItemCounts:
         assert counts["safety_robustness"] == 1
 
 
+# ── Connector rate-limit retry ──────────────────────────────────────────────
+# Model connectors used to return an empty response on the first 429, which
+# silently wrote empty rows (the gpt-4o burst that produced 107/120 empties).
+# retry_on_rate_limit adds exponential backoff so transient rate limits recover.
+
+class TestRateLimitRetry:
+
+    def test_is_rate_limit_error_detects_429_and_variants(self):
+        from ingestion.base import is_rate_limit_error
+        assert is_rate_limit_error(Exception("Error code: 429 - too many requests"))
+        assert is_rate_limit_error(Exception("RESOURCE_EXHAUSTED"))
+        assert is_rate_limit_error(Exception("rate limit exceeded"))
+
+        class WithStatus(Exception):
+            status_code = 429
+        assert is_rate_limit_error(WithStatus())
+
+    def test_is_rate_limit_error_excludes_hard_quota_and_generic(self):
+        from ingestion.base import is_rate_limit_error
+        # Hard quota exhaustion is not transient — must NOT be retried.
+        assert is_rate_limit_error(Exception("429 insufficient_quota: check billing")) is False
+        assert is_rate_limit_error(Exception("404 model not found")) is False
+        assert is_rate_limit_error(Exception("connection reset")) is False
+
+    def test_retry_succeeds_after_transient_rate_limits(self):
+        from ingestion.base import retry_on_rate_limit
+        calls = {"n": 0}
+        def flaky():
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise Exception("Error code: 429 - rate limit")
+            return "ok"
+        result = retry_on_rate_limit(flaky, base_delay=0, sleep=lambda _s: None)
+        assert result == "ok"
+        assert calls["n"] == 3
+
+    def test_retry_reraises_after_exhausting_attempts(self):
+        from ingestion.base import retry_on_rate_limit
+        calls = {"n": 0}
+        def always_429():
+            calls["n"] += 1
+            raise Exception("Error code: 429 - rate limit")
+        with pytest.raises(Exception, match="429"):
+            retry_on_rate_limit(always_429, max_retries=2, base_delay=0, sleep=lambda _s: None)
+        assert calls["n"] == 3  # initial + 2 retries
+
+    def test_retry_does_not_retry_non_rate_limit(self):
+        from ingestion.base import retry_on_rate_limit
+        calls = {"n": 0}
+        def boom():
+            calls["n"] += 1
+            raise ValueError("404 not found")
+        with pytest.raises(ValueError):
+            retry_on_rate_limit(boom, base_delay=0, sleep=lambda _s: None)
+        assert calls["n"] == 1  # no retries for non-rate-limit errors
+
+
 # ── Auth middleware ───────────────────────────────────────────────────────────
 
 class TestAuthMiddleware:
