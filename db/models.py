@@ -127,6 +127,10 @@ class Run(SQLModel, table=True):
     completed_at: datetime | None = None
     error_message: str | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
+    # Console curation: archived runs are hidden from the console's run lists by
+    # default (admin can toggle "Show archived"). Non-destructive — nothing about
+    # the run/scorecard data changes.
+    archived: bool = Field(default=False, sa_column_kwargs={"server_default": "false"})
 
     assessment: Optional[Assessment] = Relationship(back_populates="runs")
     responses: list["ModelResponse"] = Relationship(back_populates="run")

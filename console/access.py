@@ -22,3 +22,12 @@ def resolve_views(auth_user: AuthUser | None, operator_unlocked: bool) -> list[s
     if has_cat2:
         views.extend(CATEGORY_2_VIEWS)
     return views
+
+
+def can_archive_runs(auth_user: AuthUser | None, operator_unlocked: bool) -> bool:
+    """
+    Archiving/unarchiving a run is a Category 2 (admin/operator) action — it
+    curates what every viewer sees, so only admins or the operator override may
+    do it. Category 1 viewers see the curated list but cannot change it.
+    """
+    return (auth_user is not None and auth_user.role == "admin") or operator_unlocked

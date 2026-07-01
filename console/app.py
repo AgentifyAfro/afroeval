@@ -30,7 +30,7 @@ from db.session import get_engine
 from sqlmodel import Session, col, select
 
 from auth.client import AuthServiceUnavailableError, AuthUser, InvalidCredentialsError, SupabaseAuthClient
-from console.access import resolve_views
+from console.access import can_archive_runs, resolve_views
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -236,12 +236,18 @@ def build_string_id_map() -> dict[str, str]:
 
 
 @st.cache_data(ttl=30)
-def load_runs_summary() -> list[dict]:
-    """Return lightweight metadata for the 50 most recent runs."""
+def load_runs_summary(include_archived: bool = False) -> list[dict]:
+    """Return lightweight metadata for the 50 most recent runs.
+
+    Archived runs are excluded unless include_archived=True (admin "Show archived").
+    """
     engine = get_engine()
     rows = []
     with Session(engine) as session:
-        runs = session.exec(select(Run).order_by(Run.created_at.desc()).limit(50)).all()
+        query = select(Run)
+        if not include_archived:
+            query = query.where(Run.archived == False)  # noqa: E712 — SQLAlchemy needs ==
+        runs = session.exec(query.order_by(Run.created_at.desc()).limit(50)).all()
         for run in runs:
             assessment = session.get(Assessment, run.assessment_id)
             scorecard = session.exec(
@@ -259,6 +265,7 @@ def load_runs_summary() -> list[dict]:
                 "label":               label,
                 "created_at":          str(run.created_at),
                 "status":              run.status,
+                "archived":            run.archived,
                 "has_scorecard":       scorecard is not None,
                 "composite_score":     scorecard.composite_score if scorecard else None,
                 "verdict":             scorecard.verdict if scorecard else None,
@@ -434,14 +441,19 @@ def load_calibration_data() -> pd.DataFrame:
 
 
 @st.cache_data(ttl=30)
-def load_provider_comparison() -> list[dict]:
-    """All completed scorecards with assessment metadata, grouped for cross-provider comparison."""
+def load_provider_comparison(include_archived: bool = False) -> list[dict]:
+    """All completed scorecards with assessment metadata, grouped for cross-provider comparison.
+
+    Archived runs are excluded unless include_archived=True. Also feeds the
+    Language Comparison view, so archiving a run removes it from both.
+    """
     engine = get_engine()
     rows = []
     with Session(engine) as session:
-        runs = session.exec(
-            select(Run).where(Run.status == "completed").order_by(Run.created_at.desc())
-        ).all()
+        query = select(Run).where(Run.status == "completed")
+        if not include_archived:
+            query = query.where(Run.archived == False)  # noqa: E712 — SQLAlchemy needs ==
+        runs = session.exec(query.order_by(Run.created_at.desc())).all()
         for run in runs:
             scorecard = session.exec(
                 select(Scorecard).where(Scorecard.run_id == run.id)
@@ -1124,6 +1136,22 @@ def _pack_display(pack_ids: list[str]) -> tuple[str, str | None]:
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+def _set_run_archived(run_id: str, archived: bool) -> None:
+    """Toggle a run's archived flag, then refresh the cached run lists so the
+    change shows immediately. Admin-only — callers gate on can_archive_runs()."""
+    import uuid as _uuid
+
+    engine = get_engine()
+    with Session(engine) as session:
+        run = session.get(Run, _uuid.UUID(run_id))
+        if run is not None:
+            run.archived = archived
+            session.add(run)
+            session.commit()
+    load_runs_summary.clear()
+    load_provider_comparison.clear()
+
+
 def render_run_scorecard() -> None:
     render_console_header()
 
@@ -1131,13 +1159,21 @@ def render_run_scorecard() -> None:
     with st.sidebar:
         st.header("Evaluation Runs")
 
-        all_runs  = load_runs_summary()
+        auth_user   = st.session_state.get("auth_user")
+        unlocked    = st.session_state.get("operator_unlocked", False)
+        may_archive = can_archive_runs(auth_user, unlocked)
+
+        show_archived = st.checkbox("Show archived runs", value=False, key="op_show_archived")
+        all_runs  = load_runs_summary(include_archived=show_archived)
         completed = [r for r in all_runs if r["has_scorecard"]]
         if not completed:
             st.warning("No completed runs with scorecards found.")
             return
 
-        labels = [r["label"] for r in completed]
+        labels = [
+            ("🗄 " + r["label"]) if r.get("archived") else r["label"]
+            for r in completed
+        ]
         idx = st.selectbox(
             "Select run",
             range(len(labels)),
@@ -1145,6 +1181,17 @@ def render_run_scorecard() -> None:
             label_visibility="collapsed",
         )
         selected = completed[idx]
+
+        # Admin-only: archive / unarchive the selected run to curate the list.
+        if may_archive:
+            if selected.get("archived"):
+                if st.button("♻ Unarchive this run", key="op_unarchive", use_container_width=True):
+                    _set_run_archived(selected["run_id"], False)
+                    st.rerun()
+            else:
+                if st.button("🗄 Archive this run", key="op_archive", use_container_width=True):
+                    _set_run_archived(selected["run_id"], True)
+                    st.rerun()
 
     run_id = selected["run_id"]
 
