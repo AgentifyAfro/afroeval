@@ -1136,20 +1136,27 @@ def _pack_display(pack_ids: list[str]) -> tuple[str, str | None]:
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
-def _set_run_archived(run_id: str, archived: bool) -> None:
-    """Toggle a run's archived flag, then refresh the cached run lists so the
-    change shows immediately. Admin-only — callers gate on can_archive_runs()."""
+def _set_runs_archived(run_ids: list[str], archived: bool) -> int:
+    """Bulk-toggle the archived flag on the given runs, then refresh the cached
+    run lists so the change shows immediately. Admin-only — callers gate on
+    can_archive_runs(). Returns the number of runs updated."""
     import uuid as _uuid
 
+    if not run_ids:
+        return 0
+    updated = 0
     engine = get_engine()
     with Session(engine) as session:
-        run = session.get(Run, _uuid.UUID(run_id))
-        if run is not None:
-            run.archived = archived
-            session.add(run)
-            session.commit()
+        for rid in run_ids:
+            run = session.get(Run, _uuid.UUID(rid))
+            if run is not None and run.archived != archived:
+                run.archived = archived
+                session.add(run)
+                updated += 1
+        session.commit()
     load_runs_summary.clear()
     load_provider_comparison.clear()
+    return updated
 
 
 def render_run_scorecard() -> None:
@@ -1182,16 +1189,35 @@ def render_run_scorecard() -> None:
         )
         selected = completed[idx]
 
-        # Admin-only: archive / unarchive the selected run to curate the list.
+        # Admin-only: bulk archive / unarchive to curate which runs appear in
+        # the console. Collapsed by default so it never distracts from viewing.
         if may_archive:
-            if selected.get("archived"):
-                if st.button("♻ Unarchive this run", key="op_unarchive", use_container_width=True):
-                    _set_run_archived(selected["run_id"], False)
-                    st.rerun()
-            else:
-                if st.button("🗄 Archive this run", key="op_archive", use_container_width=True):
-                    _set_run_archived(selected["run_id"], True)
-                    st.rerun()
+            with st.expander("🗄 Manage runs (archive / unarchive)", expanded=False):
+                label_by_id = {
+                    r["run_id"]: (("🗄 " + r["label"]) if r.get("archived") else r["label"])
+                    for r in completed
+                }
+                picked = st.multiselect(
+                    "Select runs to archive or unarchive",
+                    options=list(label_by_id.keys()),
+                    format_func=lambda rid: label_by_id.get(rid, rid),
+                    key="op_manage_runs",
+                    help="Tip: tick 'Show archived runs' above to reveal archived "
+                         "runs (🗄) so you can unarchive them.",
+                )
+                bc1, bc2 = st.columns(2)
+                with bc1:
+                    if st.button("🗄 Archive selected", key="op_bulk_archive",
+                                 use_container_width=True, disabled=not picked):
+                        n = _set_runs_archived(picked, True)
+                        st.toast(f"Archived {n} run(s).")
+                        st.rerun()
+                with bc2:
+                    if st.button("♻ Unarchive selected", key="op_bulk_unarchive",
+                                 use_container_width=True, disabled=not picked):
+                        n = _set_runs_archived(picked, False)
+                        st.toast(f"Unarchived {n} run(s).")
+                        st.rerun()
 
     run_id = selected["run_id"]
 
