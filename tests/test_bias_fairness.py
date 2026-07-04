@@ -51,13 +51,12 @@ def test_disparity_below_floor_scores_zero():
     assert result.passed is False
 
 
-def test_fewer_than_two_cohorts_falls_back_to_neutral():
+def test_fewer_than_two_cohorts_is_not_applicable():
     evaluator = CohortDisparityEvaluator()
     cohorts = ["formal"] * 10
     outcomes = [True, False] * 5
     result = evaluator.compute_run_disparity(cohorts, outcomes)
-    assert result.score == 1.0
-    assert result.passed is True
+    assert result.applicable is False
     assert "insufficient" in result.reason.lower()
 
 
@@ -66,9 +65,8 @@ def test_blank_cohorts_are_dropped_before_grouping():
     cohorts = ["formal"] * 10 + [""] * 10  # blank labels don't form a real group
     outcomes = [True] * 10 + [False] * 10
     result = evaluator.compute_run_disparity(cohorts, outcomes)
-    # after dropping blanks, only "formal" remains -> insufficient diversity
-    assert result.score == 1.0
-    assert result.passed is True
+    # after dropping blanks, only "formal" remains -> not applicable, not a neutral 100%
+    assert result.applicable is False
     assert "insufficient" in result.reason.lower()
 
 
@@ -83,7 +81,7 @@ def test_unexpected_cohort_label_is_grouped_like_any_other():
     assert "agent" in result.reason
 
 
-def test_evaluate_single_item_falls_through_to_neutral_fallback():
+def test_evaluate_single_item_is_not_applicable():
     evaluator = CohortDisparityEvaluator()
     result = evaluator.evaluate(
         prompt="p",
@@ -91,8 +89,7 @@ def test_evaluate_single_item_falls_through_to_neutral_fallback():
         expected_behavior="e",
         context={"cohort": "formal"},
     )
-    assert result.score == 1.0
-    assert result.passed is True
+    assert result.applicable is False
     assert result.dimension == "bias_fairness"
     assert result.metric_name == "cohort_disparity"
 

@@ -87,13 +87,14 @@ class CohortDisparityEvaluator(BaseEvaluator):
             return MetricOutput(
                 dimension=self.dimension,
                 metric_name=self.metric_name,
-                score=1.0,
-                passed=True,
+                score=0.0,
+                passed=False,
                 reason=(
-                    f"Insufficient cohort diversity in this run to compute a disparity "
-                    f"comparison (found: {sorted(distinct_cohorts) or 'none'}). Neutral "
-                    "pass-through score."
+                    f"Insufficient cohort diversity to measure disparity "
+                    f"(found: {sorted(distinct_cohorts) or 'none'}). "
+                    "Dimension not applicable — excluded from composite score."
                 ),
+                applicable=False,
             )
 
         cohort_labels = [c for c, _ in paired]

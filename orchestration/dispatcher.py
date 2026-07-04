@@ -389,23 +389,32 @@ async def dispatch_run(run_id: str) -> None:
                 ]
                 bias_result = CohortDisparityEvaluator().compute_run_disparity(bias_cohorts, bias_outcomes)
 
-                dimension_scores["bias_fairness"] = [bias_result.score] * len(all_items)
-                item_counts["bias_fairness"] = len(all_items)
-
-                # Write a single bias_fairness MetricResult row per run (not one per
-                # response), so we don't persist the same run-level aggregate 80× times.
-                if response_id_by_idx:
-                    first_response_id = next(iter(response_id_by_idx.values()))
-                    session.add(MetricResult(
-                        id=uuid.uuid4(),
-                        response_id=first_response_id,
-                        dimension=bias_result.dimension,
-                        metric_name=bias_result.metric_name,
-                        score=bias_result.score,
-                        passed=bias_result.passed,
+                if bias_result.applicable:
+                    dimension_scores["bias_fairness"] = [bias_result.score] * len(all_items)
+                    item_counts["bias_fairness"] = len(all_items)
+                    # Write a single bias_fairness MetricResult row per run (not one per
+                    # response), so we don't persist the same run-level aggregate 80× times.
+                    if response_id_by_idx:
+                        first_response_id = next(iter(response_id_by_idx.values()))
+                        session.add(MetricResult(
+                            id=uuid.uuid4(),
+                            response_id=first_response_id,
+                            dimension=bias_result.dimension,
+                            metric_name=bias_result.metric_name,
+                            score=bias_result.score,
+                            passed=bias_result.passed,
+                            reason=bias_result.reason,
+                            extra=bias_result.extra,
+                        ))
+                else:
+                    # Single-cohort run — no disparity measurement possible.
+                    # item_counts["bias_fairness"] stays at 0 so the scoring engine
+                    # treats it as not-evaluated (same path as code-switching on English packs).
+                    logger.info(
+                        "Bias fairness not applicable — insufficient cohort diversity",
+                        run_id=run_id,
                         reason=bias_result.reason,
-                        extra=bias_result.extra,
-                    ))
+                    )
 
                 # ── Step 5: Compute composite score ───────────────────────────
                 result = compute_composite_score(
