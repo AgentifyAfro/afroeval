@@ -392,13 +392,12 @@ async def dispatch_run(run_id: str) -> None:
                 if bias_result.applicable:
                     dimension_scores["bias_fairness"] = [bias_result.score] * len(all_items)
                     item_counts["bias_fairness"] = len(all_items)
-                    # Write a single bias_fairness MetricResult row per run (not one per
-                    # response), so we don't persist the same run-level aggregate 80× times.
-                    if response_id_by_idx:
-                        first_response_id = next(iter(response_id_by_idx.values()))
+                    # Persist one MetricResult per response so bias fairness appears
+                    # in the drill-down for every item, not just the first one.
+                    for resp_id in response_id_by_idx.values():
                         session.add(MetricResult(
                             id=uuid.uuid4(),
-                            response_id=first_response_id,
+                            response_id=resp_id,
                             dimension=bias_result.dimension,
                             metric_name=bias_result.metric_name,
                             score=bias_result.score,
