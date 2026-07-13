@@ -153,6 +153,10 @@ st.markdown(
         border-right: 1px solid #2D2D3D !important;
     }
 
+    /* ── Brand logo — bump past st.logo's "large" preset (32px) ─────── */
+    [data-testid="stSidebarLogo"] { height: 3.5rem !important; }
+    [data-testid="stHeaderLogo"]  { height: 2.25rem !important; }
+
     /* ── H1 — gradient title text ────────────────────────────────── */
     h1 {
         font-weight: 700 !important;
