@@ -115,6 +115,20 @@ st.set_page_config(
     layout="wide",
 )
 
+# ── Brand logo — top-left header, before the sidebar >> toggle ─────────────────
+# agentifyafro-lockup.png is the alpha-keyed (transparent-background) horizontal
+# lockup derived from agentifyafro-logo.png — the real "AgentifyAfro.ai" wordmark
+# + gradient node mark, with the baked near-black field dropped out so it blends
+# into both the sidebar (#1A1A24) and canvas (#0A0A0F) without a box seam. The
+# standalone glyph mark is the small icon shown when the sidebar is collapsed.
+_ASSETS = PROJECT_ROOT / "assets"
+st.logo(
+    str(_ASSETS / "agentifyafro-lockup.png"),
+    size="large",
+    link="https://agentifyafro.ai",
+    icon_image=str(_ASSETS / "agentifyafro-mark.png"),
+)
+
 # Brand CSS — AgentifyAfro dark theme + Inter font + gradient accents.
 st.markdown(
     """
