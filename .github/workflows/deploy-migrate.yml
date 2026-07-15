@@ -1,0 +1,75 @@
+name: Deploy — Apply DB Migrations (prod)
+
+# Applies committed Alembic migrations to the production database on deploy.
+#
+# WHY THIS EXISTS: Streamlit Cloud auto-redeploys the console from `master` on
+# push, and the API's startup only calls create_all() — which creates missing
+# TABLES but never adds COLUMNS to existing ones. So when a migration adds a
+# column, the code and the prod DB drift and the console 500s with
+# `ProgrammingError: column ... does not exist` (happened 2026-07-15 with
+# scorecards.safety_unverified). This job closes that gap by running
+# `alembic upgrade head` whenever a migration lands on `master`.
+#
+# SETUP REQUIRED (one-time): add a repository secret named DATABASE_URL with the
+# production Supabase connection string —
+#   Settings → Secrets and variables → Actions → New repository secret.
+# alembic/env.py reads DATABASE_URL from the environment (falling back to
+# alembic.ini otherwise), so nothing else needs configuring.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "db/migrations/**"
+      - ".github/workflows/deploy-migrate.yml"
+  workflow_dispatch: {}   # allow manual runs from the Actions tab
+
+concurrency:
+  group: db-migrate-prod
+  cancel-in-progress: false   # never interrupt a migration mid-flight
+
+jobs:
+  migrate:
+    name: alembic upgrade head
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install runtime dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e "."
+
+      - name: Verify DATABASE_URL secret is set
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL secret is not set. Add it under Settings → Secrets and variables → Actions, then re-run."
+            exit 1
+          fi
+          echo "DATABASE_URL is set (value hidden)."
+
+      - name: Show current vs target revision
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          echo "Current (prod):"
+          python -m alembic current
+          echo "Target (head):"
+          python -m alembic heads
+
+      - name: Apply migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python -m alembic upgrade head
+
+      - name: Confirm at head
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python -m alembic current
