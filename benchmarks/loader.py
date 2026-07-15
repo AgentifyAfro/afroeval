@@ -4,6 +4,9 @@ Benchmark pack loader — versioned, contamination-safe.
 Rules:
   - Packs are loaded by name + version; never by path glob.
   - Held-out splits are filtered out and never returned to callers.
+  - Gold items are calibration anchors — "never scored". They are filtered out
+    of scoring runs at the loader (Methodology v1.1) and only returned when a
+    caller explicitly opts in via include_gold=True (calibration/monitoring).
   - Every item carries its provenance and language metadata.
 """
 
@@ -13,7 +16,12 @@ from pathlib import Path
 PACKS_DIR = Path(__file__).parent / "packs"
 
 
-def load_pack(name: str, version: str, include_held_out: bool = False) -> list[dict]:
+def load_pack(
+    name: str,
+    version: str,
+    include_held_out: bool = False,
+    include_gold: bool = False,
+) -> list[dict]:
     """
     Load benchmark items from a versioned JSONL pack file.
 
@@ -22,6 +30,10 @@ def load_pack(name: str, version: str, include_held_out: bool = False) -> list[d
         version: Version string (e.g. "v1.0.0")
         include_held_out: Must be explicitly True to load held-out splits.
                           Default False enforces contamination control.
+        include_gold: Must be explicitly True to load gold calibration items.
+                      Gold items are "never scored" — default False excludes them
+                      from evaluation runs (Methodology v1.1). Only the calibration
+                      / monitoring path sets this True.
 
     Returns list of item dicts, each with: prompt, expected_behavior,
     language, domain, cohort, provenance, is_gold, tags.
@@ -47,6 +59,9 @@ def load_pack(name: str, version: str, include_held_out: bool = False) -> list[d
                 raise ValueError(f"Invalid JSON on line {line_num} of {filename}: {e}") from e
 
             if item.get("is_held_out") and not include_held_out:
+                continue
+
+            if item.get("is_gold") and not include_gold:
                 continue
 
             _validate_item(item, line_num, filename)
