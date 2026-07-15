@@ -4,6 +4,7 @@ Sprint 1 test coverage — LLM judge, evaluator injection, connector routing, au
 All LLM/API calls are mocked; no network required.
 """
 
+import importlib.util
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -16,6 +17,14 @@ from evaluators.language_performance import (
     SemanticSimilarityEvaluator,
 )
 from evaluators.llm_judge import LLMJudge
+
+# DeepEval is an optional [eval] extra, intentionally absent from the default
+# install (see pyproject). When it is missing the evaluators use their stub
+# fallback, so tests asserting a DeepEval-path score only apply when it is present.
+_needs_deepeval = pytest.mark.skipif(
+    importlib.util.find_spec("deepeval") is None,
+    reason="deepeval not installed (optional [eval] extra); evaluator uses stub fallback",
+)
 
 # ── LLMJudge ──────────────────────────────────────────────────────────────────
 
@@ -89,6 +98,7 @@ class TestSemanticSimilarityEvaluator:
         out = ev.evaluate("p", "banana orange apple", "cat dog fish")
         assert out.score == pytest.approx(0.0)
 
+    @_needs_deepeval
     @patch("evaluators.language_performance.AnswerRelevancyMetric")
     def test_with_model_uses_deepeval_score(self, mock_metric_cls):
         mock_metric_cls.return_value = MagicMock(score=0.9, reason="Strong match")
@@ -97,6 +107,7 @@ class TestSemanticSimilarityEvaluator:
         assert out.score == pytest.approx(0.9)
         assert out.passed is True
 
+    @_needs_deepeval
     @patch("evaluators.language_performance.AnswerRelevancyMetric")
     def test_with_model_passes_at_0_6(self, mock_metric_cls):
         mock_metric_cls.return_value = MagicMock(score=0.6, reason="Adequate")
@@ -104,6 +115,7 @@ class TestSemanticSimilarityEvaluator:
         out = ev.evaluate("p", "r", "e")
         assert out.passed is True
 
+    @_needs_deepeval
     @patch("evaluators.language_performance.AnswerRelevancyMetric")
     def test_with_model_fails_below_0_6(self, mock_metric_cls):
         mock_metric_cls.return_value = MagicMock(score=0.4, reason="Weak")
@@ -111,6 +123,7 @@ class TestSemanticSimilarityEvaluator:
         out = ev.evaluate("p", "r", "e")
         assert out.passed is False
 
+    @_needs_deepeval
     @patch("evaluators.language_performance.AnswerRelevancyMetric")
     def test_metric_error_falls_back_gracefully(self, mock_metric_cls):
         mock_metric_cls.return_value.measure.side_effect = Exception("rate limited")
@@ -136,6 +149,7 @@ class TestAnswerCompletenessEvaluator:
         assert out.score == pytest.approx(0.0)
         assert out.passed is False
 
+    @_needs_deepeval
     @patch("evaluators.language_performance.GEval")
     def test_with_model_uses_deepeval_score(self, mock_geval_cls):
         mock_geval_cls.return_value = MagicMock(score=0.75, reason="Most elements present")
@@ -192,6 +206,7 @@ class TestFaithfulnessEvaluator:
         assert out.score == pytest.approx(0.4)
         assert out.passed is False
 
+    @_needs_deepeval
     @patch("evaluators.hallucination.FaithfulnessMetric")
     def test_with_model_uses_deepeval_score(self, mock_metric_cls):
         mock_metric_cls.return_value = MagicMock(score=0.95, reason="Fully faithful")

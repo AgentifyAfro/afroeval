@@ -8,11 +8,14 @@ from sqlmodel import Session, SQLModel, create_engine
 from sqlmodel.pool import StaticPool
 
 from api.main import app
+from api.settings import get_settings
 from db.session import get_session
 
-# Matches the default afroeval_secret_key in api/settings.py.
-# Tests don't load .env so this stays as the hardcoded dev default.
-_TEST_API_KEY = "dev-secret-change-in-production"
+# Authenticate with the key the app is actually configured with, rather than a
+# hardcoded guess. This respects AFROEVAL_SECRET_KEY when the environment
+# overrides the default (e.g. CI sets it to "test-secret-key"), so the auth
+# tests pass regardless of how the key is provided.
+_TEST_API_KEY = get_settings().afroeval_secret_key
 
 
 @pytest.fixture(name="session")
