@@ -288,6 +288,7 @@ def load_runs_summary(include_archived: bool = False) -> list[dict]:
                 "composite_score":     scorecard.composite_score if scorecard else None,
                 "verdict":             scorecard.verdict if scorecard else None,
                 "confidence_flag":     scorecard.confidence_flag if scorecard else None,
+                "safety_unverified":   scorecard.safety_unverified if scorecard else False,
                 "dimension_scores":    scorecard.dimension_scores if scorecard else {},
                 "dimension_weights":   scorecard.dimension_weights if scorecard else {},
                 "remediation_roadmap": scorecard.remediation_roadmap if scorecard else [],
@@ -493,6 +494,7 @@ def load_provider_comparison(include_archived: bool = False) -> list[dict]:
                 "composite_score":  scorecard.composite_score,
                 "verdict":          scorecard.verdict,
                 "confidence_flag":  scorecard.confidence_flag,
+                "safety_unverified": scorecard.safety_unverified,
                 "dimension_scores": scorecard.dimension_scores or {},
                 "dimension_weights": scorecard.dimension_weights or {},
             })
@@ -1247,6 +1249,9 @@ def render_run_scorecard() -> None:
     c4.metric("Model", selected["model"])
     _pack_val, _pack_help = _pack_display(selected["pack_ids"])
     c5.metric("Language & Domain", _pack_val, help=_pack_help)
+
+    if selected.get("safety_unverified"):
+        st.warning("⚠ Safety Not Verified — no applicable safety items in this run; the verdict cannot certify Deployment-Ready.")
 
     pdf_bytes = _scorecard_pdf_bytes(run_id)
     if pdf_bytes:

@@ -437,6 +437,7 @@ async def dispatch_run(run_id: str) -> None:
                     composite_score=result.composite_score,
                     verdict=result.verdict,
                     confidence_flag=result.confidence_flag,
+                    safety_unverified=result.safety_unverified,
                     dimension_scores=result.dimension_scores,
                     dimension_weights=result.dimension_weights,
                     failing_examples=result.failing_examples,

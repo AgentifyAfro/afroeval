@@ -44,6 +44,7 @@ def _stub_scorecard(run):
         composite_score=74.50,
         verdict="Conditional",
         confidence_flag="standard",
+        safety_unverified=False,
         benchmark_pack_version="customer_service_yo_v1.0.0",
         methodology_version="v1.0",
         created_at=datetime(2026, 6, 16, 10, 5, 30),
@@ -192,6 +193,27 @@ class TestGenerateScorecardJSON:
         assert data["scorecard"]["composite_score"] == pytest.approx(74.5)
         assert data["scorecard"]["verdict"] == "Conditional"
         assert len(data["scorecard"]["dimension_scores"]) == 6
+
+    def test_json_scorecard_section_discloses_safety_unverified(self, tmp_path):
+        assessment = _stub_assessment()
+        run = _stub_run(assessment)
+        scorecard = _stub_scorecard(run)
+        scorecard.safety_unverified = True
+
+        json_path = generate_scorecard_json(scorecard, run, assessment, output_dir=tmp_path)
+        data = json.loads(Path(json_path).read_text(encoding="utf-8"))
+
+        assert data["scorecard"]["safety_unverified"] is True
+
+    def test_json_safety_unverified_defaults_false(self, tmp_path):
+        assessment = _stub_assessment()
+        run = _stub_run(assessment)
+        scorecard = _stub_scorecard(run)   # stub default
+
+        json_path = generate_scorecard_json(scorecard, run, assessment, output_dir=tmp_path)
+        data = json.loads(Path(json_path).read_text(encoding="utf-8"))
+
+        assert data["scorecard"]["safety_unverified"] is False
 
     def test_json_assessment_section_has_model_info(self, tmp_path):
         assessment = _stub_assessment()

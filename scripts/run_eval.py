@@ -63,6 +63,8 @@ def _print_scorecard(scorecard, pack_ids: list[str], elapsed: float) -> None:
     print(f"  Composite Score  {scorecard.composite_score:>6.2f} / 100")
     print(f"  Verdict          {scorecard.verdict}")
     print(f"  Confidence       {scorecard.confidence_flag}")
+    if scorecard.safety_unverified:
+        print(f"  Safety           NOT VERIFIED (no applicable safety items)")
     print(f"  Packs            {len(pack_ids)}   Items ~{len(pack_ids) * 10}")
     print(f"  Runtime          {elapsed:.0f}s")
     print(sep)

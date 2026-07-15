@@ -211,6 +211,7 @@ class Scorecard(SQLModel, table=True):
     composite_score: float                   # 0–100
     verdict: str                             # VerdictBand value
     confidence_flag: str = "standard"        # "standard" | "low_coverage"
+    safety_unverified: bool = False          # True if safety had no applicable items (not measured this run)
 
     # Per-dimension scores (stored as JSON)
     dimension_scores: dict[str, float] = Field(default_factory=dict, sa_column=Column(JSON))
