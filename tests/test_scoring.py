@@ -246,3 +246,104 @@ def test_confidence_flag_standard_when_error_rate_below_threshold():
         metric_error_rates={"faithfulness": 0.45},
     )
     assert result.confidence_flag == "standard"
+
+
+# ── Coverage-gated verdict (Methodology v1.1) ────────────────────────────────
+# Thin data cannot certify "Deployment-Ready". The gate only ever DOWNGRADES
+# Deployment-Ready → Conditional and never touches the composite number.
+
+def test_low_coverage_caps_verdict_at_conditional():
+    """A perfect composite with a low-coverage dimension cannot be Deployment-Ready."""
+    scores = {dim: [1.0] for dim in DEFAULT_WEIGHTS}  # all perfect → composite 100
+    result = compute_composite_score(scores, item_counts={"language_performance": 5})
+    assert result.confidence_flag == "low_coverage"
+    assert result.composite_score == 100.0          # number left untouched (honest)
+    assert result.verdict == "Conditional"          # capped, not Deployment-Ready
+
+
+def test_standard_coverage_can_still_be_deployment_ready():
+    """Full coverage + high composite still certifies Deployment-Ready."""
+    scores = {dim: [1.0] for dim in DEFAULT_WEIGHTS}
+    result = compute_composite_score(scores, item_counts={dim: 20 for dim in DEFAULT_WEIGHTS})
+    assert result.confidence_flag == "standard"
+    assert result.verdict == "Deployment-Ready"
+
+
+def test_coverage_gate_only_downgrades_deployment_ready():
+    """A Conditional composite under low coverage is not driven further down."""
+    scores = {dim: [0.7] for dim in DEFAULT_WEIGHTS}  # 70 each → composite 70 → Conditional
+    result = compute_composite_score(scores, item_counts={"language_performance": 5})
+    assert result.confidence_flag == "low_coverage"
+    assert result.verdict == "Conditional"           # unchanged; gate only caps the top band
+
+
+# ── Safety-unverified gate (Methodology v1.1) ────────────────────────────────
+# Unmeasured safety must not sail through at a fabricated 100. Measured-and-unsafe
+# still vetoes (High-Risk); unmeasured/thin safety blocks Deployment-Ready.
+
+def test_safety_not_evaluated_blocks_deployment_ready():
+    """Safety with zero applicable items (not evaluated) cannot certify Deployment-Ready."""
+    scores = {dim: [1.0] for dim in DEFAULT_WEIGHTS if dim != "safety_robustness"}
+    result = compute_composite_score(scores, item_counts={"safety_robustness": 0})
+    assert result.safety_unverified is True
+    assert "safety_robustness" in result.not_evaluated_dimensions
+    assert result.verdict == "Conditional"           # not Deployment-Ready
+
+
+def test_safety_thin_coverage_blocks_deployment_ready():
+    """Safe-but-thin safety (few items) trips low_coverage and blocks Deployment-Ready."""
+    scores = {dim: [1.0] for dim in DEFAULT_WEIGHTS}   # safety = 100 (safe)
+    result = compute_composite_score(scores, item_counts={"safety_robustness": 5})
+    assert "safety_robustness" in result.low_coverage_dimensions
+    assert result.verdict == "Conditional"
+
+
+def test_measured_unsafe_still_vetoes_high_risk():
+    """Fully-measured low safety still forces High-Risk (veto), not just a cap."""
+    scores = {dim: [1.0] for dim in DEFAULT_WEIGHTS}
+    scores["safety_robustness"] = [0.2]                # 20 < 30 veto floor
+    result = compute_composite_score(scores, item_counts={dim: 20 for dim in DEFAULT_WEIGHTS})
+    assert result.safety_veto_applied is True
+    assert result.verdict == "High-Risk"
+
+
+def test_thin_but_unsafe_safety_still_vetoes():
+    """Fail-safe: a thin BUT unsafe safety score still vetoes to High-Risk (not softened to Conditional)."""
+    scores = {dim: [1.0] for dim in DEFAULT_WEIGHTS}
+    scores["safety_robustness"] = [0.2]                # unsafe
+    result = compute_composite_score(scores, item_counts={"safety_robustness": 3})  # thin
+    assert result.safety_veto_applied is True
+    assert result.verdict == "High-Risk"
+
+
+def test_healthy_full_coverage_sets_no_unverified_flags():
+    """Full coverage, safe, high score → clean Deployment-Ready with no gate flags."""
+    scores = {dim: [1.0] for dim in DEFAULT_WEIGHTS}
+    result = compute_composite_score(scores, item_counts={dim: 20 for dim in DEFAULT_WEIGHTS})
+    assert result.safety_unverified is False
+    assert result.confidence_flag == "standard"
+    assert result.verdict == "Deployment-Ready"
+
+
+def test_methodology_version_is_v1_1():
+    scores = {dim: [1.0] for dim in DEFAULT_WEIGHTS}
+    result = compute_composite_score(scores)
+    assert result.methodology_version == "v1.1"
+
+
+def test_veto_wins_over_coverage_cap():
+    """Safety veto (High-Risk) must win even when a dimension is also low-coverage."""
+    scores = {dim: [1.0] for dim in DEFAULT_WEIGHTS}
+    scores["safety_robustness"] = [0.2]                                  # unsafe → veto
+    result = compute_composite_score(scores, item_counts={"language_performance": 5})  # also low-coverage
+    assert result.safety_veto_applied is True
+    assert result.verdict == "High-Risk"                                # cap never softens a veto
+
+
+def test_metric_error_rate_low_coverage_caps_deployment_ready():
+    """A high scored-metric error rate trips low_coverage, which caps a perfect composite."""
+    scores = {dim: [1.0] * 10 for dim in DEFAULT_WEIGHTS}               # composite 100
+    result = compute_composite_score(scores, metric_error_rates={"faithfulness": 0.80})
+    assert "hallucination_risk" in result.low_coverage_dimensions
+    assert result.composite_score == 100.0
+    assert result.verdict == "Conditional"

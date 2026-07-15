@@ -1,9 +1,13 @@
 """
-Methodology v1.0 regression tests.
+Methodology v1.1 regression tests.
 
 These tests encode the specification in docs/METHODOLOGY_V1.md as executable assertions.
 Any change to the methodology that breaks these tests requires founder sign-off and
 a version bump of METHODOLOGY_VERSION in scoring/engine.py.
+
+v1.1 (founder-approved) adds the coverage gate + safety-unverified gate on top of the
+v1.0 weights / bands / veto (all unchanged). Coverage-gate behavior is covered in
+tests/test_scoring.py.
 """
 
 import pytest
@@ -23,13 +27,13 @@ from scoring.engine import (
 # ── Methodology version ───────────────────────────────────────────────────────
 
 def test_methodology_version_is_set():
-    assert METHODOLOGY_VERSION == "v1.0"
+    assert METHODOLOGY_VERSION == "v1.1"
 
 
 def test_scoring_result_carries_methodology_version():
     scores = {dim: [0.7] for dim in DEFAULT_WEIGHTS}
     result = compute_composite_score(scores)
-    assert result.methodology_version == "v1.0"
+    assert result.methodology_version == "v1.1"
 
 
 # ── Dimension coverage ────────────────────────────────────────────────────────

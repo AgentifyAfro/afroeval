@@ -107,7 +107,7 @@ An item may be included in a published pack only when ALL of the following are t
 4. `is_held_out` is `false`
 5. The item has been reviewed by the founder for methodology alignment
 
-Items that are `is_gold: true` are NEVER published in any pack — they are used only in the internal calibration pipeline.
+Items that are `is_gold: true` are calibration anchors and are **NEVER scored** — the benchmark loader (`benchmarks/loader.py`) excludes them from every evaluation run by default (Methodology v1.1). They may live inside packs for calibration/monitoring and are returned only when a caller explicitly passes `include_gold=True`.
 
 ---
 
