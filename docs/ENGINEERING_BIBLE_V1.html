@@ -388,7 +388,7 @@
         <p class="lede">The single source of truth for how AfroEval measures whether an AI system is ready to serve African users — in their language, in their cultural context, across every community. This document explains the exact mechanisms, not the marketing: the formulas, thresholds, control flow, and design trade-offs behind the score.</p>
         <dl class="meta">
           <div><dt>Classification</dt><dd>Confidential — Internal</dd></div>
-          <div><dt>Methodology</dt><dd>v1.0</dd></div>
+          <div><dt>Methodology</dt><dd>v1.1</dd></div>
           <div><dt>Dimensions</dt><dd>6 weighted</dd></div>
           <div><dt>Benchmark Packs</dt><dd>12 · 9 languages</dd></div>
           <div><dt>Baseline</dt><dd>Current build (Jul 2026)</dd></div>
@@ -677,7 +677,7 @@
           <div><div class="k problem">Problem</div><p>A single averaged number is not defensible — a regulator asks "why this weight?" and "what if a dimension had no data?"</p></div>
           <div><div class="k mech">Mechanism</div><p>Fixed, validated weights + two-level aggregation (metric → dimension → composite), with the composite renormalized over evaluated dimensions only.</p></div>
           <div><div class="k why">Why &amp; trade-offs</div><p>Fixed weights are auditable and stable across runs; the cost is that they are a judgment call, not learned. The constraint band (0.05–0.40) prevents a caller from silently nullifying or dominating with one dimension.</p></div>
-          <div><div class="k life">Lifecycle</div><p>Evaluation-stage core. Weights are a versioned methodology artifact (<span class="mono">v1.0</span>) — changing them is a methodology release, not a code tweak.</p></div>
+          <div><div class="k life">Lifecycle</div><p>Evaluation-stage core. Weights are a versioned methodology artifact (<span class="mono">v1.1</span>) — changing them is a methodology release, not a code tweak.</p></div>
         </div>
 
         <h3>4.2 · Metric → dimension aggregation <span class="badge built">As-Built</span></h3>
@@ -1065,7 +1065,7 @@ stable_pack_uuid(name, ver) <span class="op">=</span> uuid5(NAMESPACE, f"{name}_
           <table>
             <thead><tr><th>Function</th><th>As-Built</th><th>Recommended next</th></tr></thead>
             <tbody>
-              <tr><td><strong>GOVERN</strong></td><td>ADR log with replacement triggers; methodology versioning (v1.0); founder review gate on publication.</td><td><span class="badge rec">Design Rec</span> formal model-card + eval-card per run; sign-off workflow captured in-system.</td></tr>
+              <tr><td><strong>GOVERN</strong></td><td>ADR log with replacement triggers; methodology versioning (v1.1); founder review gate on publication.</td><td><span class="badge rec">Design Rec</span> formal model-card + eval-card per run; sign-off workflow captured in-system.</td></tr>
               <tr><td><strong>MAP</strong></td><td>Problem taxonomy → dimensions; cohort definitions; provenance on every item.</td><td><span class="badge rec">Design Rec</span> per-deployment context intake (use-case, population, risk tier) attached to an Assessment.</td></tr>
               <tr><td><strong>MEASURE</strong></td><td>Six dimensions, cohort disparity, coverage/confidence flags, per-item evidence, SME calibration + IRR.</td><td><span class="badge partial">Partial</span> confidence intervals on scores; automated IRR dashboards; drift trend charts.</td></tr>
               <tr><td><strong>MANAGE</strong></td><td>Verdict + safety veto + prioritized remediation roadmap; provider routing recommendation.</td><td><span class="badge rec">Design Rec</span> continuous re-evaluation triggers on model/version change; incident linkage.</td></tr>
@@ -1131,7 +1131,7 @@ stable_pack_uuid(name, ver) <span class="op">=</span> uuid5(NAMESPACE, f"{name}_
 
         <h3>11.1 · Versioning model <span class="badge built">As-Built</span></h3>
         <ul class="body">
-          <li><strong>Methodology version</strong> (<span class="mono">v1.0</span>) — stamped on every Scorecard. Any change to weights, thresholds, or aggregation is a methodology release; old scorecards remain interpretable under their own version.</li>
+          <li><strong>Methodology version</strong> (<span class="mono">v1.1</span>) — stamped on every Scorecard. Any change to weights, thresholds, or aggregation is a methodology release; old scorecards remain interpretable under their own version.</li>
           <li><strong>Pack version</strong> (<span class="mono">v1.0.0</span>) — packs are immutable once published; a change is a new version, and the deterministic UUIDv5 keeps identities stable across environments.</li>
           <li><strong>Evaluator version</strong> — each <code>MetricResult</code> carries an <code>evaluator_version</code> so a single response's scores are traceable to the exact scorer that produced them.</li>
         </ul>
