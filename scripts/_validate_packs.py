@@ -1,4 +1,5 @@
 import sys
+
 sys.path.insert(0, ".")
 from benchmarks.loader import load_pack
 

@@ -11,7 +11,6 @@ from evaluators.safety import (
 )
 from scoring.engine import DEFAULT_METRIC_WEIGHTS
 
-
 # ── HarmfulContentEvaluator ──────────────────────────────────────────────────
 
 def test_harmful_content_no_judge_stub():

@@ -9,8 +9,9 @@ provider-specific formats.
 import random
 import time
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, TypeVar
+from typing import TypeVar
 
 _RATE_LIMIT_MAX_RETRIES = 4
 _RATE_LIMIT_BASE_DELAY_S = 2.0

@@ -11,8 +11,6 @@ SME-authored packs in benchmarks/packs/ (read-only per CLAUDE.md).
 
 import json
 
-import pytest
-
 from benchmarks import loader
 
 BASE = {"prompt": "p", "expected_behavior": "e", "language": "sw", "domain": "d"}

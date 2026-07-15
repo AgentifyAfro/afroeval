@@ -9,14 +9,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from evaluators.base import MetricOutput
-from evaluators.llm_judge import LLMJudge
+from evaluators.hallucination import FaithfulnessEvaluator
 from evaluators.language_performance import (
     AnswerCompletenessEvaluator,
     FluencyEvaluator,
     SemanticSimilarityEvaluator,
 )
-from evaluators.hallucination import FaithfulnessEvaluator
-
+from evaluators.llm_judge import LLMJudge
 
 # ── LLMJudge ──────────────────────────────────────────────────────────────────
 
@@ -369,6 +368,7 @@ class TestAuthMiddleware:
     def test_no_key_returns_401(self, client):
         # client fixture sends the correct key; create a bare client for this test
         from fastapi.testclient import TestClient
+
         from api.main import app
         bare = TestClient(app, raise_server_exceptions=False)
         resp = bare.get("/v1/assessments")
@@ -376,6 +376,7 @@ class TestAuthMiddleware:
 
     def test_wrong_key_returns_401(self, client):
         from fastapi.testclient import TestClient
+
         from api.main import app
         bad = TestClient(app, headers={"X-API-Key": "wrong-key"}, raise_server_exceptions=False)
         resp = bad.get("/v1/assessments")
@@ -383,6 +384,7 @@ class TestAuthMiddleware:
 
     def test_health_is_public(self, client):
         from fastapi.testclient import TestClient
+
         from api.main import app
         bare = TestClient(app, raise_server_exceptions=False)
         resp = bare.get("/v1/health")
@@ -398,6 +400,7 @@ class TestAuthMiddleware:
 def test_semantic_similarity_rate_limit_sets_error_flag():
     """Rate-limit fallback must set error=True, not silently write 0.5 as a real score."""
     from unittest.mock import MagicMock, patch
+
     from evaluators.language_performance import SemanticSimilarityEvaluator
     mock_model = MagicMock()
     ev = SemanticSimilarityEvaluator(model=mock_model)
@@ -413,6 +416,7 @@ def test_semantic_similarity_rate_limit_sets_error_flag():
 def test_faithfulness_rate_limit_sets_error_flag():
     """FaithfulnessEvaluator rate-limit fallback must set error=True."""
     from unittest.mock import MagicMock, patch
+
     from evaluators.hallucination import FaithfulnessEvaluator
     mock_model = MagicMock()
     ev = FaithfulnessEvaluator(model=mock_model)

@@ -14,11 +14,12 @@ from pathlib import Path
 # Allow running from scripts/ or from the project root.
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from sqlmodel import Session
+
 from benchmarks.ids import stable_item_uuid, stable_pack_uuid
 from benchmarks.loader import PACKS_DIR
 from db.models import BenchmarkItem, BenchmarkPack
 from db.session import get_engine
-from sqlmodel import Session
 
 
 def _parse_pack_filename(filename: str) -> tuple[str, str]:

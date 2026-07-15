@@ -8,6 +8,7 @@ every paginated call.
 """
 
 import time
+
 import requests
 
 from api.settings import get_settings

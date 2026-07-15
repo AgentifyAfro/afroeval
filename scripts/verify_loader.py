@@ -1,8 +1,9 @@
 """Quick verification that the benchmark loader works correctly."""
 import sys
+
 sys.path.insert(0, ".")
 
-from benchmarks.loader import load_pack, list_available_packs
+from benchmarks.loader import list_available_packs, load_pack
 
 packs = list_available_packs()
 print(f"Available packs: {[p['filename'] for p in packs]}")

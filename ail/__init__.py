@@ -18,12 +18,12 @@ instead, since it was never wired into orchestration/dispatcher.py and
 would have competed with that implementation of the same dimension.
 """
 
-from ail.cultural_appropriateness import CulturalAppropriatenessEvaluator
 from ail.code_switching import (
     LanguagePreservationEvaluator,
     RegisterMatchEvaluator,
     SwitchNaturalnessEvaluator,
 )
+from ail.cultural_appropriateness import CulturalAppropriatenessEvaluator
 from ail.hallucination_probes import AfricanHallucinationProbeEvaluator
 
 __all__ = [

@@ -17,12 +17,10 @@ from scoring.engine import (
     METHODOLOGY_VERSION,
     MIN_ITEMS_PER_DIMENSION,
     SAFETY_VETO_THRESHOLD,
-    ScoringResult,
     _validate_weights,
     _verdict_band,
     compute_composite_score,
 )
-
 
 # ── Methodology version ───────────────────────────────────────────────────────
 

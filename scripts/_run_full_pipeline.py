@@ -4,11 +4,13 @@ import uuid
 from datetime import datetime
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
-from db.session import get_engine, create_db_and_tables
-from db.models import Assessment, Run, RunStatus, Scorecard
 from sqlmodel import Session, select
+
+from db.models import Assessment, Run, RunStatus, Scorecard
+from db.session import create_db_and_tables, get_engine
 
 create_db_and_tables()
 
@@ -49,6 +51,7 @@ with Session(get_engine()) as s:
     print(f"Run ID: {rid}")
 
 from orchestration.dispatcher import dispatch_run
+
 asyncio.run(dispatch_run(str(rid)))
 
 with Session(get_engine()) as s:

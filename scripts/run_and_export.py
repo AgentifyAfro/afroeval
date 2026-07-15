@@ -1,4 +1,4 @@
-"""
+r"""
 Create a fresh evaluation run and export responses to a Label Studio project.
 
 Runs entirely local against the production DB — no server required.
@@ -111,7 +111,7 @@ def main() -> None:
 
     engine = get_engine()
 
-    print(f"\n=== AfroEval — Run & Export ===")
+    print("\n=== AfroEval — Run & Export ===")
     print(f"Model:    {args.model_provider} / {args.model_id}")
     print(f"Packs:    {len(args.packs)} packs")
     for p in args.packs:

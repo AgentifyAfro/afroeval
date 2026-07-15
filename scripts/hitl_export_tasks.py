@@ -23,7 +23,6 @@ from db.session import get_engine
 from hitl.client import LabelStudioClient
 from hitl.label_config import PROJECT_TITLE, build_calibration_label_config
 
-
 # Metric names whose current implementation is a placeholder stub — the score
 # is a fixed constant that ignores the actual model response, not a real
 # measurement. Shown as "not yet implemented" instead of a misleadingly

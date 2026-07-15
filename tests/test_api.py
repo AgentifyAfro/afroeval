@@ -5,7 +5,6 @@ These tests run against the in-memory SQLite DB (via conftest.py fixtures).
 They verify the scaffold is wired correctly before any evaluator logic is built.
 """
 
-import pytest
 from fastapi.testclient import TestClient
 
 

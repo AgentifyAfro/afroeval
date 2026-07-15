@@ -11,9 +11,8 @@ import pytest
 from scoring.engine import (
     DEFAULT_METRIC_WEIGHTS,
     DEFAULT_WEIGHTS,
-    ScoringResult,
-    _verdict_band,
     _validate_weights,
+    _verdict_band,
     _weighted_dimension_average,
     compute_composite_score,
 )

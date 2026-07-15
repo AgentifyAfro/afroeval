@@ -17,7 +17,7 @@ import logging
 import sys
 import uuid
 import warnings
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -64,7 +64,7 @@ def _print_scorecard(scorecard, pack_ids: list[str], elapsed: float) -> None:
     print(f"  Verdict          {scorecard.verdict}")
     print(f"  Confidence       {scorecard.confidence_flag}")
     if scorecard.safety_unverified:
-        print(f"  Safety           NOT VERIFIED (no applicable safety items)")
+        print("  Safety           NOT VERIFIED (no applicable safety items)")
     print(f"  Packs            {len(pack_ids)}   Items ~{len(pack_ids) * 10}")
     print(f"  Runtime          {elapsed:.0f}s")
     print(sep)
@@ -98,7 +98,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--name",
-        default=f"CLI run {datetime.now(timezone.utc).replace(tzinfo=None).strftime('%Y-%m-%d %H:%M')} UTC",
+        default=f"CLI run {datetime.now(UTC).replace(tzinfo=None).strftime('%Y-%m-%d %H:%M')} UTC",
         help="Assessment name",
     )
     parser.add_argument(
@@ -112,9 +112,10 @@ def main() -> None:
 
     pack_ids: list[str] = args.packs.split(",") if args.packs else DEFAULT_PACKS
 
+    from sqlmodel import Session, select
+
     from db.models import Assessment, Run, RunStatus, Scorecard
     from db.session import get_engine
-    from sqlmodel import Session, select
 
     engine = get_engine()
 
@@ -139,13 +140,13 @@ def main() -> None:
             model_identifier=args.model,
             benchmark_pack_ids=pack_ids,
             config={},
-            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            created_at=datetime.now(UTC).replace(tzinfo=None),
         ))
         session.add(Run(
             id=run_id_uuid,
             assessment_id=assessment_id,
             status=RunStatus.PENDING,
-            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            created_at=datetime.now(UTC).replace(tzinfo=None),
         ))
         session.commit()
 
@@ -157,14 +158,14 @@ def main() -> None:
     for p in pack_ids:
         sector = SECTOR_MAP.get(p, "")
         print(f"             {p:<38}  {sector}")
-    print(f"\nDispatching… (Ctrl+C to abort)\n")
+    print("\nDispatching… (Ctrl+C to abort)\n")
 
     # ── Dispatch directly — no HTTP server needed ─────────────────────────────
     from orchestration.dispatcher import dispatch_run
 
-    start = datetime.now(timezone.utc).replace(tzinfo=None)
+    start = datetime.now(UTC).replace(tzinfo=None)
     asyncio.run(dispatch_run(run_id))
-    elapsed = (datetime.now(timezone.utc).replace(tzinfo=None) - start).total_seconds()
+    elapsed = (datetime.now(UTC).replace(tzinfo=None) - start).total_seconds()
 
     # ── Fetch and print scorecard ─────────────────────────────────────────────
     with Session(engine) as session:

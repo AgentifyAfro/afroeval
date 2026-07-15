@@ -95,7 +95,16 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP"]
-ignore = ["E501"]
+# E501 (line length) is advisory here; UP042 (str-enum → StrEnum) is skipped
+# deliberately — it changes str(enum) semantics and the DB models in db/models.py
+# rely on the (str, Enum) form for serialization.
+ignore = ["E501", "UP042"]
+
+[tool.ruff.lint.per-file-ignores]
+# Bootstrap ordering is intentional: these modules must run setup (dotenv load /
+# sys.path insertion) before their imports, so E402 does not apply.
+"db/migrations/env.py" = ["E402"]
+"scripts/_run_full_pipeline.py" = ["E402"]
 
 [tool.ruff.lint.isort]
 known-first-party = [

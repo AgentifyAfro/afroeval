@@ -10,7 +10,6 @@ from typing import Any, Optional
 
 from sqlmodel import JSON, Column, Field, Relationship, SQLModel
 
-
 # ── Enumerations ─────────────────────────────────────────────────────────────
 
 class RunStatus(str, enum.Enum):
@@ -132,7 +131,7 @@ class Run(SQLModel, table=True):
     # the run/scorecard data changes.
     archived: bool = Field(default=False, sa_column_kwargs={"server_default": "false"})
 
-    assessment: Optional[Assessment] = Relationship(back_populates="runs")
+    assessment: Assessment | None = Relationship(back_populates="runs")
     responses: list["ModelResponse"] = Relationship(back_populates="run")
     scorecard: Optional["Scorecard"] = Relationship(back_populates="run")
 
@@ -150,7 +149,7 @@ class ModelResponse(SQLModel, table=True):
     cost_usd: float | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    run: Optional[Run] = Relationship(back_populates="responses")
+    run: Run | None = Relationship(back_populates="responses")
     metric_results: list["MetricResult"] = Relationship(back_populates="response")
     reviews: list["ResponseReview"] = Relationship(back_populates="response")
 
@@ -170,7 +169,7 @@ class MetricResult(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     extra: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
 
-    response: Optional[ModelResponse] = Relationship(back_populates="metric_results")
+    response: ModelResponse | None = Relationship(back_populates="metric_results")
 
 
 class ResponseReview(SQLModel, table=True):
@@ -196,7 +195,7 @@ class ResponseReview(SQLModel, table=True):
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    response: Optional[ModelResponse] = Relationship(back_populates="reviews")
+    response: ModelResponse | None = Relationship(back_populates="reviews")
 
 
 # ── Scorecard ─────────────────────────────────────────────────────────────────
@@ -231,4 +230,4 @@ class Scorecard(SQLModel, table=True):
     pdf_path: str | None = None
     json_path: str | None = None
 
-    run: Optional[Run] = Relationship(back_populates="scorecard")
+    run: Run | None = Relationship(back_populates="scorecard")

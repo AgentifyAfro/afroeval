@@ -162,11 +162,20 @@ async def dispatch_run(run_id: str) -> None:
     Sprint 2: parallel connector + evaluator calls.
     Sprint 3: ModelResponse + MetricResult persistence (requires benchmark items in DB).
     """
+    from sqlmodel import Session, select
+
     from api.settings import get_settings
     from benchmarks.ids import stable_item_uuid as _item_uuid
-    from db.models import Assessment, BenchmarkItem, MetricResult, ModelResponse, Run, RunStatus, Scorecard
+    from db.models import (
+        Assessment,
+        BenchmarkItem,
+        MetricResult,
+        ModelResponse,
+        Run,
+        RunStatus,
+        Scorecard,
+    )
     from db.session import get_engine
-    from sqlmodel import Session, select
 
     engine = get_engine()
 

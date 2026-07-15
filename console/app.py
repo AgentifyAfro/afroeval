@@ -15,7 +15,7 @@ import threading
 import time
 import uuid
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -23,14 +23,29 @@ import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from benchmarks.ids import stable_item_uuid
-from benchmarks.loader import PACKS_DIR
-from db.models import Assessment, BenchmarkItem, BenchmarkPack, MetricResult, ModelResponse, ResponseReview, Run, RunStatus, Scorecard
-from db.session import get_engine
 from sqlmodel import Session, col, select
 
-from auth.client import AuthServiceUnavailableError, AuthUser, InvalidCredentialsError, SupabaseAuthClient
+from auth.client import (
+    AuthServiceUnavailableError,
+    AuthUser,
+    InvalidCredentialsError,
+    SupabaseAuthClient,
+)
+from benchmarks.ids import stable_item_uuid
+from benchmarks.loader import PACKS_DIR
 from console.access import can_archive_runs, resolve_views
+from db.models import (
+    Assessment,
+    BenchmarkItem,
+    BenchmarkPack,
+    MetricResult,
+    ModelResponse,
+    ResponseReview,
+    Run,
+    RunStatus,
+    Scorecard,
+)
+from db.session import get_engine
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -766,6 +781,7 @@ def _render_calibration_detail(cal_df: pd.DataFrame) -> None:
 def _launch_run(name: str, provider: str, model_id: str, pack_ids: list) -> None:
     """Create Assessment + Run rows in DB, then kick off the eval in a daemon thread."""
     import os
+
     from api.settings import get_settings
 
     # Streamlit Cloud exposes secrets via st.secrets AND as env vars, but the env-var
@@ -800,13 +816,13 @@ def _launch_run(name: str, provider: str, model_id: str, pack_ids: list) -> None
             model_identifier=model_id,
             benchmark_pack_ids=pack_ids,
             config={},
-            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            created_at=datetime.now(UTC).replace(tzinfo=None),
         ))
         session.add(Run(
             id=run_id_uuid,
             assessment_id=assessment_id,
             status=RunStatus.PENDING,
-            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            created_at=datetime.now(UTC).replace(tzinfo=None),
         ))
         session.commit()
 
@@ -815,6 +831,7 @@ def _launch_run(name: str, provider: str, model_id: str, pack_ids: list) -> None
     def _thread() -> None:
         try:
             import asyncio
+
             from orchestration.dispatcher import dispatch_run
             asyncio.run(dispatch_run(run_id_str))
         except Exception as exc:
@@ -963,7 +980,7 @@ def render_run_evaluation() -> None:
     # Auto-name includes model + selected pack labels + a fixed timestamp.
     # op_name_auto=None means new code has never run this session — always override then.
     if "op_name_ts" not in st.session_state:
-        st.session_state["op_name_ts"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
+        st.session_state["op_name_ts"] = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")
     _ts       = st.session_state["op_name_ts"]
     _pack_str = " + ".join(p["label"] for p in PACK_CATALOG if p["id"] in selected_packs) \
                 or "(no packs)"
@@ -1148,7 +1165,7 @@ def _pack_display(pack_ids: list[str]) -> tuple[str, str | None]:
     shown = ul[:4]
     rest  = len(ul) - len(shown)
     value = ", ".join(shown) + (f" +{rest}" if rest else "")
-    lang_list   = "\n".join(f"- {l}" for l in ul)
+    lang_list   = "\n".join(f"- {lang}" for lang in ul)
     domain_list = "\n".join(f"- {d}" for d in ud)
     help_text   = f"**Languages:**\n{lang_list}\n\n**Domains:**\n{domain_list}"
     return value, help_text
@@ -1613,7 +1630,7 @@ def render_language_breakdown() -> None:
         st.info("No item-level data found for these models.")
         return
 
-    langs = sorted(df["language"].unique(), key=lambda l: (l != "en", l))
+    langs = sorted(df["language"].unique(), key=lambda lang: (lang != "en", lang))
 
     def _get(lang: str, run_id: str, col: str):
         sub = df[(df["language"] == lang) & (df["run_id"] == run_id)]
@@ -1689,8 +1706,11 @@ def render_language_breakdown() -> None:
             return "color: #10B981; font-weight: 600"
         return "color: #6B7280"
 
-    score_fmt = lambda v: "—" if pd.isna(v) else f"{v:.1f}"
-    delta_fmt = lambda v: "—" if pd.isna(v) else (f"+{v:.1f}" if v > 0 else f"{v:.1f}")
+    def score_fmt(v):
+        return "—" if pd.isna(v) else f"{v:.1f}"
+
+    def delta_fmt(v):
+        return "—" if pd.isna(v) else (f"+{v:.1f}" if v > 0 else f"{v:.1f}")
 
     fmt: dict = {c: score_fmt for c in [model_a] + ([model_b] if two_models else []) if c in t1_df.columns}
     fmt.update({c: delta_fmt for c in delta_cols})
@@ -1699,11 +1719,11 @@ def render_language_breakdown() -> None:
     st.dataframe(styled_t1, use_container_width=True, hide_index=True)
 
     # ── EN Baseline Gap metrics ────────────────────────────────────────────
-    african_langs = [l for l in langs if l != "en"]
+    african_langs = [lang for lang in langs if lang != "en"]
     if en_comp_a is not None and african_langs:
         gaps_a = []
-        for l in african_langs:
-            g = _get(l, run_id_a, "composite")
+        for lang in african_langs:
+            g = _get(lang, run_id_a, "composite")
             if g is not None:
                 gaps_a.append(en_comp_a - g)
         avg_gap_a = round(sum(gaps_a) / len(gaps_a), 1) if gaps_a else None
@@ -1711,8 +1731,8 @@ def render_language_breakdown() -> None:
         avg_gap_b = None
         if two_models and en_comp_b is not None:
             gaps_b = []
-            for l in african_langs:
-                g = _get(l, run_id_b, "composite")
+            for lang in african_langs:
+                g = _get(lang, run_id_b, "composite")
                 if g is not None:
                     gaps_b.append(en_comp_b - g)
             avg_gap_b = round(sum(gaps_b) / len(gaps_b), 1) if gaps_b else None

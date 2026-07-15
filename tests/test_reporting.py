@@ -9,12 +9,10 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
 
 import pytest
 
 from reporting.generator import generate_scorecard_json, generate_scorecard_pdf
-
 
 # ── Stub factories ─────────────────────────────────────────────────────────────
 

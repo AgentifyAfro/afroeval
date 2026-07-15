@@ -26,7 +26,7 @@ import argparse
 import itertools
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 # ── Vendor imports (httpx + dotenv are in .venv) ──────────────────────────────
@@ -387,7 +387,7 @@ def main() -> None:
     #   --packs pack1,pack2   and   --packs pack1 --packs pack2
     packs = [p.strip() for raw in args.packs for p in raw.split(",") if p.strip()]
 
-    name = args.name or f"{args.model} @ {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}"
+    name = args.name or f"{args.model} @ {datetime.now(UTC).strftime('%Y-%m-%d %H:%M UTC')}"
 
     print(f"\n  {_BOLD}AfroEval Scorecard™{_RESET}  —  starting run")
     print(f"  {_DIM}Provider: {args.provider}  |  Model: {args.model}{_RESET}")
