@@ -21,6 +21,12 @@ from scoring.engine import DEFAULT_METRIC_WEIGHTS, DEFAULT_WEIGHTS, compute_comp
 
 logger = structlog.get_logger(__name__)
 
+# DeepEval-backed metrics each fire several token-heavy internal Azure calls, so
+# they run on a dedicated, tighter semaphore (see dispatch_run) to avoid blowing the
+# TPM limit — unlike the single-call LLM-judge metrics, which run 3-wide.
+_DEEPEVAL_METRIC_NAMES = frozenset({"semantic_similarity", "answer_completeness", "faithfulness"})
+_DEEPEVAL_MAX_CONCURRENCY = 1
+
 
 def _parse_pack_id(pack_id: str) -> tuple[str, str]:
     """
@@ -310,10 +316,15 @@ async def dispatch_run(run_id: str) -> None:
                 item_counts: dict[str, int] = {dim: 0 for dim in DEFAULT_WEIGHTS}
                 item_passed_flags: dict[int, list[bool]] = {idx: [] for idx in range(len(all_items))}
 
-                # Semaphore caps simultaneous LLM-judge (Azure) calls to avoid rate limits.
-                # 3 concurrent calls keeps token throughput well within Azure TPM limits
-                # for gpt-4.1-mini; was 10, which caused 429s on 60-85% of deepeval calls.
+                # Two semaphores cap simultaneous Azure calls to stay under the TPM
+                # limit. Single-call LLM-judge metrics (fluency, cultural, safety,
+                # code-switching) run 3-wide. The DeepEval metrics each fire SEVERAL
+                # token-heavy internal calls, so they get a dedicated 1-wide semaphore —
+                # otherwise 3 of them bursting at once blows the TPM (historically 429'd
+                # 60-85% of deepeval calls). Serializing the heavy metrics trades some
+                # wall-clock for real scores instead of rate-limited fallbacks.
                 _judge_sem = asyncio.Semaphore(3)
+                _deepeval_sem = asyncio.Semaphore(_DEEPEVAL_MAX_CONCURRENCY)
 
                 async def _eval_one(raw, item, evaluator):
                     context = {
@@ -322,7 +333,8 @@ async def dispatch_run(run_id: str) -> None:
                         "cohort": item.get("cohort", ""),
                         "tags": item.get("tags", []),
                     }
-                    async with _judge_sem:
+                    sem = _deepeval_sem if evaluator.metric_name in _DEEPEVAL_METRIC_NAMES else _judge_sem
+                    async with sem:
                         return await asyncio.to_thread(
                             evaluator.evaluate,
                             prompt=raw.prompt,
