@@ -133,6 +133,8 @@ def _distinct_item_counts(all_outputs: list, n_evaluators: int) -> dict[str, int
     for i, output in enumerate(all_outputs):
         if not getattr(output, "applicable", True):
             continue
+        if getattr(output, "error", False):
+            continue  # infra-error fallbacks aren't real measurements — not coverage
         seen.setdefault(output.dimension, set()).add(i // n_evaluators)
     return {dim: len(items) for dim, items in seen.items()}
 
@@ -353,18 +355,14 @@ async def dispatch_run(run_id: str) -> None:
                         continue
 
                     _metric_total_counts[output.metric_name] = _metric_total_counts.get(output.metric_name, 0) + 1
-                    if getattr(output, "error", False):
+                    is_error = getattr(output, "error", False)
+                    if is_error:
                         _metric_error_counts[output.metric_name] = _metric_error_counts.get(output.metric_name, 0) + 1
 
-                    if output.dimension in dimension_scores:
-                        dimension_scores[output.dimension].append(output.score)
-
-                    dim_metrics = dimension_metric_scores.get(output.dimension)
-                    if dim_metrics is not None and output.metric_name in dim_metrics:
-                        dim_metrics[output.metric_name].append(output.score)
-
                     # ── Step 4b: Persist MetricResult rows ────────────────────
-                    item_passed_flags[item_idx].append(output.passed)
+                    # All applicable outputs are persisted — including infra-error
+                    # fallbacks — so the item drill-down and SME export still show them
+                    # (the export sanitizes error reasons to "unavailable").
                     if item_idx in response_id_by_idx:
                         session.add(MetricResult(
                             id=uuid.uuid4(),
@@ -376,6 +374,24 @@ async def dispatch_run(run_id: str) -> None:
                             reason=output.reason,
                             extra=output.extra,
                         ))
+
+                    # Infra-error fallbacks (rate limit / content filter / timeout) are
+                    # not real measurements: exclude them from the score, pass-rate and
+                    # coverage aggregates so a 429 can't drag a dimension toward the 0.5
+                    # fallback. They still drive metric_error_rates → low_coverage, and
+                    # _distinct_item_counts skips them too (a fully-errored dimension
+                    # becomes not_evaluated rather than scoring 0.0).
+                    if is_error:
+                        continue
+
+                    if output.dimension in dimension_scores:
+                        dimension_scores[output.dimension].append(output.score)
+
+                    dim_metrics = dimension_metric_scores.get(output.dimension)
+                    if dim_metrics is not None and output.metric_name in dim_metrics:
+                        dim_metrics[output.metric_name].append(output.score)
+
+                    item_passed_flags[item_idx].append(output.passed)
 
                 # Coverage = distinct items assessed per dimension (not evaluator
                 # outputs), so the low_coverage flag reflects real item counts even

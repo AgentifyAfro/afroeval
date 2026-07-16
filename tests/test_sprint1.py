@@ -279,10 +279,10 @@ class TestDistinctItemCounts:
     evaluator outputs'. With multiple sub-metrics per dimension, per-output
     counting inflates coverage by the evaluator count and hides genuine low coverage."""
 
-    def _out(self, dimension, metric_name, applicable=True):
+    def _out(self, dimension, metric_name, applicable=True, error=False):
         return MetricOutput(
             dimension=dimension, metric_name=metric_name,
-            score=0.8, passed=True, applicable=applicable,
+            score=0.8, passed=True, applicable=applicable, error=error,
         )
 
     def test_counts_distinct_items_not_outputs(self):
@@ -306,6 +306,17 @@ class TestDistinctItemCounts:
         )
         counts = _distinct_item_counts(outputs, n_evaluators=3)
         assert counts["code_switching_quality"] == 1
+
+    def test_error_outputs_do_not_count(self):
+        from orchestration.dispatcher import _distinct_item_counts
+        evaluators = ["register_match", "switch_naturalness", "language_preservation"]
+        # item0 real scores, item1 all infra-error fallbacks (e.g. rate-limited).
+        outputs = (
+            [self._out("code_switching_quality", m) for m in evaluators]
+            + [self._out("code_switching_quality", m, error=True) for m in evaluators]
+        )
+        counts = _distinct_item_counts(outputs, n_evaluators=3)
+        assert counts["code_switching_quality"] == 1  # errored item is not coverage
 
     def test_multiple_dimensions_counted_independently(self):
         from orchestration.dispatcher import _distinct_item_counts
