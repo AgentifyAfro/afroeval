@@ -11,3 +11,4 @@ supabase==2.31.0
 reportlab==4.5.1
 fairlearn>=0.10.0
 google-genai==2.10.0
+sacrebleu==2.6.0
