@@ -1196,6 +1196,29 @@ def _set_runs_archived(run_ids: list[str], archived: bool) -> int:
     return updated
 
 
+def _archive_all_completed_runs() -> int:
+    """Archive every non-archived run that has a scorecard — a one-click way to
+    clear the Evaluation Runs list (not limited to the 50 currently loaded).
+
+    Fully reversible: tick 'Show archived runs' + Unarchive to bring any back.
+    Runs still in progress (no scorecard yet) are left untouched.
+    """
+    engine = get_engine()
+    with Session(engine) as session:
+        scored_ids = set(session.exec(select(Scorecard.run_id)).all())
+        rows = session.exec(select(Run).where(Run.archived == False)).all()  # noqa: E712
+        updated = 0
+        for run in rows:
+            if run.id in scored_ids:
+                run.archived = True
+                session.add(run)
+                updated += 1
+        session.commit()
+    load_runs_summary.clear()
+    load_provider_comparison.clear()
+    return updated
+
+
 def render_run_scorecard() -> None:
     render_console_header()
 
@@ -1255,6 +1278,23 @@ def render_run_scorecard() -> None:
                         n = _set_runs_archived(picked, False)
                         st.toast(f"Unarchived {n} run(s).")
                         st.rerun()
+
+        # ── Clear the list: one-click archive-all, pinned at the sidebar bottom ──
+        if may_archive:
+            st.divider()
+            confirm_all = st.checkbox(
+                "Confirm — archive every run in the list",
+                key="op_archive_all_confirm",
+                help="Clears the Evaluation Runs list by archiving all listed runs "
+                     "(every run with a scorecard). Nothing is deleted — tick "
+                     "'Show archived runs' above and use Unarchive to bring any back.",
+            )
+            if st.button("🗄 Archive all runs (clear list)", key="op_archive_all",
+                         type="primary", use_container_width=True,
+                         disabled=not confirm_all):
+                n = _archive_all_completed_runs()
+                st.toast(f"Archived {n} run(s) — list cleared.")
+                st.rerun()
 
     run_id = selected["run_id"]
 
