@@ -296,9 +296,12 @@ class ChrFEvaluator(BaseEvaluator):
 def _get_multilingual_model():
     """Load the multilingual sentence-transformer model once and cache it."""
     from sentence_transformers import SentenceTransformer  # noqa: PLC0415
-    # token=False forces anonymous HuggingFace download even if HF_TOKEN is set
-    # in the environment — prevents 401s from expired/invalid ambient tokens.
-    return SentenceTransformer("paraphrase-multilingual-MiniLM-L6-v2", token=False)
+    # L12 is the real multilingual paraphrase MiniLM. There is NO "L6" multilingual
+    # variant — an earlier "L6" typo pointed at a nonexistent repo, so HF returned a
+    # 401 "repository not found" that silently disabled this metric on every run.
+    # token=False downloads anonymously (the model is public) and ignores any stale
+    # ambient HF_TOKEN; set HF_TOKEN only if anonymous download rate limits become an issue.
+    return SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2", token=False)
 
 
 class MultilingualSimilarityEvaluator(BaseEvaluator):
