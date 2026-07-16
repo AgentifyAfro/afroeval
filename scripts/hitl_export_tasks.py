@@ -40,6 +40,17 @@ _ERROR_REASON_PREFIXES = (
     "chrF unavailable:",
 )
 
+# Reason substrings that mean the metric's optional dependency isn't installed in
+# this runtime (e.g. sentence-transformers/torch absent on Streamlit Cloud) — the
+# metric was intentionally not run here, which is not a transient failure and should
+# read calmly to SMEs rather than as something that "broke".
+_ENV_MISSING_SIGNALS = ("no module named", "modulenotfounderror", "not installed")
+
+
+def _is_env_missing(reason: str) -> bool:
+    low = reason.lower()
+    return any(sig in low for sig in _ENV_MISSING_SIGNALS)
+
 
 def _format_automated_scores(metric_results: list[MetricResult]) -> str:
     if not metric_results:
@@ -52,10 +63,16 @@ def _format_automated_scores(metric_results: list[MetricResult]) -> str:
                 "rely on your own independent judgment for this dimension."
             )
         elif any(m.reason.startswith(prefix) for prefix in _ERROR_REASON_PREFIXES):
-            lines.append(
-                f"{m.dimension} ({m.metric_name}): automated scoring unavailable — "
-                "rely on your own independent judgment for this dimension."
-            )
+            if _is_env_missing(m.reason):
+                lines.append(
+                    f"{m.dimension} ({m.metric_name}): optional automated metric — "
+                    "not run in this environment; score this dimension on your own judgment."
+                )
+            else:
+                lines.append(
+                    f"{m.dimension} ({m.metric_name}): automated scoring temporarily "
+                    "unavailable — rely on your own independent judgment for this dimension."
+                )
         else:
             lines.append(
                 f"{m.dimension} ({m.metric_name}): {m.score:.2f} "
