@@ -1,6 +1,6 @@
 """
 Azure OpenAI connector — live implementation using openai.AzureOpenAI client.
-Sprint 2: parallel item calls via ThreadPoolExecutor.
+Parallel item calls via ThreadPoolExecutor.
 """
 
 import time

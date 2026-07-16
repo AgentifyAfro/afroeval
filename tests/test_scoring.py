@@ -1,9 +1,8 @@
 """
 Scoring engine unit tests — the scoring regression harness foundation.
 
-These tests form the base of the scoring regression harness (Section 19 of the playbook).
+These tests form the base of the scoring regression harness.
 Any change to the scoring methodology must keep these passing.
-Reference model expected scores are added in Sprint 5.
 """
 
 import pytest

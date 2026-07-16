@@ -77,7 +77,7 @@ def list_runs(
 
 
 async def _execute_run(run_id: str) -> None:
-    """Dispatches the run to the orchestration layer. Wired fully in Sprint 1."""
+    """Dispatches the run to the orchestration layer."""
     from orchestration.dispatcher import dispatch_run
     await dispatch_run(run_id)
 

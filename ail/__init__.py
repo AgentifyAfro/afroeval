@@ -8,8 +8,8 @@ contract but contain Africa-specific logic that no generic benchmark replicates:
   - code_switching.py            — Sheng / Pidgin / mixed-language quality scoring
   - hallucination_probes.py      — African-specific fabrication detection
 
-Sprint 2 implements these evaluators. This __init__ exports stubs so the
-orchestration layer can import them throughout Sprint 1 without error.
+This __init__ re-exports the AIL evaluators so the orchestration layer can
+import them from a single entry point.
 
 Note: informal_economy.py (cohort logic for informal-sector users) was
 archived 2026-06-29 — see ail/informal_economy.archive.py. Its real logic

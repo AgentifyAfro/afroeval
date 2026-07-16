@@ -1,5 +1,5 @@
 """
 HITL module — Label Studio integration for SME benchmark validation.
 
-Sprint 1: Label Studio queue setup (Week 3 in playbook).
+Sets up the Label Studio review queue for the SME validation workflow.
 """

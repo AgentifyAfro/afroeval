@@ -289,7 +289,7 @@ def _collect_failing_examples(dimension_scores: dict[str, float]) -> list[dict]:
             failing.append({
                 "dimension": dim,
                 "score": score,
-                "note": "Dimension score below 60. Item-level examples attached in Sprint 3.",
+                "note": "Below the 60-point pass threshold — review the per-item results for the specific failing prompts and reasons.",
             })
     return failing
 

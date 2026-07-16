@@ -1,5 +1,5 @@
 """
-Sprint 1 test coverage — LLM judge, evaluator injection, connector routing, auth.
+Test coverage — LLM judge, evaluator injection, connector routing, auth.
 
 All LLM/API calls are mocked; no network required.
 """
@@ -260,7 +260,7 @@ class TestConnectorRouting:
 
     def test_unknown_provider_raises(self):
         from orchestration.dispatcher import _build_connector
-        # "gemini" is now a supported provider (added Sprint: Gemini connector),
+        # "gemini" is now a supported provider (Gemini connector),
         # so use a genuinely unknown provider to exercise the error path.
         with pytest.raises(ValueError, match="Unsupported model_provider"):
             _build_connector("nonexistent_provider", MagicMock())

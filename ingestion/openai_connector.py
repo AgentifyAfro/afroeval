@@ -1,6 +1,6 @@
 """
 OpenAI API connector — live implementation using openai.OpenAI client.
-Sprint 2: parallel item calls via ThreadPoolExecutor.
+Parallel item calls via ThreadPoolExecutor.
 """
 
 import time

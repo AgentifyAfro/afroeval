@@ -5,10 +5,10 @@ The dispatcher is the only place that knows about both the ingestion layer
 and the evaluators. It wires them together without either module knowing
 about the other (module contract).
 
-Sprint 1: live model connectors, LLM-judge evaluators, connector routing by provider.
-Sprint 2: parallel connector calls (ThreadPoolExecutor) + parallel evaluator calls
-          (asyncio.gather + semaphore). ModelResponse/MetricResult persistence deferred
-          to Sprint 3 (requires benchmark items seeded in DB for FK chain).
+The dispatch flow: route each provider to its live model connector; run connector
+calls in parallel (ThreadPoolExecutor) and evaluator calls in parallel
+(asyncio.gather + a judge semaphore); and persist ModelResponse/MetricResult rows
+for items seeded in the DB (the FK chain requires seeded benchmark items).
 """
 
 import asyncio
@@ -159,8 +159,8 @@ async def dispatch_run(run_id: str) -> None:
       6. Persist the Scorecard.
       7. Mark run COMPLETED.
 
-    Sprint 2: parallel connector + evaluator calls.
-    Sprint 3: ModelResponse + MetricResult persistence (requires benchmark items in DB).
+    Connector and evaluator calls run in parallel; ModelResponse/MetricResult rows
+    are persisted for benchmark items seeded in the DB.
     """
     from sqlmodel import Session, select
 
