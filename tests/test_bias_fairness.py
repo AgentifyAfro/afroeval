@@ -21,34 +21,108 @@ def test_clean_parity_scores_near_one():
     assert result.metric_name == "cohort_disparity"
 
 
-def test_disparity_at_threshold_clamps_to_full_score():
+def test_disparity_at_threshold_is_scored_continuously():
     evaluator = CohortDisparityEvaluator()
-    # formal: 10/10 pass (rate=1.0). informal_economy: 8.5/10 -> use 17/20 for exactness.
+    # formal=1.0, informal=0.85 -> ratio 0.85. v1.2 clamped this to 1.0.
     cohorts = ["formal"] * 20 + ["informal_economy"] * 20
-    outcomes = [True] * 20 + [True] * 17 + [False] * 3  # formal=1.0, informal=0.85 -> ratio=0.85
+    outcomes = [True] * 20 + [True] * 17 + [False] * 3
     result = evaluator.compute_run_disparity(cohorts, outcomes)
-    assert result.score == 1.0  # min(0.85/0.80, 1.0) clamps to 1.0
+    assert abs(result.score - 0.85) < 1e-9
     assert result.passed is True  # 0.85 >= 0.80
 
 
-def test_disparity_between_floor_and_threshold_is_partial_score():
+def test_disparity_below_threshold_is_scored_continuously():
     evaluator = CohortDisparityEvaluator()
-    # formal: 20/20 pass (rate=1.0). informal_economy: 13/20 pass (rate=0.65) -> ratio=0.65
+    # formal=1.0, informal=0.65 -> ratio 0.65. v1.2 scored 0.65/0.80 = 0.8125.
     cohorts = ["formal"] * 20 + ["informal_economy"] * 20
     outcomes = [True] * 20 + [True] * 13 + [False] * 7
     result = evaluator.compute_run_disparity(cohorts, outcomes)
-    assert abs(result.score - 0.8125) < 0.001  # 0.65 / 0.80
+    assert abs(result.score - 0.65) < 1e-9
     assert result.passed is False
 
 
-def test_disparity_below_floor_scores_zero():
+def test_severe_disparity_scores_low_without_a_floor_cliff():
     evaluator = CohortDisparityEvaluator()
-    # formal: 20/20 pass (rate=1.0). informal_economy: 6/20 pass (rate=0.30) -> ratio=0.30
+    # formal=1.0, informal=0.30 -> ratio 0.30. v1.2 hard-zeroed anything below 0.50.
     cohorts = ["formal"] * 20 + ["informal_economy"] * 20
     outcomes = [True] * 20 + [True] * 6 + [False] * 14
     result = evaluator.compute_run_disparity(cohorts, outcomes)
+    assert abs(result.score - 0.30) < 1e-9
+    assert result.passed is False
+
+
+def test_language_axis_governs_when_worse_than_cohort():
+    evaluator = CohortDisparityEvaluator()
+    # cohort axis: formal 0.75, informal 0.75 -> ratio 1.0 (parity)
+    # language axis: sw 1.0, am 0.5           -> ratio 0.5 (the real gap)
+    # (needs 2 obs/cell to decouple the axes: with only 1 obs/cell in a 2x2
+    # cohort x language grid, a single flipped outcome forces identical
+    # disparity on both axes by symmetry, so parity-on-one/gap-on-the-other
+    # is not representable with 4 items.)
+    cohorts = ["formal"] * 4 + ["informal_economy"] * 4
+    languages = ["sw", "sw", "am", "am"] * 2
+    outcomes = [True, True, True, False] * 2
+    result = evaluator.compute_run_disparity(cohorts, outcomes, languages=languages)
+    assert abs(result.score - 0.5) < 1e-9
+    assert result.passed is False
+    assert "0.500" in result.reason and "1.000" in result.reason
+
+
+def test_cohort_axis_governs_when_worse_than_language():
+    evaluator = CohortDisparityEvaluator()
+    cohorts = ["formal", "formal", "informal_economy", "informal_economy"]
+    languages = ["sw", "am", "sw", "am"]
+    outcomes = [True, True, False, False]  # cohort ratio 0.0, language ratio 1.0
+    result = evaluator.compute_run_disparity(cohorts, outcomes, languages=languages)
     assert result.score == 0.0
     assert result.passed is False
+
+
+def test_score_is_continuous_above_threshold():
+    evaluator = CohortDisparityEvaluator()
+    # formal 1.0, informal 0.9 -> ratio 0.90. Old code clamped this to 1.0.
+    cohorts = ["formal"] * 10 + ["informal_economy"] * 10
+    outcomes = [True] * 10 + [True] * 9 + [False]
+    result = evaluator.compute_run_disparity(cohorts, outcomes)
+    assert abs(result.score - 0.90) < 1e-9
+    assert result.passed is True  # 0.90 >= 0.80
+
+
+def test_single_language_axis_is_ignored_not_fatal():
+    evaluator = CohortDisparityEvaluator()
+    # only one language -> that axis does not qualify; cohort axis still scores.
+    cohorts = ["formal"] * 10 + ["informal_economy"] * 10
+    languages = ["sw"] * 20
+    outcomes = [True] * 10 + [True] * 9 + [False]
+    result = evaluator.compute_run_disparity(cohorts, outcomes, languages=languages)
+    assert abs(result.score - 0.90) < 1e-9
+    assert result.applicable is True
+
+
+def test_neither_axis_qualifies_is_not_applicable():
+    evaluator = CohortDisparityEvaluator()
+    result = evaluator.compute_run_disparity(["formal"] * 4, [True] * 4, languages=["sw"] * 4)
+    assert result.applicable is False
+    assert "insufficient" in result.reason.lower()
+
+
+def test_languages_argument_is_optional():
+    evaluator = CohortDisparityEvaluator()
+    cohorts = ["formal"] * 10 + ["informal_economy"] * 10
+    outcomes = [True] * 10 + [True] * 9 + [False]
+    assert evaluator.compute_run_disparity(cohorts, outcomes).score == \
+        evaluator.compute_run_disparity(cohorts, outcomes, languages=None).score
+
+
+def test_reason_names_both_axes_and_the_governing_one():
+    evaluator = CohortDisparityEvaluator()
+    cohorts = ["formal"] * 2 + ["informal_economy"] * 2
+    languages = ["sw", "am", "sw", "am"]
+    outcomes = [True, True, True, False]
+    reason = evaluator.compute_run_disparity(cohorts, outcomes, languages=languages).reason
+    assert "language" in reason.lower()
+    assert "cohort" in reason.lower()
+    assert "governing" in reason.lower()
 
 
 def test_fewer_than_two_cohorts_is_not_applicable():
