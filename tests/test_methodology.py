@@ -25,13 +25,13 @@ from scoring.engine import (
 # ── Methodology version ───────────────────────────────────────────────────────
 
 def test_methodology_version_is_set():
-    assert METHODOLOGY_VERSION == "v1.2"
+    assert METHODOLOGY_VERSION == "v1.4"
 
 
 def test_scoring_result_carries_methodology_version():
     scores = {dim: [0.7] for dim in DEFAULT_WEIGHTS}
     result = compute_composite_score(scores)
-    assert result.methodology_version == "v1.2"
+    assert result.methodology_version == "v1.4"
 
 
 # ── Dimension coverage ────────────────────────────────────────────────────────

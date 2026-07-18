@@ -61,11 +61,16 @@ Add to `tests/test_bias_fairness.py`:
 ```python
 def test_language_axis_governs_when_worse_than_cohort():
     evaluator = CohortDisparityEvaluator()
-    # cohort axis: formal 1.0, informal 1.0 -> ratio 1.0 (parity)
-    # language axis: sw 1.0, am 0.5        -> ratio 0.5 (the real gap)
-    cohorts = ["formal"] * 2 + ["informal_economy"] * 2
-    languages = ["sw", "am", "sw", "am"]
-    outcomes = [True, True, True, False]
+    # cohort axis: formal 0.75, informal 0.75 -> ratio 1.0 (parity)
+    # language axis: sw 1.0, am 0.5           -> ratio 0.5 (the real gap)
+    # NOTE: needs 2 observations per cell to decouple the axes. With only 1
+    # obs/cell in a 2x2 cohort x language grid, a single flipped outcome moves
+    # both marginals identically (0.5 on BOTH axes) -- parity-on-one /
+    # gap-on-the-other is NOT representable with 4 items, and such a fixture
+    # cannot distinguish a working min()-over-axes from a broken one.
+    cohorts = ["formal"] * 4 + ["informal_economy"] * 4
+    languages = ["sw", "sw", "am", "am"] * 2
+    outcomes = [True, True, True, False] * 2
     result = evaluator.compute_run_disparity(cohorts, outcomes, languages=languages)
     assert abs(result.score - 0.5) < 1e-9
     assert result.passed is False

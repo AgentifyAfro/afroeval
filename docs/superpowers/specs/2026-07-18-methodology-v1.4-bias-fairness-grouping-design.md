@@ -159,6 +159,16 @@ No new database column. Both ratios live in the existing `MetricResult.reason` a
     assert the continuous value at that ratio.
   - `test_disparity_between_floor_and_threshold_is_partial_score` — asserts `0.65 / 0.80`.
     Rewrite to assert `0.65`.
+- **Fixture constraint for the "one axis governs the other" tests.** A test that must show
+  *parity on one axis and a gap on the other* needs **at least 2 observations per
+  cohort × language cell**. In a 2×2 grid with a single observation per cell, flipping one
+  outcome moves both marginals identically — the naive 4-item fixture
+  (`cohorts = ["formal"]*2 + ["informal_economy"]*2`, `languages = ["sw","am","sw","am"]`,
+  `outcomes = [True,True,True,False]`) yields **0.5 on BOTH axes**, not cohort 1.0 /
+  language 0.5, and so cannot distinguish a working `min()`-over-axes from a broken one.
+  Use the 8-item form: `cohorts = ["formal"]*4 + ["informal_economy"]*4`,
+  `languages = ["sw","sw","am","am"]*2`, `outcomes = [True,True,True,False]*2` →
+  cohort 0.75/0.75 = ratio 1.0, language sw 1.0 / am 0.5 = ratio 0.5.
 
 ## Out of scope
 

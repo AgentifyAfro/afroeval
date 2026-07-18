@@ -1,5 +1,5 @@
 """
-AfroEval Composite Scoring Engine — Methodology v1.2.
+AfroEval Composite Scoring Engine — Methodology v1.4.
 
 Reference: docs/METHODOLOGY_V1.md
 
@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 
 from db.models import VerdictBand
 
-METHODOLOGY_VERSION = "v1.2"
+METHODOLOGY_VERSION = "v1.4"
 
 # Default weights — must sum to 1.0.
 # Buyer-specific re-weighting is permitted (see Methodology v1.0, Section 3).
