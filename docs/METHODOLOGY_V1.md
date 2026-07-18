@@ -124,7 +124,7 @@ Generic hallucination benchmarks do not test for African-specific fabrications. 
 - Agricultural data (market prices, crop seasons, government schemes)
 - Currency values and exchange rates
 
-**Pass threshold:** ≥ 0.75 (no African fabrication markers present; faithfulness ≥ 0.7).
+**Pass threshold:** ≥ 0.70 (faithfulness); any African fabrication marker hard-zeroes the item.
 
 <sup>†</sup> Originally specified as Ragas `FaithfulnessMetric`; switched to DeepEval's equivalent
 metric (same concept — checks output against a reference passage) because Ragas 0.4.3 has a

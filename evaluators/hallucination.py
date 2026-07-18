@@ -4,9 +4,12 @@ Hallucination Risk evaluators — Dimension weight: 20%.
 Detects fabricated facts in model responses, with African-specific probes
 (institutions, geography, regulation, currency, mobile money operators).
 
-Sub-metric weights (Methodology v1.0, Section 2.3):
-  faithfulness                  40%  DeepEval FaithfulnessMetric
-  african_hallucination_probe   60%  AfroEval AIL (ail/hallucination_probes.py)
+Sub-metric weights (Methodology v1.2, Section 2.3):
+  faithfulness                 100%  DeepEval FaithfulnessMetric
+
+As of v1.2, african_hallucination_probe (AfroEval AIL, ail/hallucination_probes.py)
+carries 0 weight and acts as a per-item gate instead: a fired probe hard-zeroes
+that item's hallucination score. It is still computed, persisted and displayed.
 
 Note: FaithfulnessMetric is designed for RAG (checking output against retrieved
 context passages). AfroEval benchmark items have no retrieval step, so the
