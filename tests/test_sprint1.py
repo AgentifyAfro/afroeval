@@ -521,3 +521,16 @@ def test_metric_output_error_field_can_be_set():
     from evaluators.base import MetricOutput
     out = MetricOutput(dimension="d", metric_name="m", score=0.5, passed=False, reason="r", error=True)
     assert out.error is True
+
+
+# ── Bias fairness: language axis wiring ────────────────────────────────────
+
+class TestBiasLanguageAxis:
+    def test_dispatcher_passes_language_labels(self):
+        """The language axis is useless if the dispatcher never supplies it."""
+        import inspect
+
+        from orchestration import dispatcher
+        src = inspect.getsource(dispatcher.dispatch_run)
+        assert "bias_languages" in src
+        assert "languages=bias_languages" in src

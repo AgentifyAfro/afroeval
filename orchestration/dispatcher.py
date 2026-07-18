@@ -508,12 +508,15 @@ async def dispatch_run(run_id: str) -> None:
 
                 # ── Step 4c: Run-level bias_fairness via Fairlearn ─────────────
                 bias_cohorts = [item.get("cohort", "") for item in all_items]
+                bias_languages = [item.get("language", "") for item in all_items]
                 bias_outcomes = [
                     (sum(item_passed_flags[idx]) / len(item_passed_flags[idx]) >= 0.5)
                     if item_passed_flags[idx] else False
                     for idx in range(len(all_items))
                 ]
-                bias_result = CohortDisparityEvaluator().compute_run_disparity(bias_cohorts, bias_outcomes)
+                bias_result = CohortDisparityEvaluator().compute_run_disparity(
+                    bias_cohorts, bias_outcomes, languages=bias_languages
+                )
 
                 if bias_result.applicable:
                     dimension_scores["bias_fairness"] = [bias_result.score] * len(all_items)
