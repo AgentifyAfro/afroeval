@@ -369,6 +369,18 @@ def _cover_block(scorecard, run, assessment, s):
             "See the flagged items for the triggering marker.",
             s["meta"],
         ))
+
+    # Methodology v1.3 rule 10 — Tier 2 items are never presented as dual-validated.
+    single_expert = _single_expert_disclosure(assessment.benchmark_pack_ids)
+    if single_expert["present"]:
+        story.append(Paragraph(
+            f"ⓘ Single-Expert Validated Items — {single_expert['count']} of "
+            f"{single_expert['scored_items']} scored items ({single_expert['share']:.0%}) were "
+            "validated by one reviewer qualified in both the item's language and domain, "
+            "rather than two independent validators with inter-rater reliability. "
+            "Inter-rater reliability is not defined for these items and is not reported.",
+            s["meta"],
+        ))
     story.append(Spacer(1, 0.15 * inch))
 
     story.append(HRFlowable(width="100%", thickness=0.75, color=LIGHT_GRAY, spaceAfter=0.1 * inch))
@@ -478,6 +490,48 @@ def _footer_block(scorecard, run, s):
     ]
 
 
+# ── Tier 2 disclosure ─────────────────────────────────────────────────────────
+
+def _single_expert_disclosure(pack_ids) -> dict:
+    """Tier 2 (single-expert validated) items among the packs this run scored.
+
+    Methodology v1.3 publication rule 10: wherever validation status is reported, the
+    presence and count of Tier 2 items must be disclosed — they rest on one qualified
+    expert rather than two independent validators plus IRR, and must never be presented
+    as dual-validated.
+
+    Computed from the pack files at render time rather than stored on the scorecard, so
+    no migration is needed and historical scorecards are unaffected: a scorecard for a
+    run over packs with no Tier 2 items simply reports present=False. load_pack already
+    excludes gold and held-out items, so the denominator is the scored set — the same
+    population rule 9's cap is measured against.
+    """
+    from benchmarks.loader import SINGLE_EXPERT_VALIDATED_TAG, load_pack
+
+    by_pack, flagged, scored = {}, 0, 0
+    for pack_id in pack_ids or []:
+        idx = pack_id.rfind("_v")
+        if idx == -1:
+            continue
+        try:
+            items = load_pack(pack_id[:idx], pack_id[idx + 1:])
+        except (FileNotFoundError, ValueError):
+            continue  # dispatcher already warns on unloadable packs; don't fail the report
+        n = sum(1 for i in items if SINGLE_EXPERT_VALIDATED_TAG in (i.get("tags") or []))
+        scored += len(items)
+        flagged += n
+        if n:
+            by_pack[pack_id] = {"single_expert_items": n, "scored_items": len(items)}
+
+    return {
+        "present":       flagged > 0,
+        "count":         flagged,
+        "scored_items":  scored,
+        "share":         round(flagged / scored, 4) if scored else 0.0,
+        "by_pack":       by_pack,
+    }
+
+
 # ── JSON internals ────────────────────────────────────────────────────────────
 
 def _build_json_payload(scorecard, run, assessment) -> dict:
@@ -504,6 +558,7 @@ def _build_json_payload(scorecard, run, assessment) -> dict:
             "confidence_flag":       scorecard.confidence_flag,
             "safety_unverified":     scorecard.safety_unverified,
             "african_fabrication_detected": scorecard.african_fabrication_detected,
+            "single_expert_validated_items": _single_expert_disclosure(assessment.benchmark_pack_ids),
             "benchmark_pack_version": scorecard.benchmark_pack_version,
             "dimension_scores":      scorecard.dimension_scores,
             "dimension_weights":     scorecard.dimension_weights,

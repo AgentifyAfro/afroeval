@@ -15,6 +15,12 @@ from pathlib import Path
 
 PACKS_DIR = Path(__file__).parent / "packs"
 
+# Marks a Tier 2 item — published on one qualified expert's judgment rather than two
+# independent validators (Methodology v1.3, docs/BENCHMARK_ITEM_SCHEMA.md). Defined here
+# because the pack files are the source of truth; the authoring script and the reporting
+# layer both import it so a single string change can never desync them.
+SINGLE_EXPERT_VALIDATED_TAG = "single_expert_validated"
+
 
 def load_pack(
     name: str,

@@ -214,6 +214,54 @@ class TestGenerateScorecardJSON:
 
         assert data["scorecard"]["safety_unverified"] is False
 
+    def test_json_discloses_single_expert_validated_items(self, tmp_path):
+        """Methodology v1.3 rule 10 — Tier 2 items are never reported as dual-validated."""
+        assessment = _stub_assessment()
+        assessment.benchmark_pack_ids = ["community_health_am_v1.1.0"]
+        run = _stub_run(assessment)
+        scorecard = _stub_scorecard(run)
+
+        json_path = generate_scorecard_json(scorecard, run, assessment, output_dir=tmp_path)
+        disclosure = json.loads(Path(json_path).read_text(encoding="utf-8"))["scorecard"][
+            "single_expert_validated_items"
+        ]
+
+        assert disclosure["present"] is True
+        assert disclosure["count"] == 4
+        # Denominator is the scored set (gold + held-out excluded), matching the rule 9 cap.
+        assert disclosure["scored_items"] == 11
+        assert disclosure["by_pack"]["community_health_am_v1.1.0"]["single_expert_items"] == 4
+
+    def test_json_single_expert_disclosure_absent_for_dual_validated_pack(self, tmp_path):
+        """A pack with no Tier 2 items must report clean, not merely omit the field."""
+        assessment = _stub_assessment()
+        assessment.benchmark_pack_ids = ["community_health_am_v1.0.0"]
+        run = _stub_run(assessment)
+        scorecard = _stub_scorecard(run)
+
+        json_path = generate_scorecard_json(scorecard, run, assessment, output_dir=tmp_path)
+        disclosure = json.loads(Path(json_path).read_text(encoding="utf-8"))["scorecard"][
+            "single_expert_validated_items"
+        ]
+
+        assert disclosure["present"] is False
+        assert disclosure["count"] == 0
+        assert disclosure["by_pack"] == {}
+
+    def test_json_single_expert_disclosure_survives_unloadable_pack(self, tmp_path):
+        """An unresolvable pack id must not fail the report — the dispatcher already warns."""
+        assessment = _stub_assessment()
+        assessment.benchmark_pack_ids = ["does_not_exist_v9.9.9", "nonsense"]
+        run = _stub_run(assessment)
+        scorecard = _stub_scorecard(run)
+
+        json_path = generate_scorecard_json(scorecard, run, assessment, output_dir=tmp_path)
+        disclosure = json.loads(Path(json_path).read_text(encoding="utf-8"))["scorecard"][
+            "single_expert_validated_items"
+        ]
+
+        assert disclosure["present"] is False
+
     def test_json_scorecard_section_discloses_african_fabrication_detected(self, tmp_path):
         assessment = _stub_assessment()
         run = _stub_run(assessment)
