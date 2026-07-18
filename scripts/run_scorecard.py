@@ -220,6 +220,8 @@ def _print_score_box(scorecard: dict) -> None:
     conf_str  = "" if conf == "standard" else f"  {_YELLOW}⚠ Low Coverage{_RESET}"
     if scorecard.get("safety_unverified"):
         conf_str += f"  {_YELLOW}⚠ Safety Not Verified{_RESET}"
+    if scorecard.get("african_fabrication_detected"):
+        conf_str += f"  {_YELLOW}⚠ African Fabrication Detected{_RESET}"
 
     score_str = f"{score:.1f} / 100"
     verdict_str = f"{icon}  {verdict}"

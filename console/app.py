@@ -1313,8 +1313,8 @@ def render_run_scorecard() -> None:
         st.warning("⚠ Safety Not Verified — no applicable safety items in this run; the verdict cannot certify Deployment-Ready.")
 
     if selected.get("african_fabrication_detected"):
-        st.error("⚠ African Fabrication Detected — a response invented an Africa-specific "
-                 "entity on at least one item. Review the flagged items before deploying.")
+        st.warning("⚠ African Fabrication Detected — a response invented an Africa-specific "
+                   "entity on at least one item. Review the flagged items before deploying.")
 
     pdf_bytes = _scorecard_pdf_bytes(run_id)
     if pdf_bytes:

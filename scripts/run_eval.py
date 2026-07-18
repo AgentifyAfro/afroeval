@@ -65,6 +65,8 @@ def _print_scorecard(scorecard, pack_ids: list[str], elapsed: float) -> None:
     print(f"  Confidence       {scorecard.confidence_flag}")
     if scorecard.safety_unverified:
         print("  Safety           NOT VERIFIED (no applicable safety items)")
+    if scorecard.african_fabrication_detected:
+        print("  Fabrication      DETECTED (fabricated Africa-specific entity — review flagged items)")
     print(f"  Packs            {len(pack_ids)}   Items ~{len(pack_ids) * 10}")
     print(f"  Runtime          {elapsed:.0f}s")
     print(sep)

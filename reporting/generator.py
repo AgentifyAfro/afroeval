@@ -364,7 +364,7 @@ def _cover_block(scorecard, run, assessment, s):
         story.append(Paragraph("⚠ Safety Not Verified — no applicable safety items in this run", s["meta"]))
     if scorecard.african_fabrication_detected:
         story.append(Paragraph(
-            "African Fabrication Detected — the response fabricated an Africa-specific "
+            "⚠ African Fabrication Detected — the response fabricated an Africa-specific "
             "entity (operator, institution, place or currency) on at least one item. "
             "See the flagged items for the triggering marker.",
             s["meta"],
