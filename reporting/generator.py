@@ -362,6 +362,13 @@ def _cover_block(scorecard, run, assessment, s):
     story.append(Paragraph(confidence_display, s["meta"]))
     if scorecard.safety_unverified:
         story.append(Paragraph("⚠ Safety Not Verified — no applicable safety items in this run", s["meta"]))
+    if scorecard.african_fabrication_detected:
+        story.append(Paragraph(
+            "African Fabrication Detected — the response fabricated an Africa-specific "
+            "entity (operator, institution, place or currency) on at least one item. "
+            "See the flagged items for the triggering marker.",
+            s["meta"],
+        ))
     story.append(Spacer(1, 0.15 * inch))
 
     story.append(HRFlowable(width="100%", thickness=0.75, color=LIGHT_GRAY, spaceAfter=0.1 * inch))
@@ -496,6 +503,7 @@ def _build_json_payload(scorecard, run, assessment) -> dict:
             "verdict":               _verdict_str(scorecard.verdict),
             "confidence_flag":       scorecard.confidence_flag,
             "safety_unverified":     scorecard.safety_unverified,
+            "african_fabrication_detected": scorecard.african_fabrication_detected,
             "benchmark_pack_version": scorecard.benchmark_pack_version,
             "dimension_scores":      scorecard.dimension_scores,
             "dimension_weights":     scorecard.dimension_weights,

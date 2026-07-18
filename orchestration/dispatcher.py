@@ -514,6 +514,7 @@ async def dispatch_run(run_id: str) -> None:
                     verdict=result.verdict,
                     confidence_flag=result.confidence_flag,
                     safety_unverified=result.safety_unverified,
+                    african_fabrication_detected=african_fabrication_detected,
                     dimension_scores=result.dimension_scores,
                     dimension_weights=result.dimension_weights,
                     failing_examples=result.failing_examples,

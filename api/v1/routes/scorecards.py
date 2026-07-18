@@ -22,6 +22,7 @@ class ScorecardRead(BaseModel):
     verdict: str
     confidence_flag: str
     safety_unverified: bool
+    african_fabrication_detected: bool
     dimension_scores: dict[str, float]
     dimension_weights: dict[str, float]
     failing_examples: list[dict]
@@ -67,6 +68,7 @@ def _to_read(s: Scorecard) -> ScorecardRead:
         verdict=s.verdict,
         confidence_flag=s.confidence_flag,
         safety_unverified=s.safety_unverified,
+        african_fabrication_detected=s.african_fabrication_detected,
         dimension_scores=s.dimension_scores,
         dimension_weights=s.dimension_weights,
         failing_examples=s.failing_examples,

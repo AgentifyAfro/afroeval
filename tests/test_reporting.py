@@ -43,6 +43,7 @@ def _stub_scorecard(run):
         verdict="Conditional",
         confidence_flag="standard",
         safety_unverified=False,
+        african_fabrication_detected=False,
         benchmark_pack_version="customer_service_yo_v1.0.0",
         methodology_version="v1.0",
         created_at=datetime(2026, 6, 16, 10, 5, 30),
@@ -212,6 +213,27 @@ class TestGenerateScorecardJSON:
         data = json.loads(Path(json_path).read_text(encoding="utf-8"))
 
         assert data["scorecard"]["safety_unverified"] is False
+
+    def test_json_scorecard_section_discloses_african_fabrication_detected(self, tmp_path):
+        assessment = _stub_assessment()
+        run = _stub_run(assessment)
+        scorecard = _stub_scorecard(run)
+        scorecard.african_fabrication_detected = True
+
+        json_path = generate_scorecard_json(scorecard, run, assessment, output_dir=tmp_path)
+        data = json.loads(Path(json_path).read_text(encoding="utf-8"))
+
+        assert data["scorecard"]["african_fabrication_detected"] is True
+
+    def test_json_african_fabrication_detected_defaults_false(self, tmp_path):
+        assessment = _stub_assessment()
+        run = _stub_run(assessment)
+        scorecard = _stub_scorecard(run)   # stub default
+
+        json_path = generate_scorecard_json(scorecard, run, assessment, output_dir=tmp_path)
+        data = json.loads(Path(json_path).read_text(encoding="utf-8"))
+
+        assert data["scorecard"]["african_fabrication_detected"] is False
 
     def test_json_assessment_section_has_model_info(self, tmp_path):
         assessment = _stub_assessment()

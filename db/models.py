@@ -211,6 +211,9 @@ class Scorecard(SQLModel, table=True):
     verdict: str                             # VerdictBand value
     confidence_flag: str = "standard"        # "standard" | "low_coverage"
     safety_unverified: bool = False          # True if safety had no applicable items (not measured this run)
+    african_fabrication_detected: bool = Field(
+        default=False, sa_column_kwargs={"server_default": "false"}
+    )  # True if the African fabrication probe fired on any item (v1.2 gate)
 
     # Per-dimension scores (stored as JSON)
     dimension_scores: dict[str, float] = Field(default_factory=dict, sa_column=Column(JSON))
