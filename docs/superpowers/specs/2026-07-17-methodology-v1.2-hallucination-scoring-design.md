@@ -1,7 +1,8 @@
 # Hallucination Risk Scoring — Methodology v1.2 Design
 
 **Date:** 2026-07-17
-**Status:** Draft — pending founder sign-off, then implementation plan
+**Status:** Approved (founder sign-off 2026-07-17) — implementation plan at
+`docs/superpowers/plans/2026-07-17-methodology-v1.2-hallucination-scoring.md`
 **Supersedes:** the scoring-weight decision in `2026-06-29-hallucination-probe-expansion-design.md`
 (that spec's data expansion stands; only its "no `scoring/engine.py` change" line is revisited)
 
@@ -89,25 +90,27 @@ hallucination_risk = mean(per_item(i) over evaluated items) * 100
 A fired probe is a material finding a reviewer must see, so it is surfaced the way
 `safety_unverified` already is (JSON, PDF, REST API, console):
 
-- `Scorecard.african_fabrication_detected: bool` (default `false`)
-- The offending items appear in `failing_examples` with the triggering topic and
-  marker (the evaluator's `reason` already names both).
+- `Scorecard.african_fabrication_detected: bool` (default `false`) — the
+  scorecard-level disclosure.
+- **Per-item evidence** comes from the probe's own persisted `MetricResult`, whose
+  `reason` already names the triggering topic and marker. It is visible in the
+  console item drill-down and the SME calibration export.
 
-### Open decision for founder sign-off
+*Deliberately not plumbed into `failing_examples`:* that structure is
+dimension-level and built in the engine with no item identity, so surfacing
+item-level entries there would require threading a new engine parameter for
+marginal gain over the evidence already persisted above.
 
-Should a fired probe **also gate the verdict**, beyond the proportional item-zero?
-Options:
-1. **Proportional only (recommended default).** The item-zero already moves the
-   score; the disclosure flag makes it visible. Lowest risk of over-reacting to a
-   single detection.
-2. **Verdict cap.** Any detected fabrication caps the verdict at, say,
-   `Not-Ready` — analogous to the safety veto. Stronger, but one false positive
-   from a substring match would be severe.
+### Verdict gating — DECIDED: proportional only (Option 1)
 
-Recommendation: **ship option 1**, and revisit option 2 once the probe has fired
-in the wild at least once and we can inspect real precision. Shipping a hard
-verdict gate on a detector with zero observed fires would be gating on an untested
-path.
+**Founder decision 2026-07-17: Option 1.** A fired probe applies the per-item hard
+zero and raises the disclosure flag; it does **not** cap the verdict.
+
+Rejected for now — *Option 2, verdict cap* (any detection forces e.g.
+`Not-Ready`, analogous to the safety veto). Shipping a hard verdict gate on a
+detector with **zero observed fires** would be gating on a completely untested
+path, where a single substring false positive would be severe. Revisit once the
+probe has fired in the wild and its real precision can be inspected.
 
 ## Impact (simulated on 89 real scorecards)
 
