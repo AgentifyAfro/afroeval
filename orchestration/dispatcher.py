@@ -28,8 +28,12 @@ _DEEPEVAL_METRIC_NAMES = frozenset({"semantic_similarity", "answer_completeness"
 _DEEPEVAL_MAX_CONCURRENCY = 1
 
 # v1.2: metrics that GATE a dimension rather than score it. They are computed and
-# persisted for evidence, but contribute no positive score and no coverage.
+# persisted for evidence, but contribute no positive score, no coverage and no
+# bias pass-rate entry.
 _GATE_ONLY_METRICS = frozenset({"african_hallucination_probe"})
+
+# The scored metric that the gate above zeroes out when it fires.
+_GATED_TARGET_METRIC = "faithfulness"
 
 
 def _probe_fired_items(all_outputs: list, n_evaluators: int) -> set[int]:
@@ -41,11 +45,25 @@ def _probe_fired_items(all_outputs: list, n_evaluators: int) -> set[int]:
     return {
         i // n_evaluators
         for i, out in enumerate(all_outputs)
-        if getattr(out, "metric_name", "") == "african_hallucination_probe"
+        if getattr(out, "metric_name", "") in _GATE_ONLY_METRICS
         and getattr(out, "applicable", True)
         and not getattr(out, "error", False)
         and out.score == 0.0
     }
+
+
+def _gated_metric_score(
+    metric_name: str, item_idx: int, score: float, probe_fired_items: set[int]
+) -> float:
+    """Apply the v1.2 fabrication gate to a single metric score.
+
+    A confirmed African fabrication on an item is a hard fail for that item's
+    hallucination score: the gated target metric is forced to 0.0. Every other
+    metric — and every ungated item — passes through untouched.
+    """
+    if metric_name == _GATED_TARGET_METRIC and item_idx in probe_fired_items:
+        return 0.0
+    return score
 
 
 def _parse_pack_id(pack_id: str) -> tuple[str, str]:
@@ -428,6 +446,28 @@ async def dispatch_run(run_id: str) -> None:
                     # _distinct_item_counts skips them too (a fully-errored dimension
                     # becomes not_evaluated rather than scoring 0.0).
                     if is_error:
+                        # ...with ONE exception: if the fabrication probe fired on
+                        # this item, the item WAS measured — by the probe — even
+                        # though the judge metric errored. Dropping it would let a
+                        # 429 silently erase a confirmed fabrication, which is
+                        # exactly the case the gate exists for, so append the 0.0.
+                        # Coverage deliberately still excludes it: the probe is a
+                        # gate, not a measurement (_GATE_ONLY_METRICS), and the
+                        # faithfulness measurement genuinely didn't happen. Net
+                        # effect is conservative — the score reflects the
+                        # fabrication while coverage stays honestly low.
+                        if output.metric_name == _GATED_TARGET_METRIC:
+                            dim_metrics = dimension_metric_scores.get(output.dimension)
+                            if (
+                                dim_metrics is not None
+                                and output.metric_name in dim_metrics
+                                and item_idx in probe_fired_items
+                            ):
+                                dim_metrics[output.metric_name].append(
+                                    _gated_metric_score(
+                                        output.metric_name, item_idx, output.score, probe_fired_items
+                                    )
+                                )
                         continue
 
                     if output.dimension in dimension_scores:
@@ -435,12 +475,22 @@ async def dispatch_run(run_id: str) -> None:
 
                     dim_metrics = dimension_metric_scores.get(output.dimension)
                     if dim_metrics is not None and output.metric_name in dim_metrics:
-                        metric_score = output.score
                         # v1.2 gate: a detected African fabrication is a hard fail for
                         # that item's hallucination score.
-                        if output.metric_name == "faithfulness" and item_idx in probe_fired_items:
-                            metric_score = 0.0
-                        dim_metrics[output.metric_name].append(metric_score)
+                        dim_metrics[output.metric_name].append(
+                            _gated_metric_score(
+                                output.metric_name, item_idx, output.score, probe_fired_items
+                            )
+                        )
+
+                    # v1.2: gate-only metrics are not a measurement — they don't count
+                    # toward coverage or the bias pass-rate. Letting the probe into
+                    # item_passed_flags would move the verdict through bias_fairness
+                    # (an unauthorized channel, double-counting the gate) and, when it
+                    # doesn't fire, inject a guaranteed True that dilutes real failures
+                    # against the >= 0.5 outcome threshold.
+                    if output.metric_name in _GATE_ONLY_METRICS:
+                        continue
 
                     item_passed_flags[item_idx].append(output.passed)
 

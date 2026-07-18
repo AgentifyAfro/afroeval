@@ -367,6 +367,22 @@ class TestProbeGate:
         counts = _distinct_item_counts(outputs, n_evaluators=1)
         assert counts.get("hallucination_risk", 0) == 0
 
+    # The substitution that actually wires _probe_fired_items into the dimension
+    # score. Without these, a refactor could delete the gate and stay green.
+    def test_gated_faithfulness_is_zeroed(self):
+        from orchestration.dispatcher import _gated_metric_score
+        assert _gated_metric_score("faithfulness", 1, 0.95, {1}) == 0.0
+
+    def test_ungated_faithfulness_passes_through(self):
+        from orchestration.dispatcher import _gated_metric_score
+        assert _gated_metric_score("faithfulness", 0, 0.95, {1}) == 0.95
+
+    def test_non_faithfulness_metric_passes_through(self):
+        from orchestration.dispatcher import _gated_metric_score
+        # The gate zeroes only the hallucination target metric, never other
+        # dimensions' metrics on the same (fabricating) item.
+        assert _gated_metric_score("cultural_fluency", 1, 0.8, {1}) == 0.8
+
 
 # ── Connector rate-limit retry ──────────────────────────────────────────────
 # Model connectors used to return an empty response on the first 429, which
