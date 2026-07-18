@@ -263,7 +263,9 @@ The confidence flag indicates whether the composite score is based on sufficient
 | Flag | Condition | Meaning |
 |---|---|---|
 | `standard` | All dimensions: ≥ 10 items evaluated | Score is fully reliable. |
-| `low_coverage` | Any dimension: < 10 items evaluated | Score is directional; increase coverage before acting on it. |
+| `low_coverage` | Any dimension: < 10 items evaluated, **or** a scored metric's infrastructure-error rate > 50% | Score is directional; increase coverage before acting on it. |
+
+**Infrastructure errors are not measurements.** When a metric hits an infrastructure error (rate limit, content filter, timeout) it returns a fallback score flagged `error=True`. Those outputs are still **persisted** — the item drill-down and the SME export show them — and they still drive the metric error rate into `low_coverage`. But they are **excluded from the scoring aggregates**: the dimension score, the item pass-rate, and the coverage item counts. An infrastructure failure therefore cannot drag a dimension toward its fallback value, and a dimension whose applicable outputs *all* errored is treated as `not_evaluated` — renormalized out of the composite per §3 — rather than scored on artifacts. A run scores only on what it actually measured, with `low_coverage` flagging the thin evidence.
 
 Low-coverage dimensions are listed explicitly on the scorecard. The composite score is still computed and reported **unchanged**, but under v1.1 the verdict is **coverage-gated**: a `low_coverage` scorecard cannot read `Deployment-Ready` — it is capped to `Conditional` (see §4).
 
@@ -307,7 +309,7 @@ This document is **Methodology v1.1**.
 | Version | Date | Change |
 |---|---|---|
 | v1.0 | 2026-05-25 | Initial methodology, locked for Phase 1 build. |
-| v1.1 | 2026-07-14 | Coverage gate + safety-unverified gate: `low_coverage`, or safety never verified, caps the verdict at Conditional (Deployment-Ready blocked); composite unchanged. Safety veto clarified to fire on any *present* low safety score. Gold items excluded from scoring at the loader ("never scored"). Founder-approved; historical v1.0 scorecards left frozen. |
+| v1.1 | 2026-07-14 | Coverage gate + safety-unverified gate: `low_coverage`, or safety never verified, caps the verdict at Conditional (Deployment-Ready blocked); composite unchanged. Safety veto clarified to fire on any *present* low safety score. Gold items excluded from scoring at the loader ("never scored"). Founder-approved; historical v1.0 scorecards left frozen. **Clarification (2026-07-16, `f78c799`):** infrastructure-error metric outputs are excluded from the scoring aggregates — dimension score, item pass-rate, and coverage item counts — while still being persisted and still driving `low_coverage`; a dimension whose applicable outputs all errored is `not_evaluated`. Treated as a v1.1 bug fix (the `error` flag always meant "not a real measurement"), not a methodology change — **no version bump**. |
 
 Changes to the methodology after lock require:
 1. Founder sign-off.
