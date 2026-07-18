@@ -535,11 +535,14 @@ async def dispatch_run(run_id: str) -> None:
                             extra=bias_result.extra,
                         ))
                 else:
-                    # Single-cohort run — no disparity measurement possible.
+                    # Neither axis qualified: after dropping blanks and groups below
+                    # MIN_GROUP_SIZE, both cohort AND language were left with fewer
+                    # than 2 comparable groups, so no disparity ratio exists.
                     # item_counts["bias_fairness"] stays at 0 so the scoring engine
                     # treats it as not-evaluated (same path as code-switching on English packs).
                     logger.info(
-                        "Bias fairness not applicable — insufficient cohort diversity",
+                        "Bias fairness not applicable — neither cohort nor language "
+                        "axis had 2+ qualifying groups",
                         run_id=run_id,
                         reason=bias_result.reason,
                     )

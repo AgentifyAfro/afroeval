@@ -30,13 +30,21 @@ FORMAL_COHORTS = {"formal_economy", "urban", "high_literacy", "smartphone_user"}
 
 DISPARITY_PASS_THRESHOLD = 0.80   # sets `passed` only; does NOT scale the score (v1.4)
 
+MIN_GROUP_SIZE = 5   # groups smaller than this are too volatile to carry a ratio (v1.4)
 
-def _axis_ratio(labels: list[str], outcomes: list[bool]) -> tuple[float, dict, str, str] | None:
+
+def _axis_ratio(
+    labels: list[str], outcomes: list[bool]
+) -> tuple[float, dict, str, str, dict] | None:
     """Disparate impact ratio for one grouping axis.
 
-    Returns (ratio, per_group_rates, worst_group, best_group), or None when the
-    axis has fewer than 2 distinct non-blank groups and therefore cannot support
-    a comparison.
+    Returns (ratio, per_group_rates, worst_group, best_group, excluded_groups),
+    or None when the axis has fewer than 2 distinct non-blank groups of at least
+    MIN_GROUP_SIZE items and therefore cannot support a comparison.
+
+    excluded_groups maps {label: item_count} for every group dropped for being
+    smaller than MIN_GROUP_SIZE. These are disclosed in the reason text so no
+    group is ever silently removed from scoring.
     """
     if labels and len(labels) != len(outcomes):
         # Guarded only when labels is non-empty: compute_run_disparity calls
@@ -48,6 +56,16 @@ def _axis_ratio(labels: list[str], outcomes: list[bool]) -> tuple[float, dict, s
             f"{len(outcomes)} outcomes"
         )
     paired = [(lbl, out) for lbl, out in zip(labels, outcomes) if lbl]
+
+    # Drop groups too small to carry a stable selection rate (v1.4). A 2-item
+    # legacy label that happens to fail twice would otherwise force the axis
+    # ratio to 0.0 and zero out 15% of the composite.
+    counts: dict[str, int] = {}
+    for lbl, _ in paired:
+        counts[lbl] = counts.get(lbl, 0) + 1
+    excluded = {lbl: n for lbl, n in counts.items() if n < MIN_GROUP_SIZE}
+    paired = [(lbl, out) for lbl, out in paired if lbl not in excluded]
+
     if len({lbl for lbl, _ in paired}) < 2:
         return None
 
@@ -65,7 +83,25 @@ def _axis_ratio(labels: list[str], outcomes: list[bool]) -> tuple[float, dict, s
     )
     rates = mf.by_group["selection_rate"]
     ratio = float(rates.min() / rates.max()) if rates.max() > 0 else 1.0
-    return ratio, rates.to_dict(), str(rates.idxmin()), str(rates.idxmax())
+    return (
+        ratio,
+        # cast to builtin str/float: `extra` is persisted to a JSON column and
+        # numpy scalars are not JSON-serialisable.
+        {str(k): float(v) for k, v in rates.to_dict().items()},
+        str(rates.idxmin()),
+        str(rates.idxmax()),
+        dict(sorted(excluded.items())),
+    )
+
+
+def _small_groups(labels: list[str]) -> dict[str, int]:
+    """{label: count} for non-blank groups below MIN_GROUP_SIZE — used to disclose
+    exclusions on the not-applicable path, where _axis_ratio returns None."""
+    counts: dict[str, int] = {}
+    for lbl in labels:
+        if lbl:
+            counts[lbl] = counts.get(lbl, 0) + 1
+    return {lbl: n for lbl, n in sorted(counts.items()) if n < MIN_GROUP_SIZE}
 
 
 class CohortDisparityEvaluator(BaseEvaluator):
@@ -74,10 +110,10 @@ class CohortDisparityEvaluator(BaseEvaluator):
 
     evaluate() (the per-item BaseEvaluator method) is a degenerate
     pass-through — a single item has no sibling to compare against, so it
-    always falls through to the same "insufficient cohort diversity" neutral
-    fallback that compute_run_disparity() uses for any run with fewer than 2
-    distinct cohorts. The real computation is compute_run_disparity(),
-    called once per run.
+    always falls through to the same not-applicable result that
+    compute_run_disparity() returns when neither the cohort nor the language
+    axis has 2+ qualifying groups. The real computation is
+    compute_run_disparity(), called once per run.
     """
 
     @property
@@ -111,9 +147,10 @@ class CohortDisparityEvaluator(BaseEvaluator):
         independently over two axes: user cohort and item language. The WORSE of the
         two governs the score (v1.4) — parity on one axis must not mask a gap on the
         other. Score is the governing ratio itself: continuous, no clamp, no floor.
-        An axis with fewer than 2 distinct non-blank groups is skipped; if neither
-        axis qualifies the dimension is not applicable and is excluded from the
-        composite.
+        Groups with fewer than MIN_GROUP_SIZE items are excluded from their axis
+        (and named in the reason). An axis left with fewer than 2 distinct
+        non-blank qualifying groups is skipped; if neither axis qualifies the
+        dimension is not applicable and is excluded from the composite.
         """
         if not _FAIRLEARN_AVAILABLE:
             return MetricOutput(
@@ -133,6 +170,8 @@ class CohortDisparityEvaluator(BaseEvaluator):
         if not qualified:
             cohorts_found = sorted({c for c in cohorts if c})
             languages_found = sorted({lang for lang in (languages or []) if lang})
+            excluded_cohorts = _small_groups(cohorts)
+            excluded_languages = _small_groups(list(languages or []))
             return MetricOutput(
                 dimension=self.dimension,
                 metric_name=self.metric_name,
@@ -142,9 +181,24 @@ class CohortDisparityEvaluator(BaseEvaluator):
                     f"Insufficient group diversity on both axes to measure disparity "
                     f"(cohorts found: {cohorts_found or 'none'}; "
                     f"languages found: {languages_found or 'none'}). "
+                    f"Groups below the {MIN_GROUP_SIZE}-item minimum were excluded - "
+                    f"cohort: {excluded_cohorts or 'none'}; "
+                    f"language: {excluded_languages or 'none'}. "
                     "Dimension not applicable - excluded from composite score."
                 ),
                 applicable=False,
+                extra={
+                    "governing_axis": None,
+                    "governing_ratio": None,
+                    "language_ratio": None,
+                    "cohort_ratio": None,
+                    "per_group_selection_rate": {},
+                    "excluded_groups": {
+                        "cohort": excluded_cohorts,
+                        "language": excluded_languages,
+                    },
+                    "min_group_size": MIN_GROUP_SIZE,
+                },
             )
 
         # min() breaks ties by dict insertion order, so "cohort" (inserted
@@ -158,22 +212,38 @@ class CohortDisparityEvaluator(BaseEvaluator):
         score = governing_ratio
         passed = bool(governing_ratio >= DISPARITY_PASS_THRESHOLD)
 
+        source_labels = {"cohort": cohorts, "language": list(languages or [])}
+        excluded_by_axis: dict[str, dict] = {}
+
         parts = []
         for name in ("language", "cohort"):
             res = qualified.get(name)
             if res is None:
-                parts.append(f"{name} axis: not measured (fewer than 2 groups).")
-                continue
-            ratio, rates, worst, best = res
-            parts.append(
-                f"{name} disparity ratio: {ratio:.3f} "
-                f"(per-group selection rates: {rates}; "
-                f"worst: '{worst}', best: '{best}')."
-            )
+                excluded_by_axis[name] = _small_groups(source_labels[name])
+                parts.append(
+                    f"{name} axis: not measured (fewer than 2 qualifying groups)."
+                )
+            else:
+                ratio, rates, worst, best, excluded = res
+                excluded_by_axis[name] = excluded
+                parts.append(
+                    f"{name} disparity ratio: {ratio:.3f} "
+                    f"(per-group selection rates: {rates}; "
+                    f"worst: '{worst}', best: '{best}')."
+                )
+            if excluded_by_axis[name]:
+                named = ", ".join(
+                    f"'{lbl}' (n={n})" for lbl, n in excluded_by_axis[name].items()
+                )
+                parts.append(
+                    f"Excluded from {name} axis, below the {MIN_GROUP_SIZE}-item "
+                    f"minimum: {named}."
+                )
+
         reason = (
             " ".join(parts)
             + f" Governing axis: {governing_axis} at {governing_ratio:.3f} "
-            f"(threshold >={DISPARITY_PASS_THRESHOLD}; score is the ratio itself)."
+            f"(threshold >={DISPARITY_PASS_THRESHOLD:.2f}; score is the ratio itself)."
         )
 
         return MetricOutput(
@@ -182,4 +252,17 @@ class CohortDisparityEvaluator(BaseEvaluator):
             score=score,
             passed=passed,
             reason=reason,
+            extra={
+                "governing_axis": governing_axis,
+                "governing_ratio": governing_ratio,
+                "language_ratio": (
+                    qualified["language"][0] if "language" in qualified else None
+                ),
+                "cohort_ratio": (
+                    qualified["cohort"][0] if "cohort" in qualified else None
+                ),
+                "per_group_selection_rate": {n: r[1] for n, r in qualified.items()},
+                "excluded_groups": excluded_by_axis,
+                "min_group_size": MIN_GROUP_SIZE,
+            },
         )
