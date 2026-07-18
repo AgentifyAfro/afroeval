@@ -27,6 +27,26 @@ logger = structlog.get_logger(__name__)
 _DEEPEVAL_METRIC_NAMES = frozenset({"semantic_similarity", "answer_completeness", "faithfulness"})
 _DEEPEVAL_MAX_CONCURRENCY = 1
 
+# v1.2: metrics that GATE a dimension rather than score it. They are computed and
+# persisted for evidence, but contribute no positive score and no coverage.
+_GATE_ONLY_METRICS = frozenset({"african_hallucination_probe"})
+
+
+def _probe_fired_items(all_outputs: list, n_evaluators: int) -> set[int]:
+    """Item indices where the African fabrication probe actually fired (score 0.0).
+
+    Errored or not-applicable probe outputs are NOT treated as fabrication — an
+    infra failure must never manufacture a hallucination finding.
+    """
+    return {
+        i // n_evaluators
+        for i, out in enumerate(all_outputs)
+        if getattr(out, "metric_name", "") == "african_hallucination_probe"
+        and getattr(out, "applicable", True)
+        and not getattr(out, "error", False)
+        and out.score == 0.0
+    }
+
 
 def _parse_pack_id(pack_id: str) -> tuple[str, str]:
     """
@@ -141,6 +161,8 @@ def _distinct_item_counts(all_outputs: list, n_evaluators: int) -> dict[str, int
             continue
         if getattr(output, "error", False):
             continue  # infra-error fallbacks aren't real measurements — not coverage
+        if getattr(output, "metric_name", "") in _GATE_ONLY_METRICS:
+            continue  # gate-only metrics don't constitute a measurement
         seen.setdefault(output.dimension, set()).add(i // n_evaluators)
     return {dim: len(items) for dim, items in seen.items()}
 
@@ -355,6 +377,18 @@ async def dispatch_run(run_id: str) -> None:
                 _metric_total_counts: dict[str, int] = {}
 
                 n_evaluators = len(evaluators)
+
+                # v1.2: pre-scan for items where the fabrication probe fired, so the
+                # faithfulness score for those items is hard-zeroed below. The probe
+                # is a gate, not a positive weight (spec 2026-07-17).
+                probe_fired_items = _probe_fired_items(all_outputs, n_evaluators)
+                african_fabrication_detected = bool(probe_fired_items)
+                if african_fabrication_detected:
+                    logger.info(
+                        "African fabrication probe fired — gating item hallucination scores",
+                        run_id=run_id, item_count=len(probe_fired_items),
+                    )
+
                 for i, output in enumerate(all_outputs):
                     # item_idx must be derived from position (fixed evaluator grid),
                     # so compute it before any skip to keep the mapping intact.
@@ -401,7 +435,12 @@ async def dispatch_run(run_id: str) -> None:
 
                     dim_metrics = dimension_metric_scores.get(output.dimension)
                     if dim_metrics is not None and output.metric_name in dim_metrics:
-                        dim_metrics[output.metric_name].append(output.score)
+                        metric_score = output.score
+                        # v1.2 gate: a detected African fabrication is a hard fail for
+                        # that item's hallucination score.
+                        if output.metric_name == "faithfulness" and item_idx in probe_fired_items:
+                            metric_score = 0.0
+                        dim_metrics[output.metric_name].append(metric_score)
 
                     item_passed_flags[item_idx].append(output.passed)
 

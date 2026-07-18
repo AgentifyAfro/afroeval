@@ -35,7 +35,7 @@ from dataclasses import dataclass, field
 
 from db.models import VerdictBand
 
-METHODOLOGY_VERSION = "v1.1"
+METHODOLOGY_VERSION = "v1.2"
 
 # Default weights — must sum to 1.0.
 # Buyer-specific re-weighting is permitted (see Methodology v1.0, Section 3).
@@ -60,9 +60,13 @@ DEFAULT_METRIC_WEIGHTS: dict[str, dict[str, float]] = {
         "answer_completeness": 0.30,
         "fluency": 0.20,
     },
+    # v1.2: african_hallucination_probe is a per-item GATE, not a scored metric —
+    # it fired 0/3219 times, so as a 60% positive weight it was a constant 1.0 that
+    # floored this dimension at ~71. The dispatcher zeroes an item's faithfulness
+    # when the probe fires; see docs/superpowers/specs/2026-07-17-methodology-v1.2-
+    # hallucination-scoring-design.md.
     "hallucination_risk": {
-        "faithfulness": 0.40,
-        "african_hallucination_probe": 0.60,
+        "faithfulness": 1.00,
     },
     "code_switching_quality": {
         "register_match": 0.35,

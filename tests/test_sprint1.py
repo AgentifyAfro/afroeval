@@ -330,6 +330,44 @@ class TestDistinctItemCounts:
         assert counts["safety_robustness"] == 1
 
 
+# ── v1.2 fabrication-probe gate ────────────────────────────────────────────────
+
+class TestProbeGate:
+    """The probe is a per-item GATE in v1.2: it zeroes that item's hallucination
+    score and never contributes positive weight or coverage."""
+
+    def _out(self, metric_name, score, applicable=True, error=False):
+        return MetricOutput(
+            dimension="hallucination_risk", metric_name=metric_name,
+            score=score, passed=score >= 0.5, applicable=applicable, error=error,
+        )
+
+    def test_detects_item_where_probe_fired(self):
+        from orchestration.dispatcher import _probe_fired_items
+        # 2 items x 2 evaluators (faithfulness, probe). Probe fires on item 1 only.
+        outputs = [
+            self._out("faithfulness", 0.9), self._out("african_hallucination_probe", 1.0),
+            self._out("faithfulness", 0.9), self._out("african_hallucination_probe", 0.0),
+        ]
+        assert _probe_fired_items(outputs, n_evaluators=2) == {1}
+
+    def test_errored_probe_does_not_count_as_fired(self):
+        from orchestration.dispatcher import _probe_fired_items
+        outputs = [
+            self._out("faithfulness", 0.9),
+            self._out("african_hallucination_probe", 0.0, error=True),
+        ]
+        assert _probe_fired_items(outputs, n_evaluators=2) == set()
+
+    def test_gate_only_metric_is_not_coverage(self):
+        from orchestration.dispatcher import _distinct_item_counts
+        # Only the probe succeeded for this item — that is NOT a hallucination
+        # measurement, so it must not count toward coverage.
+        outputs = [self._out("african_hallucination_probe", 1.0)]
+        counts = _distinct_item_counts(outputs, n_evaluators=1)
+        assert counts.get("hallucination_risk", 0) == 0
+
+
 # ── Connector rate-limit retry ──────────────────────────────────────────────
 # Model connectors used to return an empty response on the first 429, which
 # silently wrote empty rows (the gpt-4o burst that produced 107/120 empties).

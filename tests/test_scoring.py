@@ -323,10 +323,10 @@ def test_healthy_full_coverage_sets_no_unverified_flags():
     assert result.verdict == "Deployment-Ready"
 
 
-def test_methodology_version_is_v1_1():
+def test_methodology_version_is_v1_2():
     scores = {dim: [1.0] for dim in DEFAULT_WEIGHTS}
     result = compute_composite_score(scores)
-    assert result.methodology_version == "v1.1"
+    assert result.methodology_version == "v1.2"
 
 
 def test_veto_wins_over_coverage_cap():
@@ -345,3 +345,39 @@ def test_metric_error_rate_low_coverage_caps_deployment_ready():
     assert "hallucination_risk" in result.low_coverage_dimensions
     assert result.composite_score == 100.0
     assert result.verdict == "Conditional"
+
+
+# ── Methodology v1.2: probe demoted to a per-item gate ────────────────────────
+
+class TestV12HallucinationScoring:
+
+    def test_probe_removed_from_metric_weights(self):
+        from scoring.engine import DEFAULT_METRIC_WEIGHTS
+        weights = DEFAULT_METRIC_WEIGHTS["hallucination_risk"]
+        assert "african_hallucination_probe" not in weights
+        assert weights == {"faithfulness": 1.00}
+
+    def test_hallucination_scores_faithfulness_only(self):
+        from scoring.engine import compute_composite_score
+        result = compute_composite_score(
+            dimension_raw_scores={"hallucination_risk": [0.8]},
+            item_counts={"hallucination_risk": 12},
+            dimension_metric_scores={"hallucination_risk": {"faithfulness": [0.8]}},
+            metric_error_rates={},
+        )
+        assert result.dimension_scores["hallucination_risk"] == 80.0
+
+    def test_methodology_version_is_v12(self):
+        from scoring.engine import METHODOLOGY_VERSION
+        assert METHODOLOGY_VERSION == "v1.2"
+
+    def test_all_faithfulness_errored_is_not_evaluated_not_zero(self):
+        from scoring.engine import compute_composite_score
+        result = compute_composite_score(
+            dimension_raw_scores={"hallucination_risk": []},
+            item_counts={"hallucination_risk": 0},
+            dimension_metric_scores={"hallucination_risk": {"faithfulness": []}},
+            metric_error_rates={"faithfulness": 1.0},
+        )
+        assert "hallucination_risk" in result.not_evaluated_dimensions
+        assert "hallucination_risk" not in result.dimension_scores
