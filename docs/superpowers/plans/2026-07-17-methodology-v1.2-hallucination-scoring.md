@@ -253,7 +253,7 @@ run is not_evaluated rather than 0.0. METHODOLOGY_VERSION -> v1.2."
 
 **Files:**
 - Modify: `db/models.py:213` area (Scorecard), `orchestration/dispatcher.py:477` area (persist)
-- Create: `db/migrations/versions/a1b2c3d4e5f6_add_scorecard_african_fabrication_detected.py`
+- Create: `db/migrations/versions/c7d8e9f0a1b2_add_scorecard_african_fabrication_detected.py`
 - Modify: `reporting/generator.py:363` area (PDF), `reporting/generator.py:498` area (JSON)
 - Modify: `api/v1/routes/scorecards.py:24` and `:69`, `console/app.py:306`, `:512`, `:1310`
 - Test: `tests/test_reporting.py`
@@ -304,12 +304,12 @@ In `db/models.py`, directly below the `safety_unverified` field (line ~213):
 
 - [ ] **Step 4: Create the Alembic migration**
 
-Create `db/migrations/versions/a1b2c3d4e5f6_add_scorecard_african_fabrication_detected.py`:
+Create `db/migrations/versions/c7d8e9f0a1b2_add_scorecard_african_fabrication_detected.py`:
 
 ```python
 """add african_fabrication_detected flag to scorecards (Methodology v1.2)
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: c7d8e9f0a1b2
 Revises: e4f5a6b7c8d9
 Create Date: 2026-07-17 12:00:00.000000
 
@@ -319,7 +319,7 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = 'a1b2c3d4e5f6'
+revision: str = 'c7d8e9f0a1b2'
 down_revision: Union[str, None] = 'e4f5a6b7c8d9'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -409,12 +409,12 @@ Expected: reporting tests PASS; ruff "All checks passed!".
 .venv/Scripts/python.exe -m alembic current
 ```
 
-Expected: `current` reports `a1b2c3d4e5f6 (head)`. (Prod applies automatically via the `deploy-migrate` workflow on push to `master`.)
+Expected: `current` reports `c7d8e9f0a1b2 (head)`. (Prod applies automatically via the `deploy-migrate` workflow on push to `master`.)
 
 - [ ] **Step 9: Commit**
 
 ```bash
-git add db/models.py db/migrations/versions/a1b2c3d4e5f6_add_scorecard_african_fabrication_detected.py \
+git add db/models.py db/migrations/versions/c7d8e9f0a1b2_add_scorecard_african_fabrication_detected.py \
         orchestration/dispatcher.py reporting/generator.py api/v1/routes/scorecards.py console/app.py tests/test_reporting.py
 git commit -m "feat(scorecard): disclose african_fabrication_detected (Methodology v1.2)
 

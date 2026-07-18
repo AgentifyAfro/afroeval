@@ -149,6 +149,13 @@ full 12-pack run to **0 infra-errors in 1,380 metric results**, error fallbacks 
 already excluded from scoring (`f78c799`), and thin evidence raises `low_coverage`
 which caps the verdict to Conditional.
 
+Accepted side-effect: because `scoring/engine.py` builds `_metric_to_dim` from
+`active_metric_weights`, dropping the probe from `DEFAULT_METRIC_WEIGHTS` means a
+probe entry in `metric_error_rates` no longer maps to any dimension, so a >50%
+probe error rate can no longer raise `low_coverage` — a known and accepted
+consequence, not an oversight, since the probe is local deterministic substring
+matching with no realistic failure mode.
+
 ## Migration
 
 - **Version bump:** `METHODOLOGY_VERSION` `"v1.1"` → `"v1.2"` in
