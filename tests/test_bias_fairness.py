@@ -110,8 +110,32 @@ def test_languages_argument_is_optional():
     evaluator = CohortDisparityEvaluator()
     cohorts = ["formal"] * 10 + ["informal_economy"] * 10
     outcomes = [True] * 10 + [True] * 9 + [False]
-    assert evaluator.compute_run_disparity(cohorts, outcomes).score == \
-        evaluator.compute_run_disparity(cohorts, outcomes, languages=None).score
+    score_without_languages = evaluator.compute_run_disparity(cohorts, outcomes).score
+    score_with_none_languages = evaluator.compute_run_disparity(
+        cohorts, outcomes, languages=None
+    ).score
+    assert score_without_languages == score_with_none_languages
+    assert abs(score_without_languages - 0.90) < 1e-9
+
+
+def test_language_axis_alone_qualifies_when_cohort_does_not():
+    evaluator = CohortDisparityEvaluator()
+    cohorts = ["formal"] * 20
+    languages = ["sw"] * 10 + ["am"] * 10
+    outcomes = [True] * 10 + [True] * 9 + [False]
+    result = evaluator.compute_run_disparity(cohorts, outcomes, languages=languages)
+    assert result.applicable is True
+    assert abs(result.score - 0.90) < 1e-9
+    assert "cohort axis: not measured" in result.reason
+
+
+def test_axis_ratio_raises_on_labels_outcomes_length_mismatch():
+    import pytest
+
+    from evaluators.bias_fairness import _axis_ratio
+
+    with pytest.raises(ValueError):
+        _axis_ratio(["formal", "informal_economy", "formal"], [True, False])
 
 
 def test_reason_names_both_axes_and_the_governing_one():

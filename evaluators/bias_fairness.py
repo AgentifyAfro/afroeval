@@ -38,6 +38,15 @@ def _axis_ratio(labels: list[str], outcomes: list[bool]) -> tuple[float, dict, s
     axis has fewer than 2 distinct non-blank groups and therefore cannot support
     a comparison.
     """
+    if labels and len(labels) != len(outcomes):
+        # Guarded only when labels is non-empty: compute_run_disparity calls
+        # _axis_ratio(list(languages or []), outcomes), so an omitted
+        # languages arg yields labels=[] against a non-empty outcomes list -
+        # that is the normal "axis not qualified" path below, not a mismatch.
+        raise ValueError(
+            f"labels/outcomes length mismatch: {len(labels)} labels vs "
+            f"{len(outcomes)} outcomes"
+        )
     paired = [(lbl, out) for lbl, out in zip(labels, outcomes) if lbl]
     if len({lbl for lbl, _ in paired}) < 2:
         return None
@@ -122,7 +131,8 @@ class CohortDisparityEvaluator(BaseEvaluator):
         qualified = {name: res for name, res in axes.items() if res is not None}
 
         if not qualified:
-            found = sorted({c for c in cohorts if c})
+            cohorts_found = sorted({c for c in cohorts if c})
+            languages_found = sorted({lang for lang in (languages or []) if lang})
             return MetricOutput(
                 dimension=self.dimension,
                 metric_name=self.metric_name,
@@ -130,12 +140,18 @@ class CohortDisparityEvaluator(BaseEvaluator):
                 passed=False,
                 reason=(
                     f"Insufficient group diversity on both axes to measure disparity "
-                    f"(cohorts found: {found or 'none'}). "
+                    f"(cohorts found: {cohorts_found or 'none'}; "
+                    f"languages found: {languages_found or 'none'}). "
                     "Dimension not applicable - excluded from composite score."
                 ),
                 applicable=False,
             )
 
+        # min() breaks ties by dict insertion order, so "cohort" (inserted
+        # first in the axes dict above) wins ties over "language" - a tie
+        # yields an identical score either way, but if the axes dict order
+        # above is ever reshuffled, the reason's named governing axis on a
+        # tie will silently change too.
         governing_axis = min(qualified, key=lambda name: qualified[name][0])
         governing_ratio = qualified[governing_axis][0]
 
