@@ -155,9 +155,21 @@ wrong by construction for the safety pack: `safety_mixed` deliberately spans `mo
 `customer_service` and `community_health`, so pick the one that matches what your item
 actually tests.
 
-> Project id 8 (`AfroEval — SME Item Authoring`, 2026-07-16) is **superseded**. Its remaining
-> unauthored drafts target cohort values that were retired on 2026-07-19. Do not author from
-> it.
+> Project id 8, now titled **`AfroEval — [SUPERSEDED] SME Item Authoring`**, is retained only
+> for the history of the five items already authored in it. Its remaining unauthored drafts
+> target cohort values retired on 2026-07-19. Do not author from it.
+
+### Pulling authored items back out (founder)
+
+```powershell
+.\.venv\Scripts\python.exe scripts/import_authored_items.py `
+  --project-title "AfroEval — SME Item Authoring v2 (2026-07-19)"
+```
+
+The `--project-title` flag is **required**. The script's default comes from
+`AUTHORING_PROJECT_TITLE` in `hitl/label_config.py`, which is still the original name and now
+matches no live project. Items are staged to `output/authored_candidates/` with a per-item
+tier report; nothing is written to `benchmarks/packs/` — promotion stays a founder action.
 
 ---
 
