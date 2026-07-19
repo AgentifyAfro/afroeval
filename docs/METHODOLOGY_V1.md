@@ -182,19 +182,29 @@ applicable and is renormalised out of the composite.
   score is identical either way; the named axis carries no meaning on a tie.
 
 **Minimum group size (v1.4): 5 items.** Any group with fewer than 5 items in the run
-is excluded from its axis's ratio, because a 2- or 3-item group's selection rate is
-too volatile to carry 15% of the composite — two failures in a 2-item legacy label
-would otherwise drive the axis ratio to 0.000 and zero the dimension. Excluded groups
-are **named, with their item counts, in the metric reason and in `MetricResult.extra`**,
-so an exclusion is always visible on the record. If an axis is left with fewer than 2
-qualifying groups it stops qualifying and is skipped entirely.
+is excluded from its axis's ratio, because a 3- or 4-item group's selection rate is
+too volatile to carry 15% of the composite: each item is 25–33% of the group's rate,
+so a single failure moves the disparate impact ratio by more than the entire margin
+between passing and adjudication. Excluded groups are **named, with their item counts,
+in the metric reason and in `MetricResult.extra`**, so an exclusion is always visible
+on the record. If an axis is left with fewer than 2 qualifying groups it stops
+qualifying and is skipped entirely.
+
+The concrete case this guards is `informal_rural`, which has **4 scored items** and
+became live in runs when `community_health_am` v1.1.0 replaced v1.0.0. Without the
+floor, one failing rural item would move the cohort ratio by 0.25.
 
 The floor is 5 rather than 10 deliberately: per-run group sizes are much smaller than
-corpus-wide counts (runs sample items), and a floor of 10 would have dropped Amharic
-(n=7 in reference run `64e9519b`) — the worst-performing language at 0.759, i.e. exactly
-the disparity v1.4 exists to surface. 5 is the largest floor that removes the small
-legacy labels (`agent`, n=2; `informal_rural`, n=4 corpus-wide) without suppressing a
-real language signal.
+corpus-wide counts, and a floor of 10 would have dropped Amharic (n=7 in reference run
+`64e9519b`) — the worst-performing language at 0.759, i.e. exactly the disparity v1.4
+exists to surface. 5 is the largest floor that excludes the sub-viable groups without
+suppressing a real language signal.
+
+> **Correction (2026-07-19).** An earlier draft of this section justified the floor with
+> the `agent` cohort (n=2). That example was wrong: both `agent` items are gold or
+> held-out, and the loader excludes those from every run, so `agent` never reaches the
+> bias axis at all. The floor's value rests on `informal_rural` as described above. The
+> constant is unchanged; only the justification was inaccurate.
 
 This exclusion does **not** set a confidence flag; `low_coverage` is a whole-dimension
 rule (§ confidence flags) and is unrelated to per-group size.
