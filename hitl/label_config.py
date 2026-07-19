@@ -174,3 +174,45 @@ def build_validation_label_config() -> str:
   {_choices("verdict", ["validated", "needs_revision"], to_name="prompt", required=True)}
 </View>
 """.strip()
+
+
+# ── Adjudication project ──────────────────────────────────────────────────────
+# Third-rater queue for items where the original validator pair disagreed (see
+# scripts/validation_writeback.compute_item_results -> needs_adjudication). Distinct from
+# the validation config above: the adjudicator sees BOTH original ratings and their
+# justifications, because they are resolving a disagreement rather than rating blind.
+
+ADJUDICATION_PROJECT_TITLE = "AfroEval — Item Adjudication"
+
+
+def build_adjudication_label_config() -> str:
+    """
+    Third-rater adjudication for items where the original pair disagreed.
+
+    The adjudicator sees BOTH original ratings and their justifications — unlike the
+    validators, who rate blind. The decision is theirs to make on the record, so the
+    rationale field is required.
+    """
+    return f"""
+<View>
+  <Header value="Adjudicate — the two validators disagreed"/>
+  <Text name="reason" value="$reason"/>
+  <Header value="Prompt"/>
+  <Text name="prompt" value="$prompt"/>
+  <Header value="Expected behaviour"/>
+  <Text name="expected_behavior" value="$expected_behavior"/>
+  <Header value="Validator A"/>
+  <Text name="rating_a" value="$rating_a"/>
+  <Header value="Validator B"/>
+  <Text name="rating_b" value="$rating_b"/>
+
+  <Header value="Adjudicated cultural score (1-5)"/>
+  {_choices("adjudicated_cultural_score", ["1", "2", "3", "4", "5"], to_name="prompt")}
+  <Header value="Adjudicated factual accuracy"/>
+  {_choices("adjudicated_factual_accuracy", ["yes", "no", "needs_revision"], to_name="prompt")}
+  <Header value="Outcome"/>
+  {_choices("adjudicated_verdict", ["publish", "revise", "reject"], to_name="prompt")}
+  <Header value="Rationale (required — this is the record of the decision)"/>
+  <TextArea name="adjudication_rationale" toName="prompt" rows="4" maxSubmissions="1" required="true"/>
+</View>
+""".strip()

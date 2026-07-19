@@ -8,6 +8,7 @@ that would have caught it before Label Studio did.
 import re
 
 from hitl.label_config import (
+    build_adjudication_label_config,
     build_authoring_label_config,
     build_calibration_label_config,
     build_validation_label_config,
@@ -24,6 +25,7 @@ _CONFIGS = {
     "calibration": build_calibration_label_config,
     "authoring": build_authoring_label_config,
     "validation": build_validation_label_config,
+    "adjudication": build_adjudication_label_config,
 }
 
 
