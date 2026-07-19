@@ -28,7 +28,6 @@ Usage (from afroeval/):
 """
 
 import argparse
-import hashlib
 import json
 import re
 import sys
@@ -40,6 +39,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from benchmarks.loader import SINGLE_EXPERT_VALIDATED_TAG
 from hitl.client import LabelStudioClient
 from hitl.label_config import AUTHORING_PROJECT_TITLE
+from validation.identity import pseudonymise
 
 _TEXT_FIELDS = ("prompt", "expected_behavior", "provenance", "sme_notes")
 _CHOICE_FIELDS = ("language", "domain", "cohort", "difficulty", "status")
@@ -91,17 +91,13 @@ def _cites_external_source(provenance: str) -> bool:
 def _pseudonymise(identity: str) -> str:
     """Map a Label Studio identity (usually an email) to a stable pseudonymous author id.
 
-    `sme_author_id` is published inside pack files, which are shared with clients — the
-    schema requires it to be anonymised. Label Studio hands us real emails, so hashing
-    happens here, at the boundary, rather than being left to each promotion step to
-    remember. Deterministic, so the same SME keeps the same id across imports.
+    Delegates to validation.identity.pseudonymise — the shared implementation also used at
+    import time to re-check author exclusion, so the two must never diverge.
 
     The real identity is kept alongside as `_sme_author_identity`; underscore-prefixed
     fields are staging-only and are stripped when an item is promoted into a pack.
     """
-    if not identity:
-        return ""
-    return "sme-" + hashlib.sha256(identity.encode("utf-8")).hexdigest()[:8]
+    return pseudonymise(identity)
 
 
 def _build_user_lookup(client: LabelStudioClient) -> dict[int, str]:

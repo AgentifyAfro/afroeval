@@ -21,6 +21,7 @@ from db.models import BenchmarkItem, ItemValidation
 from db.session import get_engine
 from hitl.client import LabelStudioClient
 from hitl.label_config import VALIDATION_PROJECT_TITLE
+from validation.identity import pseudonymise
 
 _CHOICE_FIELDS = ("factual_accuracy", "language_quality", "cultural_score",
                   "schema_compliant", "verdict")
@@ -56,12 +57,16 @@ def main() -> None:
 
     users = {u["id"]: (u.get("email") or f"user_{u['id']}") for u in client.list_users()}
     engine = get_engine()
-    written = skipped_self = skipped_incomplete = skipped_dupe = 0
+    written = skipped_self = skipped_incomplete = skipped_dupe = skipped_missing_item_id = 0
 
     with Session(engine) as session:
         for task in client.export_annotated_tasks(project["id"]):
             data = task.get("data", {})
-            item_uuid = stable_item_uuid(data["item_id"])
+            raw_item_id = data.get("item_id")
+            if not raw_item_id:
+                skipped_missing_item_id += 1
+                continue
+            item_uuid = stable_item_uuid(raw_item_id)
             item = session.get(BenchmarkItem, item_uuid)
             if item is None:
                 continue
@@ -72,9 +77,12 @@ def main() -> None:
                     skipped_incomplete += 1
                     continue
 
-                validator = users.get(ann.get("completed_by"), "")
+                completed_by = ann.get("completed_by")
+                validator = pseudonymise(users.get(completed_by) or f"user_{completed_by}")
                 # Re-check author exclusion. Assignment enforces it; if an assignment bug
                 # ever lets one through, it must die here rather than become a Tier 1 item.
+                # Both sides must be pseudonymised the same way (validation.identity) —
+                # item.sme_author_id is already a hash, validator was still a raw email.
                 if validator and validator == (item.sme_author_id or ""):
                     skipped_self += 1
                     continue
@@ -108,6 +116,7 @@ def main() -> None:
     print(f"  skipped — already recorded for this validator: {skipped_dupe}")
     print(f"  skipped — incomplete instrument:                {skipped_incomplete}")
     print(f"  skipped — validator authored the item:          {skipped_self}")
+    print(f"  skipped — task missing item_id:                 {skipped_missing_item_id}")
 
 
 if __name__ == "__main__":

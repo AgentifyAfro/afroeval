@@ -98,6 +98,7 @@ def seed() -> None:
                         provenance=item.get("provenance", ""),
                         is_gold=item.get("is_gold", False),
                         tags=item.get("tags", []),
+                        sme_author_id=item.get("sme_author_id", ""),
                     ))
                     new_items += 1
 
