@@ -143,6 +143,7 @@ def _load_validations(items: list[dict]) -> tuple[list[dict], int]:
                 "cultural_score": r.cultural_score,
                 "factual_accuracy": r.factual_accuracy,
                 "item_content_hash": r.item_content_hash,
+                "justification": r.justification,
             })
         return out, skipped
 
