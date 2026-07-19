@@ -138,10 +138,26 @@ automated judge scores against, so it carries as much weight as the prompt.
 
 ### Where to work
 
-Label Studio → **`AfroEval — SME Item Authoring`** (project id 8). Each task carries an
-English draft scaffold: scenario, prompt intent, expected-behaviour sketch, provenance hint.
-**The scaffold is a starting point, not a translation exercise** — write the real prompt and
-expected behaviour in the target language, in the register a real user would use.
+Label Studio → **`AfroEval — SME Item Authoring v2 (2026-07-19)`** — **project id 9**.
+
+**Use the language tab for your language.** The project has a saved view per language —
+Yoruba, Hausa, Sheng, Swahili, Afaan Oromoo, Amharic, English, isiZulu, Somali — so you see
+only your own queue. Tasks are also interleaved by language, so no single language dominates
+the default view.
+
+Each task carries an English draft scaffold: scenario, prompt intent, expected-behaviour
+sketch, provenance hint. **The scaffold is a starting point, not a translation exercise** —
+write the real prompt and expected behaviour in the target language, in the register a real
+user would use.
+
+**Set `domain` yourself on each item.** The draft's suggested domain is a hint, and it is
+wrong by construction for the safety pack: `safety_mixed` deliberately spans `mobile_money`,
+`customer_service` and `community_health`, so pick the one that matches what your item
+actually tests.
+
+> Project id 8 (`AfroEval — SME Item Authoring`, 2026-07-16) is **superseded**. Its remaining
+> unauthored drafts target cohort values that were retired on 2026-07-19. Do not author from
+> it.
 
 ---
 
