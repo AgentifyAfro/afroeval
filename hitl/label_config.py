@@ -64,9 +64,10 @@ _DOMAINS = ["mobile_money", "customer_service", "community_health",
 _COHORTS = ["informal_economy", "informal_rural", "formal"]
 
 
-def _choices(name: str, values: list[str]) -> str:
+def _choices(name: str, values: list[str], to_name: str = "scenario", required: bool = False) -> str:
     opts = "\n".join(f'      <Choice value="{v}"/>' for v in values)
-    return (f'    <Choices name="{name}" toName="scenario" choice="single" showInLine="true">\n'
+    required_attr = ' required="true"' if required else ""
+    return (f'    <Choices name="{name}" toName="{to_name}" choice="single" showInLine="true"{required_attr}>\n'
             f'{opts}\n    </Choices>')
 
 
@@ -155,21 +156,21 @@ def build_validation_label_config() -> str:
   <Text name="provenance" value="$provenance"/>
 
   <Header value="1. Factual accuracy — is the expected behaviour correct?"/>
-  {_choices("factual_accuracy", ["yes", "no", "needs_revision"])}
+  {_choices("factual_accuracy", ["yes", "no", "needs_revision"], to_name="prompt", required=True)}
 
   <Header value="2. Language quality (1 unnatural — 3 native register)"/>
-  {_choices("language_quality", ["1", "2", "3"])}
+  {_choices("language_quality", ["1", "2", "3"], to_name="prompt", required=True)}
 
   <Header value="3. Cultural appropriateness (1-5, per CULTURAL_RUBRIC_V1.md)"/>
-  {_choices("cultural_score", ["1", "2", "3", "4", "5"])}
+  {_choices("cultural_score", ["1", "2", "3", "4", "5"], to_name="prompt", required=True)}
 
   <Header value="4. Schema compliant — required fields present, provenance cites a dated source, cohort is one of formal / informal_economy / informal_rural?"/>
-  {_choices("schema_compliant", ["yes", "no"])}
+  {_choices("schema_compliant", ["yes", "no"], to_name="prompt", required=True)}
 
   <Header value="Justification (one sentence — required)"/>
-  <TextArea name="justification" toName="prompt" rows="3" maxSubmissions="1"/>
+  <TextArea name="justification" toName="prompt" rows="3" maxSubmissions="1" required="true"/>
 
   <Header value="Verdict"/>
-  {_choices("verdict", ["validated", "needs_revision"])}
+  {_choices("verdict", ["validated", "needs_revision"], to_name="prompt", required=True)}
 </View>
 """.strip()

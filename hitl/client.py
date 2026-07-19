@@ -49,21 +49,31 @@ class LabelStudioClient:
         projects = body["results"] if isinstance(body, dict) else body
         return next((p for p in projects if p["title"] == title), None)
 
-    def create_project(self, title: str, label_config: str) -> dict:
+    def create_project(
+        self, title: str, label_config: str, maximum_annotations: int | None = None
+    ) -> dict:
+        body = {"title": title, "label_config": label_config}
+        if maximum_annotations is not None:
+            body["maximum_annotations"] = maximum_annotations
         resp = requests.post(
             f"{self.base_url}/api/projects/",
             headers=self._headers(),
-            json={"title": title, "label_config": label_config},
+            json=body,
             timeout=15,
         )
         resp.raise_for_status()
         return resp.json()
 
-    def get_or_create_project(self, title: str, label_config: str) -> dict:
+    def get_or_create_project(
+        self, title: str, label_config: str, maximum_annotations: int | None = None
+    ) -> dict:
+        """NOTE: if a project with this title already exists, its settings (including
+        maximum_annotations) are NOT updated — this only affects newly created projects.
+        Whoever creates the real project must confirm maximum_annotations is set correctly."""
         existing = self.find_project_by_title(title)
         if existing is not None:
             return existing
-        return self.create_project(title, label_config)
+        return self.create_project(title, label_config, maximum_annotations=maximum_annotations)
 
     def import_tasks(self, project_id: int, tasks: list[dict]) -> dict:
         """tasks: list of plain data dicts — each gets wrapped in {"data": ...} here."""

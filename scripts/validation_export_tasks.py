@@ -33,6 +33,17 @@ def _load_roster() -> list[dict]:
         return json.load(f)
 
 
+def _already_exported_item_ids(client: LabelStudioClient, project_id: int) -> set[str]:
+    """Mirrors scripts/hitl_export_tasks.py's _already_exported_response_ids — without this,
+    re-running the export re-imports every item as a duplicate task, corrupting the per-pair
+    batch counts the 10-item kappa minimum depends on."""
+    return {
+        t["data"]["item_id"]
+        for t in client.list_tasks(project_id)
+        if "item_id" in t.get("data", {})
+    }
+
+
 def _load_pack_by_id(pack_id: str) -> list[dict]:
     """'mobile_money_sw_v1.0.0' -> load_pack('mobile_money_sw', 'v1.0.0')
 
@@ -44,7 +55,12 @@ def _load_pack_by_id(pack_id: str) -> list[dict]:
     idx = pack_id.rfind("_v")
     if idx == -1:
         raise ValueError(f"Cannot parse pack id '{pack_id}' — expected <name>_v<version>")
-    return load_pack(pack_id[:idx], pack_id[idx + 1:])
+    # include_gold=True: gold items are excluded from SCORING (they're calibration
+    # anchors, never scored — Methodology v1.1), not from human validation. Tier 1
+    # requires two independent validations for every item including gold, and gold
+    # is barred from Tier 2 (docs/BENCHMARK_ITEM_SCHEMA.md:131), so this is the only
+    # path that can ever validate them.
+    return load_pack(pack_id[:idx], pack_id[idx + 1:], include_gold=True)
 
 
 def main() -> None:
@@ -99,9 +115,21 @@ def main() -> None:
         return
 
     client = LabelStudioClient()
-    project = client.get_or_create_project(args.project_title, build_validation_label_config())
-    result = client.import_tasks(project["id"], tasks)
-    print(f"\nProject '{args.project_title}' (id={project['id']}): imported {len(tasks)} task(s)")
+    project = client.get_or_create_project(
+        args.project_title, build_validation_label_config(), maximum_annotations=2
+    )
+    already_exported = _already_exported_item_ids(client, project["id"])
+    new_tasks = [t for t in tasks if t["item_id"] not in already_exported]
+    skipped = len(tasks) - len(new_tasks)
+    if skipped:
+        print(f"\nSkipping {skipped} item(s) already exported to project '{args.project_title}'.")
+
+    if not new_tasks:
+        print("Nothing new to import.")
+        return
+
+    result = client.import_tasks(project["id"], new_tasks)
+    print(f"\nProject '{args.project_title}' (id={project['id']}): imported {len(new_tasks)} task(s)")
     print(f"   {result}")
 
 
