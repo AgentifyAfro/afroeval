@@ -9,7 +9,7 @@ the publication gates from docs/BENCHMARK_ITEM_SCHEMA.md:
     - non-empty provenance
     - is_held_out == false
     - validation_count >= 2   (distinct SMEs who approved the task)
-    - irr_score >= 0.60       (comes from the separate validation step; absent here)
+    - irr_score >= 0.70       (comes from the separate validation step; absent here)
 
 That is Tier 1. Methodology v1.3 adds Tier 2 — single-expert validated — for items whose
 one validator holds BOTH native/fluent command of the language AND domain expertise. Tier 2
@@ -40,6 +40,7 @@ from benchmarks.loader import SINGLE_EXPERT_VALIDATED_TAG
 from hitl.client import LabelStudioClient
 from hitl.label_config import AUTHORING_PROJECT_TITLE
 from validation.identity import pseudonymise
+from validation.irr import IRR_FLOOR as _IRR_FLOOR  # 0.70 — single source of truth (v1.4)
 
 _TEXT_FIELDS = ("prompt", "expected_behavior", "provenance", "sme_notes")
 _CHOICE_FIELDS = ("language", "domain", "cohort", "difficulty", "status")
@@ -47,7 +48,7 @@ _CHOICE_FIELDS = ("language", "domain", "cohort", "difficulty", "status")
 _STAGING_DIR = Path(__file__).parent.parent / "output" / "authored_candidates"
 
 # Publication gates (docs/BENCHMARK_ITEM_SCHEMA.md). Named so the report is legible.
-_IRR_FLOOR = 0.60
+# _IRR_FLOOR is imported from validation.irr above so the floor is defined in exactly one place.
 _MIN_VALIDATORS = 2
 
 # Tier 2 — single-expert validated (Methodology v1.3). Tag lives in benchmarks.loader so

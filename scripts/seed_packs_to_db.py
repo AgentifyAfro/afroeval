@@ -99,6 +99,8 @@ def seed() -> None:
                         is_gold=item.get("is_gold", False),
                         tags=item.get("tags", []),
                         sme_author_id=item.get("sme_author_id", ""),
+                        validation_count=item.get("validation_count", 0),
+                        irr_score=item.get("irr_score"),
                     ))
                     new_items += 1
 

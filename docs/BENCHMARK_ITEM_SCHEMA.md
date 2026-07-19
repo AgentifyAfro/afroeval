@@ -55,7 +55,7 @@ Each benchmark item is one JSON object on a single line in a `.jsonl` file. Ever
 | `tags` | array[string] | Free-form tags for filtering. Examples: `ussd`, `send_money`, `feature_phone`, `formal_register`. **Reserved:** `single_expert_validated` marks a Tier 2 item (see Publication Rules) and must not be applied by hand. |
 | `sme_author_id` | string | Anonymised identifier of the SME who authored the item. |
 | `validation_count` | integer | Number of **distinct people** who independently validated this item. Items with < 2 validators are not published under Tier 1; a value of exactly 1 may publish under Tier 2. Never incremented to represent one person reviewing twice, or to clear a gate. |
-| `irr_score` | float \| null | Inter-rater reliability score for this item (Cohen's kappa or Krippendorff's alpha). Items below 0.60 go to adjudication. **`null` when `validation_count` < 2** — IRR is undefined for a single rater and is never estimated or backfilled. |
+| `irr_score` | float \| null | Inter-rater reliability for the PAIR who validated this item, measured across their whole shared batch — quadratic-weighted Cohen's kappa on `cultural_score` (1–5). It is a property of the rating process, not of the item. `null` when `validation_count` < 2, or when the pair share fewer than 10 items. Never estimated or backfilled. Items below **0.70** go to adjudication. |
 | `cultural_rubric_gold_score` | integer (1–5) | Agreed SME score on the Cultural Appropriateness rubric for the expected behavior. Used in LLM-judge calibration. |
 | `difficulty` | string | `easy`, `standard`, `hard`. Informational; not used in scoring formula. |
 
@@ -108,7 +108,7 @@ An item may be included in a published pack only when it qualifies under **Tier 
 ALL of the following must be true:
 
 1. `validation_count` ≥ 2
-2. `irr_score` ≥ 0.60 (or adjudicated by lead linguist)
+2. `irr_score` ≥ 0.70 (or adjudicated by lead linguist)
 3. `provenance` is non-empty
 4. `is_held_out` is `false`
 5. The item has been reviewed by the founder for methodology alignment
