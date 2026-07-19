@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Optional
 
-from sqlmodel import JSON, Column, Field, Relationship, SQLModel
+from sqlmodel import JSON, Column, Field, Relationship, SQLModel, UniqueConstraint
 
 # ── Enumerations ─────────────────────────────────────────────────────────────
 
@@ -196,6 +196,39 @@ class ResponseReview(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     response: ModelResponse | None = Relationship(back_populates="reviews")
+
+
+class ItemValidation(SQLModel, table=True):
+    """
+    One SME's validation of one benchmark item (Methodology v1.4 Tier 1 path).
+
+    Distinct from ResponseReview, which rates a model RESPONSE on the six scorecard
+    dimensions. This rates the ITEM itself against the four-part validator instrument in
+    docs/SME_ROLE_PACKS.md.
+    """
+    __tablename__ = "item_validations"
+    __table_args__ = (
+        UniqueConstraint("item_id", "validator_id", name="uq_item_validations_item_validator"),
+    )
+
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    item_id: uuid.UUID = Field(foreign_key="benchmark_items.id", index=True)
+
+    # sha256 of the item content at rating time. A row whose hash no longer matches the
+    # item is STALE and must not count toward validation_count.
+    item_content_hash: str = Field(index=True)
+
+    validator_id: str = Field(index=True)      # pseudonymised, as sme_author_id already is
+    batch_id: str = Field(default="", index=True)  # the (pair, batch) kappa is computed over
+
+    factual_accuracy: str                      # "yes" | "no" | "needs_revision" - hard gate
+    language_quality: int                      # 1-3
+    cultural_score: int                        # 1-5, the kappa input
+    schema_compliant: bool
+    justification: str = ""
+    verdict: str                               # "validated" | "needs_revision"
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 # ── Scorecard ─────────────────────────────────────────────────────────────────
