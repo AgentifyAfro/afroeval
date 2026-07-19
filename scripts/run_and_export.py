@@ -38,7 +38,7 @@ _DEFAULT_PACKS = [
     "mobile_money_sw_v1.0.0",
     "remittance_so_v1.0.0",
     "cross_border_trade_ha_v1.0.0",
-    "community_health_am_v1.0.0",
+    "community_health_am_v1.1.0",
     "agriculture_om_v1.0.0",
     "agriculture_ha_v1.0.0",
     "public_services_zu_v1.0.0",

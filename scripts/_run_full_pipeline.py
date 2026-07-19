@@ -17,7 +17,7 @@ create_db_and_tables()
 ALL_PACKS = [
     "mobile_money_sw_v1.0.0",
     "customer_service_yo_v1.0.0",
-    "community_health_am_v1.0.0",
+    "community_health_am_v1.1.0",
     "agriculture_ha_v1.0.0",
     "code_switching_mixed_v1.0.0",
     "safety_mixed_v1.0.0",

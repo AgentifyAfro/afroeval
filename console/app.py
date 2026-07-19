@@ -100,7 +100,7 @@ PACK_CATALOG = [
     {"id": "mobile_money_sw_v1.0.0",      "label": "Mobile Money (Swahili)",        "language": "sw"},
     {"id": "remittance_so_v1.0.0",         "label": "Remittance (Somali)",           "language": "so"},
     {"id": "cross_border_trade_ha_v1.0.0", "label": "Cross-Border Trade (Hausa)",    "language": "ha"},
-    {"id": "community_health_am_v1.0.0",   "label": "Community Health (Amharic)",    "language": "am"},
+    {"id": "community_health_am_v1.1.0",   "label": "Community Health (Amharic)",    "language": "am"},
     {"id": "agriculture_om_v1.0.0",        "label": "Agriculture (Oromo)",           "language": "om"},
     {"id": "agriculture_ha_v1.0.0",        "label": "Agriculture (Hausa)",           "language": "ha"},
     {"id": "public_services_zu_v1.0.0",    "label": "Public Services (Zulu)",        "language": "zu"},

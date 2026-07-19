@@ -10,7 +10,7 @@ Usage:
     python scripts/run_scorecard.py --packs customer_service_yo_v1.0.0
 
     # Multiple packs
-    python scripts/run_scorecard.py --packs customer_service_yo_v1.0.0 --packs community_health_am_v1.0.0
+    python scripts/run_scorecard.py --packs customer_service_yo_v1.0.0 --packs community_health_am_v1.1.0
 
     # Custom name + provider override
     python scripts/run_scorecard.py --packs safety_mixed_v1.0.0 --name "Safety smoke test" --provider anthropic
