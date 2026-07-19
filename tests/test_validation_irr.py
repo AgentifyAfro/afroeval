@@ -27,13 +27,32 @@ def test_exactly_the_minimum_batch_is_allowed():
 
 def test_near_agreement_scores_higher_than_far_disagreement():
     """
-    Quadratic weighting is the point: on an ordinal 1-5 scale, 4-vs-5 must cost far less
-    than 1-vs-5. Unweighted kappa would treat them identically.
+    Quadratic weighting is the point: on an ordinal 1-5 scale, a single item off by one
+    must cost far less than the same single item off by four. The disagreement COUNT is
+    held constant (exactly one mismatched item in both fixtures) so only distance varies -
+    otherwise unweighted kappa would rank them the same way and this test would pass for
+    the wrong reason.
     """
     a = [1, 2, 3, 4, 5, 1, 2, 3, 4, 5]
-    near = [1, 2, 3, 4, 4, 1, 2, 3, 4, 4]   # off by one on two items
-    far = [5, 2, 3, 4, 1, 5, 2, 3, 4, 1]    # inverted on the same two items
+    near = [1, 2, 3, 4, 4, 1, 2, 3, 4, 5]  # one item off by one (5 -> 4)
+    far = [1, 2, 3, 4, 1, 1, 2, 3, 4, 5]  # the same item off by four (5 -> 1)
     assert pair_kappa(a, near) > pair_kappa(a, far)
+
+
+def test_labels_are_pinned_to_the_cultural_scale_not_inferred_from_the_batch():
+    """
+    cohen_kappa_score builds its quadratic weight matrix from the labels it is given. If we
+    don't pass labels=[1,2,3,4,5] explicitly, sklearn infers them from whatever values
+    happen to appear in the batch. This batch only uses {1,2,5} - no rater ever used 3 or 4
+    - so an unpinned call treats 2-vs-5 as an adjacent-category disagreement (distance 1 in
+    the observed-label space) instead of its true distance of 3 on the real 1-5 scale. That
+    inflates kappa past the 0.70 floor and would wrongly let a Tier 1 item through. This
+    must fail if `labels=CULTURAL_SCALE` is removed from pair_kappa.
+    """
+    a = [2, 1, 5, 5, 5, 1, 1, 2, 1, 5]
+    b = [1, 2, 2, 5, 2, 1, 1, 2, 1, 5]
+    kappa = pair_kappa(a, b)
+    assert kappa < IRR_FLOOR
 
 
 def test_mismatched_lengths_raise_rather_than_truncate():

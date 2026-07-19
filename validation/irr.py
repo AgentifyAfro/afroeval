@@ -17,6 +17,12 @@ MIN_SHARED_BATCH = 10
 # conventional "substantial agreement" bar for Cohen's kappa.
 IRR_FLOOR = 0.70
 
+# The cultural rubric is a fixed 1-5 ordinal scale. Pin it explicitly: sklearn otherwise
+# builds the quadratic weight matrix from the labels OBSERVED in the batch, so a batch that
+# happens to use only {1,2,5} would score 2-vs-5 as an adjacent disagreement and inflate
+# kappa past the floor.
+CULTURAL_SCALE = [1, 2, 3, 4, 5]
+
 
 def batch_key(validator_a: str, validator_b: str) -> str:
     """Order-independent identifier for a rater pair. (A,B) and (B,A) are one pair."""
@@ -40,8 +46,10 @@ def pair_kappa(a_scores: list[int], b_scores: list[int]) -> float | None:
         )
     if len(a_scores) < MIN_SHARED_BATCH:
         return None
-    if a_scores == b_scores:
+    if list(a_scores) == list(b_scores):
         # cohen_kappa_score returns nan when both raters use a single identical label
         # (zero variance). Perfect agreement is 1.0 by definition.
         return 1.0
-    return float(cohen_kappa_score(a_scores, b_scores, weights="quadratic"))
+    return float(
+        cohen_kappa_score(a_scores, b_scores, labels=CULTURAL_SCALE, weights="quadratic")
+    )
