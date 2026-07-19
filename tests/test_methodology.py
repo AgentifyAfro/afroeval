@@ -1,13 +1,16 @@
 """
-Methodology v1.1 regression tests.
+Methodology v1.4 regression tests.
 
 These tests encode the specification in docs/METHODOLOGY_V1.md as executable assertions.
 Any change to the methodology that breaks these tests requires founder sign-off and
 a version bump of METHODOLOGY_VERSION in scoring/engine.py.
 
-v1.1 (founder-approved) adds the coverage gate + safety-unverified gate on top of the
-v1.0 weights / bands / veto (all unchanged). Coverage-gate behavior is covered in
-tests/test_scoring.py.
+Lineage, all founder-approved, on top of the v1.0 weights / bands / veto:
+  v1.1  coverage gate + safety-unverified gate (behavior covered in tests/test_scoring.py)
+  v1.2  african_hallucination_probe demoted to a per-item gate; faithfulness carries 100%
+  v1.3  Tier 2 single-expert item validation — a publication rule, not a scoring change
+        (see docs/BENCHMARK_ITEM_SCHEMA.md; no assertions here)
+  v1.4  bias & fairness measured on language + cohort axes, continuous disparity scoring
 """
 
 import pytest

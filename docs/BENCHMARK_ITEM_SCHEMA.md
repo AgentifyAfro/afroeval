@@ -1,7 +1,8 @@
-# Benchmark Item Schema — Version 1.0
+# Benchmark Item Schema — Version 1.3
 
 **Status:** Locked for MVP  
-**Enforced by:** `benchmarks/loader.py` (required fields) and `db/models.py` (BenchmarkItem table)
+**Enforced by:** `benchmarks/loader.py` (required fields, `SINGLE_EXPERT_VALIDATED_TAG`) and `db/models.py` (BenchmarkItem table)  
+**Versioning:** This document carries its own version line (see Schema Version History), independent of the methodology version — v1.1 and v1.2 were schema-only changes with no methodology counterpart. v1.3 records the Tier 1 / Tier 2 publication regime introduced alongside **Methodology v1.3**; the matching numbers are coincidental, not a lockstep.
 
 ---
 
@@ -178,3 +179,4 @@ Items that are `is_gold: true` are calibration anchors and are **NEVER scored** 
 | v1.0 | 2026-05-25 | Initial schema, locked for Phase 1 build. |
 | v1.1 | 2026-06-16 | Added `om` (Oromo) and `so` (Somali) to AnchorLanguage; added `remittance` domain and `re` ID abbreviation. |
 | v1.2 | 2026-06-17 | Added `en` (US English) as high-resource comparative baseline language. |
+| v1.3 | 2026-07-18 | **Tier 1 / Tier 2 publication regime** (aligns with Methodology v1.3). Publication Rules split into Tier 1 — dual-SME validated, the default and unchanged — and Tier 2 — single-expert validated, an exception requiring `validation_count == 1`, `irr_score: null`, an authoritative external source in `provenance`, `is_gold: false`, attested dual qualification, dated founder sign-off, the reserved `single_expert_validated` tag, a ≤40% cap on the pack's scored set, and mandatory disclosure. Field reference updated for `tags`, `validation_count`, and `irr_score`. No structural field added or removed. |
