@@ -55,8 +55,13 @@ AUTHORING_PROJECT_TITLE = "AfroEval — SME Item Authoring"
 _LANGUAGES = ["sw", "yo", "am", "ha", "zu", "sheng", "om", "so", "en"]
 _DOMAINS = ["mobile_money", "customer_service", "community_health",
             "agriculture", "government", "remittance"]
-_COHORTS = ["informal_economy", "informal_urban", "informal_rural",
-            "formal", "low_literacy", "feature_phone"]
+# Methodology v1.4 (2026-07-19): cohort is a SCORED grouping on the bias_fairness axis, so
+# every distinct value becomes a disparity group. Values retired that day —
+# informal_urban, low_literacy, feature_phone — are now recorded as TAGS instead: they stay
+# searchable without creating groups too small to carry 15% of the composite (a group under
+# MIN_GROUP_SIZE=5 is excluded from the ratio entirely). Do not re-add a cohort value here
+# without deciding how the pack will reach 5+ scored items in that cohort.
+_COHORTS = ["informal_economy", "informal_rural", "formal"]
 
 
 def _choices(name: str, values: list[str]) -> str:
