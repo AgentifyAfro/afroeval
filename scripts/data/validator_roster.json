@@ -1,0 +1,6 @@
+[
+  {"validator_id": "sme-placeholder-1", "languages": ["am", "en"], "domains": ["community_health"]},
+  {"validator_id": "sme-placeholder-2", "languages": ["sw", "sheng", "en"], "domains": ["mobile_money"]},
+  {"validator_id": "sme-placeholder-3", "languages": ["ha", "yo", "en"], "domains": ["agriculture", "customer_service"]},
+  {"validator_id": "sme-placeholder-4", "languages": ["zu", "so", "en"], "domains": ["public_services", "remittance"]}
+]
