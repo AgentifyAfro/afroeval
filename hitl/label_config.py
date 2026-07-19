@@ -124,3 +124,52 @@ def build_authoring_label_config() -> str:
               placeholder="Any notes for the reviewer / adjudicator."/>
   </View>
 </View>"""
+
+
+# ── Item-validation project ───────────────────────────────────────────────────
+# The Tier 1 gate: two independent validators judge an EXISTING item (as opposed
+# to the authoring config above, which drafts a NEW one). See
+# docs/superpowers/specs/2026-07-19-item-validation-path-design.md.
+
+VALIDATION_PROJECT_TITLE = "AfroEval — SME Item Validation"
+
+
+def build_validation_label_config() -> str:
+    """
+    The four-part validator instrument from docs/SME_ROLE_PACKS.md:77-97.
+
+    Distinct from the authoring config: the SME is not writing an item here, they are
+    judging one that already exists. cultural_score is the kappa input; factual_accuracy is
+    a hard gate that sends an item to adjudication on disagreement regardless of kappa.
+    """
+    return f"""
+<View>
+  <Header value="Validate this benchmark item"/>
+  <Text name="item_language" value="$language" />
+  <Text name="item_domain" value="$domain" />
+  <Header value="Prompt"/>
+  <Text name="prompt" value="$prompt"/>
+  <Header value="Expected behaviour (the ground truth an evaluator scores against)"/>
+  <Text name="expected_behavior" value="$expected_behavior"/>
+  <Header value="Provenance"/>
+  <Text name="provenance" value="$provenance"/>
+
+  <Header value="1. Factual accuracy — is the expected behaviour correct?"/>
+  {_choices("factual_accuracy", ["yes", "no", "needs_revision"])}
+
+  <Header value="2. Language quality (1 unnatural — 3 native register)"/>
+  {_choices("language_quality", ["1", "2", "3"])}
+
+  <Header value="3. Cultural appropriateness (1-5, per CULTURAL_RUBRIC_V1.md)"/>
+  {_choices("cultural_score", ["1", "2", "3", "4", "5"])}
+
+  <Header value="4. Schema compliant — required fields present, provenance cites a dated source, cohort is one of formal / informal_economy / informal_rural?"/>
+  {_choices("schema_compliant", ["yes", "no"])}
+
+  <Header value="Justification (one sentence — required)"/>
+  <TextArea name="justification" toName="prompt" rows="3" maxSubmissions="1"/>
+
+  <Header value="Verdict"/>
+  {_choices("verdict", ["validated", "needs_revision"])}
+</View>
+""".strip()
