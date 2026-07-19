@@ -1,14 +1,27 @@
 """
-Seed script — generates example benchmark JSONL packs for local development.
+BOOTSTRAP ONLY — generates the original example benchmark JSONL packs.
 
-These are NOT SME-validated. They exist to:
-  - Prove the benchmark loader works end-to-end.
-  - Give the orchestration layer enough items to clear low_coverage (10+ per dimension).
-  - Be replaced item-by-item as SME-validated content arrives.
+*** DO NOT RUN THIS AGAINST A LIVE CORPUS. ***
 
-Run: python scripts/seed_benchmarks.py
+This script belongs to the Week 3 bootstrap (commit b67bc99). Its hardcoded lists are
+DEVELOPMENT SEEDS, not SME-validated content, and they are far smaller than the live packs
+they share filenames with — running it unguarded would replace 66 live items with 21 seeds,
+destroying 45 SME-authored items across six packs.
+
+That is a direct violation of the project rule that `benchmarks/packs/*.jsonl` "must never be
+rewritten, reformatted, or simplified by any automated tool or agent".
+
+It is retained because it is the only record of the original bootstrap corpus. Since
+2026-07-19 it refuses to touch any pack file that already exists; `--force` is required to
+override, and it reports exactly what would be lost before doing so.
+
+Run (safe — writes only files that do not exist):
+    python scripts/seed_benchmarks.py
+Preview without writing anything:
+    python scripts/seed_benchmarks.py --dry-run
 """
 
+import argparse
 import json
 from pathlib import Path
 
@@ -308,11 +321,61 @@ SEED_PACKS = [
 ]
 
 
+def _live_item_count(path: Path) -> int:
+    """Items currently in a pack file on disk, or -1 if it does not exist."""
+    if not path.exists():
+        return -1
+    with path.open(encoding="utf-8") as f:
+        return sum(1 for line in f if line.strip())
+
+
 def main():
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        "--force", action="store_true",
+        help="Overwrite pack files that already exist. DESTROYS SME-authored items.",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true",
+        help="Report what would happen and write nothing.",
+    )
+    args = parser.parse_args()
+
     PACKS_DIR.mkdir(parents=True, exist_ok=True)
-    total = 0
+
+    existing, writable = [], []
     for pack in SEED_PACKS:
-        output_path = PACKS_DIR / pack["filename"]
+        path = PACKS_DIR / pack["filename"]
+        live = _live_item_count(path)
+        (existing if live >= 0 else writable).append((pack, path, live))
+
+    if existing:
+        lost = sum(live - len(p["items"]) for p, _, live in existing if live > len(p["items"]))
+        print("\nThese pack files ALREADY EXIST and hold live content:\n")
+        print(f"  {'pack':<42}{'live':>6}{'seed':>6}{'delta':>7}")
+        for p, _, live in existing:
+            print(f"  {p['filename']:<42}{live:>6}{len(p['items']):>6}{len(p['items']) - live:>7}")
+        print(f"\n  Overwriting them would destroy {lost} SME-authored items.")
+
+    if existing and not args.force:
+        print("\nREFUSING to overwrite. benchmarks/packs/*.jsonl is SME-validated data and is")
+        print("never rewritten by an automated tool. Pass --force only if you have read the")
+        print("table above and intend exactly that; recover with `git checkout -- benchmarks/packs/`.")
+        if not writable:
+            return
+        print(f"\nProceeding with the {len(writable)} pack(s) that do not exist yet.")
+
+    targets = writable + (existing if args.force else [])
+    if args.force and existing:
+        print("\n--force given: existing packs WILL be overwritten.")
+    if args.dry_run:
+        print(f"\n--dry-run: would write {len(targets)} pack file(s); nothing written.")
+        return
+
+    total = 0
+    for pack, output_path, _ in targets:
         public_items = [i for i in pack["items"] if not i.get("is_held_out")]
         with output_path.open("w", encoding="utf-8") as f:
             for item in pack["items"]:
@@ -320,6 +383,9 @@ def main():
         total += len(public_items)
         print(f"  {pack['filename']}: {len(public_items)} public + "
               f"{len(pack['items']) - len(public_items)} held-out items")
+    if not targets:
+        print("\nNothing written.")
+        return
     print(f"\nTotal public items: {total}")
     print("These are DEVELOPMENT SEEDS — not SME-validated.")
     print("Replace item-by-item as SME-validated content arrives.")
