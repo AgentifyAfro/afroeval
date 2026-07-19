@@ -1,5 +1,7 @@
 """The rules that decide whether an item is Tier 1."""
-from scripts.validation_writeback import compute_item_results
+import json
+
+from scripts.validation_writeback import apply_results, compute_item_results, load_packs
 from validation.hashing import item_content_hash
 
 ITEM = {"id": "ch-am-001", "prompt": "p", "expected_behavior": "e"}
@@ -84,3 +86,38 @@ def test_kappa_below_the_floor_forces_adjudication():
     assert res["itm-0"]["needs_adjudication"] is True
     assert "kappa" in res["itm-0"]["reason"]
     assert res["itm-0"]["irr_score"] < 0.70
+
+
+def test_factual_dispute_is_written_to_a_pack_with_a_null_irr_score(tmp_path):
+    """
+    Same scenario as test_factual_disagreement_forces_adjudication_regardless_of_kappa
+    (identical cultural scores -> kappa would be 1.0, opposite factual verdicts), but
+    exercised end-to-end through apply_results against a temp pack. A factual dispute
+    must never be stamped onto disk as a passing irr_score - the pack should read
+    validation_count=2 (two people did rate it) and irr_score=null (unresolved), not
+    irr_score=1.0.
+    """
+    items = _items(10)
+    vals = _batch(("sme-a", "sme-b"), 10, factual_b="no")
+    results = compute_item_results(vals, items)
+    assert results["itm-0"]["needs_adjudication"] is True
+    assert results["itm-0"]["irr_score"] == 1.0  # the raw kappa would pass on its own
+
+    pack_path = tmp_path / "disputed_v1.0.0.jsonl"
+    rows = [
+        {"id": item["id"], "prompt": item["prompt"], "expected_behavior": item["expected_behavior"],
+         "validation_count": 0, "irr_score": None}
+        for item in items
+    ]
+    pack_path.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+
+    _, rows_by_path, newline_by_path = load_packs(tmp_path)
+    written, changed = apply_results(results, rows_by_path, newline_by_path)
+
+    assert pack_path in written
+    updated = {
+        json.loads(line)["id"]: json.loads(line)
+        for line in pack_path.read_text(encoding="utf-8").splitlines()
+    }
+    assert updated["itm-0"]["validation_count"] == 2
+    assert updated["itm-0"]["irr_score"] is None

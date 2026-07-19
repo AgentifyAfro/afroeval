@@ -200,12 +200,19 @@ def apply_results(
     Two rules keep this from touching data it has no business touching:
 
     1. A pack is only rewritten when a field actually changed AND the rendered bytes
-       differ from what is already on disk. No no-op rewrites.
+       differ from what is already on disk. No no-op rewrites. A pack where nothing was
+       touched never becomes a write candidate at all - it is not enough for its bytes
+       to happen to round-trip identically.
     2. Fields are only written for items the DB holds validation rows for. If every row
        for an item has gone stale the count is written as 0 and irr_score as null -
        that demotion is the whole point of the content hash. But an item the DB has
        never heard of keeps whatever the pack already published; a missing row is not
        evidence of a missing validation.
+    3. needs_adjudication (factual dispute, sub-floor kappa, or a >1-rubric-point
+       cultural gap) is never a Tier 1 pass no matter what the kappa arithmetic says.
+       validation_count is written truthfully - two people did rate the item - but
+       irr_score is written as null so the pack never advertises an unresolved dispute
+       as passing.
 
     Returns (paths_written, items_changed).
     """
@@ -213,17 +220,22 @@ def apply_results(
     changed = 0
 
     for path, rows in rows_by_path.items():
+        pack_changed = False
         for d in rows:
             r = results.get(d["id"])
             if r is None or not r["has_validation_history"]:
                 continue
             count = r["validation_count"]
-            irr = r["irr_score"] if count else None
+            irr = None if (not count or r["needs_adjudication"]) else r["irr_score"]
             if d.get("validation_count") == count and d.get("irr_score") == irr:
                 continue
             d["validation_count"] = count
             d["irr_score"] = irr
             changed += 1
+            pack_changed = True
+
+        if not pack_changed:
+            continue
 
         rendered = _render(rows, newline_by_path[path])
         if rendered != path.read_bytes():
@@ -247,8 +259,12 @@ def main() -> None:
 
     validations, skipped = _load_validations(items)
     results = compute_item_results(validations, items)
+    # needs_adjudication (factual dispute, sub-floor kappa, or a >1-rubric-point cultural
+    # gap) overrides a passing kappa up to and including 1.00 - a flagged item is never
+    # Tier 1 eligible, even if it would otherwise satisfy count/floor.
     tier1 = sum(1 for r in results.values()
-                if r["validation_count"] >= 2 and (r["irr_score"] or 0) >= IRR_FLOOR)
+                if r["validation_count"] >= 2 and (r["irr_score"] or 0) >= IRR_FLOOR
+                and not r["needs_adjudication"])
     adj = [i for i, r in results.items() if r["needs_adjudication"]]
     print(f"Items: {len(items)} | Tier 1 eligible: {tier1} | needing adjudication: {len(adj)}")
     if skipped:

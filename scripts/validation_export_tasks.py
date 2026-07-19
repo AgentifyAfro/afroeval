@@ -36,7 +36,14 @@ def _load_roster() -> list[dict]:
 def _already_exported_item_ids(client: LabelStudioClient, project_id: int) -> set[str]:
     """Mirrors scripts/hitl_export_tasks.py's _already_exported_response_ids — without this,
     re-running the export re-imports every item as a duplicate task, corrupting the per-pair
-    batch counts the 10-item kappa minimum depends on."""
+    batch counts the 10-item kappa minimum depends on.
+
+    Assumption: this keys on the item's string id alone, which is NOT globally unique
+    across pack versions (e.g. ch-am-001..011 exist in both community_health_am v1.0.0
+    and v1.1.0 — see load_packs() in scripts/validation_writeback.py, which groups by
+    source file for exactly this reason). Only reachable under the normal workflow of
+    one active pack version at a time; a future multi-version export would need to key
+    on (pack, id) instead."""
     return {
         t["data"]["item_id"]
         for t in client.list_tasks(project_id)
@@ -119,6 +126,9 @@ def main() -> None:
         args.project_title, build_validation_label_config(), maximum_annotations=2
     )
     already_exported = _already_exported_item_ids(client, project["id"])
+    # Same assumption as _already_exported_item_ids: keyed on string id alone, not
+    # unique across pack versions. Fine only because one pack version is active at a
+    # time in the normal workflow.
     new_tasks = [t for t in tasks if t["item_id"] not in already_exported]
     skipped = len(tasks) - len(new_tasks)
     if skipped:

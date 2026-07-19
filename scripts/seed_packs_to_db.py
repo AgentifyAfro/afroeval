@@ -114,10 +114,15 @@ def seed() -> None:
                     # Content fields (prompt, expected_behavior, ...) are deliberately
                     # left alone: this seeder is not a content migration tool.
                     fresh = {
-                        "sme_author_id": item.get("sme_author_id", ""),
                         "validation_count": item.get("validation_count", 0),
                         "irr_score": item.get("irr_score"),
                     }
+                    # Only overwrite sme_author_id when the pack actually carries a
+                    # non-empty value. A pack that omits the field is silent on
+                    # authorship, not asserting "no author" - don't blank an existing
+                    # DB value just because this particular pack row doesn't carry it.
+                    if item.get("sme_author_id"):
+                        fresh["sme_author_id"] = item["sme_author_id"]
                     if any(getattr(existing, k) != v for k, v in fresh.items()):
                         for k, v in fresh.items():
                             setattr(existing, k, v)
