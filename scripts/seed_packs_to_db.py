@@ -1,8 +1,10 @@
 """
 Sync benchmark JSONL packs → BenchmarkPack + BenchmarkItem rows in the DB.
 
-Idempotent: re-running skips rows that already exist (check-then-insert).
-Safe to run multiple times — existing rows are never modified or deleted.
+Idempotent: re-running inserts missing rows and refreshes the validation record
+(sme_author_id, validation_count, irr_score) on rows that already exist — the pack file
+is the source of truth for those three fields. Item content and pack rows are never
+modified, and nothing is ever deleted.
 
 Usage (from afroeval/):
     .\\.venv\\Scripts\\python.exe scripts/seed_packs_to_db.py
@@ -53,6 +55,7 @@ def seed() -> None:
     engine = get_engine()
     new_packs = 0
     new_items = 0
+    updated_items = 0
 
     with Session(engine) as session:
         for pack_path in pack_files:
@@ -86,7 +89,8 @@ def seed() -> None:
             # ── Upsert BenchmarkItems ──────────────────────────────────────
             for item in items:
                 item_uuid = stable_item_uuid(item["id"])
-                if session.get(BenchmarkItem, item_uuid) is None:
+                existing = session.get(BenchmarkItem, item_uuid)
+                if existing is None:
                     session.add(BenchmarkItem(
                         id=item_uuid,
                         pack_id=pack_uuid,
@@ -103,11 +107,28 @@ def seed() -> None:
                         irr_score=item.get("irr_score"),
                     ))
                     new_items += 1
+                else:
+                    # The pack is the source of truth for the validation record, so
+                    # refresh it onto rows that already exist - otherwise the writeback's
+                    # results never reach the DB for the corpus that is already seeded.
+                    # Content fields (prompt, expected_behavior, ...) are deliberately
+                    # left alone: this seeder is not a content migration tool.
+                    fresh = {
+                        "sme_author_id": item.get("sme_author_id", ""),
+                        "validation_count": item.get("validation_count", 0),
+                        "irr_score": item.get("irr_score"),
+                    }
+                    if any(getattr(existing, k) != v for k, v in fresh.items()):
+                        for k, v in fresh.items():
+                            setattr(existing, k, v)
+                        session.add(existing)
+                        updated_items += 1
 
             session.commit()
 
-    print(f"\nDone. Inserted {new_packs} pack(s), {new_items} item(s).")
-    if new_packs == 0 and new_items == 0:
+    print(f"\nDone. Inserted {new_packs} pack(s), {new_items} item(s). "
+          f"Refreshed the validation record on {updated_items} existing item(s).")
+    if new_packs == 0 and new_items == 0 and updated_items == 0:
         print("Everything was already seeded — no changes made.")
 
 

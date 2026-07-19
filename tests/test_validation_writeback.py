@@ -66,6 +66,21 @@ def test_factual_disagreement_forces_adjudication_regardless_of_kappa():
 
 
 def test_kappa_below_the_floor_forces_adjudication():
-    res = compute_item_results(
-        _batch(("sme-a", "sme-b"), 10, cultural_a=1, cultural_b=5), _items(10))
+    """
+    Only the kappa branch can catch this batch. The pair alternates 3/4 against 4/3, so
+    every single item is within 1 rubric point (the per-item gap branch never fires) and
+    the factual verdicts match - but across the batch they agree on nothing, giving a
+    kappa of -1.0. Reliability is a batch property; per-item closeness cannot stand in
+    for it.
+    """
+    vals = []
+    for i in range(10):
+        iid, h = f"itm-{i}", item_content_hash(f"p{i}", f"e{i}")
+        a, b = (3, 4) if i % 2 == 0 else (4, 3)
+        vals.append(_v("sme-a", a, item_id=iid, h=h))
+        vals.append(_v("sme-b", b, item_id=iid, h=h))
+
+    res = compute_item_results(vals, _items(10))
     assert res["itm-0"]["needs_adjudication"] is True
+    assert "kappa" in res["itm-0"]["reason"]
+    assert res["itm-0"]["irr_score"] < 0.70
