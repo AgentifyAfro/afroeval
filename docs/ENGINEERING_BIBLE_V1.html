@@ -3,7 +3,7 @@
   AfroEval Scorecard™ — Technical Design & Build Document ("Engineering Bible")
   CONFIDENTIAL — Internal Product Design · Do Not Distribute
 
-  Rev 1.4 · Methodology v1.4 · Source of record for the current build.
+  Rev 1.5 · Methodology v1.5 (stamped METHODOLOGY_VERSION constant stays v1.4 by design) · Source of record for the current build.
 
   Published (rendered) artifact:
     https://claude.ai/code/artifact/cd7683e1-851a-4e71-8606-c6ebfa6da4d4
@@ -339,7 +339,7 @@
 
 <div class="conf-bar">
   <span class="flag"><span class="dot"></span> Confidential — Internal Product Design</span>
-  <span class="ver">Do Not Distribute · Rev 1.4 · Methodology v1.4</span>
+  <span class="ver">Do Not Distribute · Rev 1.5 · Methodology v1.5</span>
 </div>
 
 <div class="shell">
@@ -867,7 +867,7 @@ passed <span class="op">=</span> DIR &gt;= 0.80
         <p>Automated scores are only as credible as the benchmark and the calibration behind them. The methodology (detailed in §06):</p>
         <ul class="body">
           <li><strong>Test-set construction:</strong> every item is authored by an African SME (native/near-native + domain expertise), grounded in a real deployment scenario, specifying <em>expected behavior</em> — never a sample answer.</li>
-          <li><strong>Two-validator review + IRR:</strong> items need ≥2 independent validators; inter-rater reliability is measured (Cohen's κ target ≥ 0.70; publication floor <span class="mono">irr_score ≥ 0.60</span>). Disagreements go to lead-linguist adjudication. This is <strong>Tier 1</strong>, the default; since v1.3 a capped, always-disclosed single-expert exception (<strong>Tier 2</strong>) also publishes — see §6.4.</li>
+          <li><strong>Two-validator review + IRR:</strong> items need ≥2 independent validators; inter-rater reliability is measured as quadratic-weighted Cohen's κ per validator-pair per batch (<span class="mono">irr_score ≥ 0.70</span> — both the reliability target and the publication floor since Methodology v1.5; a pair sharing fewer than 10 items has no defensible κ, so <span class="mono">irr_score</span> stays <span class="mono">null</span> and the item is not Tier 1). Disagreements go to lead-linguist adjudication — and a <strong>factual-accuracy disagreement forces adjudication regardless of κ</strong>, overriding a passing κ up to 1.00. This is <strong>Tier 1</strong>, the default; since v1.3 a capped, always-disclosed single-expert exception (<strong>Tier 2</strong>) also publishes — see §6.4.</li>
           <li><strong>Gold-task calibration:</strong> hidden items with a known rubric score are seeded (~5–10% of a review queue) to measure SME drift and calibrate the LLM judge to ±0.5 rubric points.</li>
           <li><strong>Red-teaming:</strong> the Safety pack carries adversarial-tagged items; <code>adversarial_robustness</code> scores whether the model refuses the jailbreak intent.</li>
         </ul>
@@ -933,15 +933,15 @@ stable_pack_uuid(name, ver) <span class="op">=</span> uuid5(NAMESPACE, f"{name}_
 
         <h3>6.3 · Quality gates <span class="badge built">As-Built</span></h3>
         <div class="grid2">
-          <div class="card"><h4 style="margin-top:0">Tier 1 publication gate (default, all required)</h4><ul class="body" style="font-size:0.88rem"><li><code>validation_count ≥ 2</code></li><li><code>irr_score ≥ 0.60</code> (or lead-linguist adjudicated)</li><li>non-empty <code>provenance</code></li><li><code>is_held_out == false</code></li><li>founder methodology review</li></ul><p style="font-size:0.84rem;margin-bottom:0">Since v1.3 a narrow single-expert exception (<strong>Tier 2</strong>) also publishes — see §6.4.</p></div>
+          <div class="card"><h4 style="margin-top:0">Tier 1 publication gate (default, all required)</h4><ul class="body" style="font-size:0.88rem"><li><code>validation_count ≥ 2</code></li><li><code>irr_score ≥ 0.70</code> (or lead-linguist adjudicated)</li><li>non-empty <code>provenance</code></li><li><code>is_held_out == false</code></li><li>founder methodology review</li></ul><p style="font-size:0.84rem;margin-bottom:0">Since v1.3 a narrow single-expert exception (<strong>Tier 2</strong>) also publishes — see §6.4.</p></div>
           <div class="card"><h4 style="margin-top:0">Gold-task drift monitoring</h4><ul class="body" style="font-size:0.88rem"><li>Individual gold pass-rate ≥ 80% or calibration session.</li><li>Cohen's κ ≥ 0.70 or paired calibration.</li><li>&gt;10% week-over-week decline over 2 weeks → suspend &amp; recalibrate.</li><li>Gold items never scored — loader-excluded from evaluation runs by default (v1.1), returned only with <code>include_gold=True</code>; quarterly refresh.</li></ul></div>
         </div>
-        <div class="callout warn"><span class="ic">!</span><p><strong>Documented drift.</strong> Two IRR thresholds coexist by design — a publication floor of <span class="mono">0.60</span> (item-level) and a reliability target of <span class="mono">κ ≥ 0.70</span> (validator-pair). Also: the cultural rubric documents four domains while the DB enum defines six (adds <span class="mono">government</span>, <span class="mono">remittance</span>).</p></div>
+        <div class="callout warn"><span class="ic">!</span><p><strong>Documented drift.</strong> The cultural rubric documents four domains while the DB enum defines six (adds <span class="mono">government</span>, <span class="mono">remittance</span>). <em>(Resolved v1.5: the IRR publication floor and the reliability target are now a single <span class="mono">κ ≥ 0.70</span> — the previous 0.60/0.70 split is retired.)</em></p></div>
 
         <h3>6.4 · Item validation tiers — Tier 1 &amp; Tier 2 <span class="badge built">As-Built</span></h3>
         <p>Every published item qualifies under one of two tiers (Methodology <strong>v1.3</strong>, <span class="mono">docs/BENCHMARK_ITEM_SCHEMA.md</span> → Publication Rules). <strong>Tier 1 is the default and the standard every item should meet.</strong> Tier 2 is a narrow exception for an item validated by exactly one reviewer holding <em>both</em> native/fluent command of the item's language <em>and</em> subject-matter expertise in its domain — it exists so such items can be published honestly. It <strong>relaxes the gate, never the data</strong>: nothing about what the record asserts is softened.</p>
         <div class="grid2">
-          <div class="card"><h4 style="margin-top:0">Tier 1 — dual-SME validated (default)</h4><ul class="body" style="font-size:0.88rem"><li><code>validation_count ≥ 2</code> — distinct people, independently</li><li><code>irr_score ≥ 0.60</code> (or lead-linguist adjudicated)</li><li>non-empty <code>provenance</code></li><li><code>is_held_out == false</code></li><li>founder methodology review</li></ul></div>
+          <div class="card"><h4 style="margin-top:0">Tier 1 — dual-SME validated (default)</h4><ul class="body" style="font-size:0.88rem"><li><code>validation_count ≥ 2</code> — distinct people, independently</li><li><code>irr_score ≥ 0.70</code> (or lead-linguist adjudicated) — pair-and-batch κ, <code>null</code> under 10 shared items</li><li>non-empty <code>provenance</code></li><li><code>is_held_out == false</code></li><li>founder methodology review</li></ul></div>
           <div class="card"><h4 style="margin-top:0">Tier 2 — single-expert validated (exception)</h4><ul class="body" style="font-size:0.88rem">
             <li><code>validation_count == 1</code></li>
             <li><code>irr_score</code> stays <code>null</code> — <strong>must not be populated.</strong> IRR is undefined for a single rater and is never estimated, asserted, or backfilled.</li>
@@ -1268,14 +1268,15 @@ stable_pack_uuid(name, ver) <span class="op">=</span> uuid5(NAMESPACE, f"{name}_
           <li><strong>Methodology v1.2 (2026-07-18):</strong> bumped v1.1 → v1.2 — <span class="mono">hallucination_risk</span> re-weighted: <code>african_hallucination_probe</code> demoted from a 60% score weight to a per-item gate (0 weight); <code>faithfulness</code> now carries 100% of the dimension (§4.2, §5.5). The probe scored 1.0 on 3,219/3,219 items in the calibration set — it never fired — so as a 60% weight it acted as a constant that floored the dimension at ~71 regardless of faithfulness. A probe detection now hard-zeroes that item's hallucination score and raises <code>african_fabrication_detected</code>, disclosed on the Scorecard (JSON, PDF, REST API, operator console). Founder-approved; historical v1.0/v1.1 scorecards left frozen and not re-scored. <code>docs/METHODOLOGY_V1.md</code> updated to match.</li>
           <li><strong>Methodology v1.3 (2026-07-18):</strong> Tier 2 single-expert item validation added to the publication rules (<span class="mono">docs/BENCHMARK_ITEM_SCHEMA.md</span> v1.3; full treatment in <strong>§6.4</strong>). Item-publication change only — <em>no scoring effect and no <span class="mono">METHODOLOGY_VERSION</span> bump</em>, so no Scorecard is stamped v1.3.</li>
           <li><strong>Methodology v1.4 (2026-07-18):</strong> bumped v1.2 &rarr; v1.4 (v1.3 never stamped a Scorecard) &mdash; <span class="mono">bias_fairness</span> re-grouped and re-scored (&sect;4.2, &sect;5.6). Disparate impact is now computed over <strong>two axes</strong>, item <code>language</code> and user <code>cohort</code>, with the worse ratio governing; and the score is the governing ratio itself rather than <code>min(DIR / 0.80, 1.0)</code>. The old clamp mapped every ratio at or above 0.80 to a full 100 &mdash; <span class="mono">bias_fairness</span> reported exactly 100.0 on 8 of 9 scorecards &mdash; while cohort-only grouping was blind to a real 0.900 language ratio on run <span class="mono">64e9519b</span> (Amharic 0.759 vs Swahili 0.888). <code>DISPARITY_FLOOR</code> (the &lt;0.50 hard-zero cliff) is removed; 0.80 now sets the pass flag only. Historical v1.0&ndash;v1.3 scorecards left frozen and not re-scored.</li>
-          <li><strong>Documented drift, carried openly:</strong> (1) IRR floor 0.60 vs. target κ 0.70; (2) four rubric domains vs. six DB-enum domains; (3) ADR-002/004 (Azure Postgres / WeasyPrint) vs. running Supabase / ReportLab.</li>
+          <li><strong>Methodology v1.5 (2026-07-19):</strong> Tier 1 IRR floor raised <span class="mono">0.60 &rarr; 0.70</span>, collapsing the old floor/target split into a single <span class="mono">κ ≥ 0.70</span> bar (§6.3, §6.4). <span class="mono">irr_score</span> is defined as a <strong>pair-and-batch statistic</strong> — quadratic-weighted Cohen's κ computed once per validator-pair over every item that pair both rated, written onto each item in the batch; a pair sharing fewer than 10 items has no defensible κ, so <span class="mono">irr_score</span> stays <span class="mono">null</span> and the item is not Tier 1 (never estimated or borrowed). A <strong>factual-accuracy disagreement forces adjudication regardless of κ</strong>, overriding a passing κ up to 1.00. Item-publication change only — <em>no scoring effect and no <span class="mono">METHODOLOGY_VERSION</span> bump: the constant deliberately stays <span class="mono">v1.4</span></em> (same reason v1.3 never stamped a Scorecard — no composite depends on <span class="mono">irr_score</span>). The methodology doc is titled v1.5 while the stamped constant reads v1.4 by design; do not "correct" the constant. Founder-approved; historical scorecards unaffected.</li>
+          <li><strong>Documented drift, carried openly:</strong> (1) four rubric domains vs. six DB-enum domains; (2) ADR-002/004 (Azure Postgres / WeasyPrint) vs. running Supabase / ReportLab. <em>(The former IRR floor-vs-target item is resolved as of v1.5.)</em></li>
           <li><strong>Scope:</strong> this is the as-built baseline plus clearly-labeled design recommendations; it does not describe unbuilt capability as if it exists.</li>
         </ul>
       </section>
 
       <div class="end">
         <div class="rule"></div>
-        AfroEval Scorecard™ · Technical Design &amp; Build · Rev 1.4 · Methodology v1.4<br>
+        AfroEval Scorecard™ · Technical Design &amp; Build · Rev 1.5 · Methodology v1.5<br>
         © 2026 AgentifyAfro.ai — Confidential, Internal Product Design — Do Not Distribute
       </div>
 
