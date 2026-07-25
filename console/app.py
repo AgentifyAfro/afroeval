@@ -204,7 +204,9 @@ st.markdown(
     }
     [data-testid="stMetricValue"] div { color: #00CFFF !important; font-weight: 700 !important; }
     [data-testid="stMetricLabel"] div {
-        color: #6B7280 !important;
+        /* #6B7280 was 3.57:1 on the #1A1A24 card — below WCAG AA. #A6ABC4 is 7.6:1
+           (AAA), matching the Engineering Bible's --text-faint (commit 47a7ab5). */
+        color: #A6ABC4 !important;
         font-size: 0.72rem !important;
         text-transform: uppercase !important;
         letter-spacing: 0.06em !important;
@@ -1750,7 +1752,7 @@ def render_language_breakdown() -> None:
             return "color: #F59E0B; font-weight: 600"
         if v > 0:
             return "color: #10B981; font-weight: 600"
-        return "color: #6B7280"
+        return "color: #A6ABC4"  # neutral delta — WCAG AA/AAA faint (was #6B7280, 3.6:1)
 
     def score_fmt(v):
         return "—" if pd.isna(v) else f"{v:.1f}"
