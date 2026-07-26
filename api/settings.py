@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     ail_judge_model: str = "gpt-4.1-mini"
     ail_judge_provider: str = "azure_openai"
 
+    # Evaluator concurrency — how many simultaneous Azure calls the dispatcher allows.
+    # Defaults preserve the safe, hard-won values; raise via JUDGE_MAX_CONCURRENCY /
+    # DEEPEVAL_MAX_CONCURRENCY ONLY if the Azure deployment has TPM headroom (higher
+    # values previously 429'd 60–85% of DeepEval calls — see orchestration/dispatcher.py).
+    judge_max_concurrency: int = 3        # single-call LLM-judge metrics run this wide
+    deepeval_max_concurrency: int = 1     # token-heavy DeepEval metrics run this wide
+
     # Reporting
     scorecard_output_dir: str = "./output/scorecards"
 

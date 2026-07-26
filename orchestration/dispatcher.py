@@ -23,9 +23,17 @@ logger = structlog.get_logger(__name__)
 
 # DeepEval-backed metrics each fire several token-heavy internal Azure calls, so
 # they run on a dedicated, tighter semaphore (see dispatch_run) to avoid blowing the
-# TPM limit — unlike the single-call LLM-judge metrics, which run 3-wide.
+# TPM limit — unlike the single-call LLM-judge metrics, which run wider.
 _DEEPEVAL_METRIC_NAMES = frozenset({"semantic_similarity", "answer_completeness", "faithfulness"})
-_DEEPEVAL_MAX_CONCURRENCY = 1
+
+
+def _concurrency_limits(cfg) -> tuple[int, int]:
+    """(judge, deepeval) simultaneous-Azure-call limits, sourced from settings.
+
+    Env-tunable via JUDGE_MAX_CONCURRENCY / DEEPEVAL_MAX_CONCURRENCY. Defaults (3, 1)
+    preserve the safe values; raise only with Azure TPM headroom.
+    """
+    return cfg.judge_max_concurrency, cfg.deepeval_max_concurrency
 
 # v1.2: metrics that GATE a dimension rather than score it. They are computed and
 # persisted for evidence, but contribute no positive score, no coverage and no
@@ -358,13 +366,14 @@ async def dispatch_run(run_id: str) -> None:
 
                 # Two semaphores cap simultaneous Azure calls to stay under the TPM
                 # limit. Single-call LLM-judge metrics (fluency, cultural, safety,
-                # code-switching) run 3-wide. The DeepEval metrics each fire SEVERAL
-                # token-heavy internal calls, so they get a dedicated 1-wide semaphore —
-                # otherwise 3 of them bursting at once blows the TPM (historically 429'd
-                # 60-85% of deepeval calls). Serializing the heavy metrics trades some
-                # wall-clock for real scores instead of rate-limited fallbacks.
-                _judge_sem = asyncio.Semaphore(3)
-                _deepeval_sem = asyncio.Semaphore(_DEEPEVAL_MAX_CONCURRENCY)
+                # code-switching) run judge-wide. The DeepEval metrics each fire SEVERAL
+                # token-heavy internal calls, so they get a dedicated, tighter semaphore —
+                # otherwise a few bursting at once blows the TPM (historically 429'd
+                # 60-85% of deepeval calls). Both limits are env-tunable (defaults 3 / 1);
+                # raise them only with Azure TPM headroom.
+                judge_n, deepeval_n = _concurrency_limits(cfg)
+                _judge_sem = asyncio.Semaphore(judge_n)
+                _deepeval_sem = asyncio.Semaphore(deepeval_n)
 
                 async def _eval_one(raw, item, evaluator):
                     context = {
