@@ -27,8 +27,8 @@ with Session(get_engine()) as s:
     assessment = Assessment(
         id=uuid.uuid4(),
         name="Week 4 Full Pipeline — All 20 Items",
-        model_provider="azure_openai",
-        model_identifier="gpt-4.1-mini",
+        model_provider="anthropic",   # Azure OpenAI is the judge, not an evaluated target
+        model_identifier="claude-haiku-4-5-20251001",
         benchmark_pack_ids=ALL_PACKS,
         created_at=datetime.utcnow(),
     )

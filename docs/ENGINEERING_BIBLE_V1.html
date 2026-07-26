@@ -409,7 +409,7 @@
         <div class="kpi-row">
           <div class="kpi"><div class="v">6</div><div class="l">Scored dimensions</div></div>
           <div class="kpi"><div class="v">14</div><div class="l">Evaluators wired</div></div>
-          <div class="kpi"><div class="v">4</div><div class="l">Model providers</div></div>
+          <div class="kpi"><div class="v">3</div><div class="l">Evaluated targets</div></div>
           <div class="kpi"><div class="v">0–100</div><div class="l">Composite scale</div></div>
           <div class="kpi"><div class="v">&lt;30</div><div class="l">Safety veto floor</div></div>
           <div class="kpi"><div class="v">0.80</div><div class="l">Fairness pass (4/5ths)</div></div>
@@ -1010,7 +1010,7 @@ stable_pack_uuid(name, ver) <span class="op">=</span> uuid5(NAMESPACE, f"{name}_
       <!-- ════════ 07 SYSTEM COMPONENTS ════════ -->
       <section class="doc" id="s7">
         <div class="sec-head"><span class="num">07</span><h2>System components</h2></div>
-        <p class="sec-sub">The concrete tools, services, and integration points — and how the multi-model, Azure-aligned connector layer normalizes four very different provider APIs into one contract.</p>
+        <p class="sec-sub">The concrete tools, services, and integration points — and how the multi-model connector layer normalizes each provider API into one contract. The <strong>evaluated targets are Anthropic, OpenAI, and Gemini</strong>; Azure OpenAI is retained as the <strong>LLM judge</strong> (§05), not an evaluated target.</p>
 
         <h3>7.1 · Model connectors <span class="badge built">As-Built</span></h3>
         <p>Every provider implements one interface: <code>get_responses(items) → list[ModelResponseRaw]</code>, one normalized DTO per item in order. The orchestrator "never handles provider-specific formats."</p>
@@ -1018,7 +1018,7 @@ stable_pack_uuid(name, ver) <span class="op">=</span> uuid5(NAMESPACE, f"{name}_
           <table>
             <thead><tr><th>Provider</th><th>SDK / default model</th><th>Notable handling</th></tr></thead>
             <tbody>
-              <tr><td>Azure OpenAI</td><td class="mono">AzureOpenAI · gpt-4.1-mini · api 2025-01-01-preview</td><td>Content-filter block returns a traceable placeholder (not empty) — Azure mis-flags African-language content and an empty string would silently tank scores.</td></tr>
+              <tr><td>Azure OpenAI <span class="badge built">judge</span></td><td class="mono">AzureOpenAI · gpt-4.1-mini · api 2025-01-01-preview</td><td>The Azure <strong>LLM judge / DeepEval backend</strong> (§05), <strong>not an evaluated target</strong> since the judge-neutrality change (2026-07). Content-filter block returns a traceable placeholder (not empty) — Azure mis-flags African-language content and an empty string would silently tank scores.</td></tr>
               <tr><td>Anthropic</td><td class="mono">Anthropic · claude-haiku-4-5</td><td>System prompt via <code>system=</code>; token sum of input+output.</td></tr>
               <tr><td>OpenAI</td><td class="mono">OpenAI · gpt-4o</td><td>Standard chat.completions.</td></tr>
               <tr><td>Google Gemini</td><td class="mono">google-genai · gemini-2.5-flash</td><td><code>GenerateContentConfig</code> with system_instruction; broad exception → empty.</td></tr>
@@ -1026,6 +1026,7 @@ stable_pack_uuid(name, ver) <span class="op">=</span> uuid5(NAMESPACE, f"{name}_
             </tbody>
           </table>
         </div>
+        <div class="callout info"><span class="ic">i</span><p><strong>Judge neutrality (2026-07).</strong> The evaluated-target set is <code>EVALUATED_PROVIDERS</code> = <strong>Anthropic, OpenAI, Gemini</strong> (three). Azure OpenAI was removed as an evaluated target because the Azure judge grading the identical Azure target is a self-preferencing flaw. The <code>AzureOpenAIConnector</code> remains in the codebase, and Azure OpenAI continues as the LLM judge and DeepEval backend — the two roles are now cleanly separated.</p></div>
         <p>Shared pattern: <code>_MAX_WORKERS = 5</code> concurrent calls (<code>ThreadPoolExecutor</code>), <code>temperature=0.0</code>, <code>max_tokens=512</code>, latency via <code>time.monotonic()</code>. Rate-limit handling is centralized in <code>retry_on_rate_limit</code> — 4 retries, exponential backoff + jitter — and critically <code>is_rate_limit_error</code> returns <strong>False for <code>insufficient_quota</code></strong> (a hard quota, so fail fast rather than back off pointlessly).</p>
 
         <h3>7.2 · Multi-model dispatch <span class="badge built">As-Built</span></h3>

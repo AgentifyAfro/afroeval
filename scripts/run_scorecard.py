@@ -348,14 +348,16 @@ Examples:
     )
     p.add_argument(
         "--provider",
-        default="azure_openai",
-        choices=["azure_openai", "openai", "anthropic"],
-        help="Model provider (default: azure_openai)",
+        default="anthropic",
+        # Mirrors EVALUATED_PROVIDERS (db.models) — Azure OpenAI is the judge, not a target.
+        # Kept as a literal so this thin API client needs no ORM import.
+        choices=["anthropic", "openai", "gemini"],
+        help="Model provider (default: anthropic)",
     )
     p.add_argument(
         "--model", "-m",
-        default="gpt-4.1-mini",
-        help="Model identifier / deployment name (default: gpt-4.1-mini)",
+        default="claude-haiku-4-5-20251001",
+        help="Model identifier (default: claude-haiku-4-5-20251001)",
     )
     p.add_argument(
         "--base-url",

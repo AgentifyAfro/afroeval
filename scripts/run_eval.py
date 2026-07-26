@@ -108,8 +108,8 @@ def main() -> None:
         default=None,
         help="Comma-separated pack IDs (default: all 8 strategic packs)",
     )
-    parser.add_argument("--provider", default="azure_openai", help="Model provider")
-    parser.add_argument("--model", default="gpt-4.1-mini", help="Model identifier")
+    parser.add_argument("--provider", default="anthropic", help="Model provider (Azure is the judge, not a target)")
+    parser.add_argument("--model", default="claude-haiku-4-5-20251001", help="Model identifier")
     args = parser.parse_args()
 
     pack_ids: list[str] = args.packs.split(",") if args.packs else DEFAULT_PACKS

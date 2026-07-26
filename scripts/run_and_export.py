@@ -10,8 +10,8 @@ Usage (from afroeval/):
 
 Options:
     --assessment-name    Name shown in the console (default: "SME Calibration v2 — all packs")
-    --model-provider     azure_openai | anthropic (default: azure_openai)
-    --model-id           Model deployment name (default: gpt-4.1-mini)
+    --model-provider     anthropic | openai | gemini (default: anthropic) — Azure is the judge, not a target
+    --model-id           Model identifier (default: claude-haiku-4-5-20251001)
     --packs              Space-separated pack names (default: all 12 packs)
     --project-title      Label Studio project title (default: "AfroEval — SME Calibration v2 (2026-06-29)")
     --skip-export        Run evaluation only; skip Label Studio export
@@ -29,7 +29,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 import structlog
 from sqlmodel import Session
 
-from db.models import Assessment, Run, RunStatus
+from db.models import EVALUATED_PROVIDERS, Assessment, Run, RunStatus
 from db.session import get_engine
 
 logger = structlog.get_logger(__name__)
@@ -102,8 +102,8 @@ async def _run(run_id: str) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--assessment-name", default="SME Calibration v2 — all packs")
-    parser.add_argument("--model-provider", default="azure_openai", choices=["azure_openai", "anthropic", "openai", "gemini"])
-    parser.add_argument("--model-id", default="gpt-4.1-mini")
+    parser.add_argument("--model-provider", default=EVALUATED_PROVIDERS[0], choices=list(EVALUATED_PROVIDERS))
+    parser.add_argument("--model-id", default="claude-haiku-4-5-20251001")
     parser.add_argument("--packs", nargs="+", default=_DEFAULT_PACKS)
     parser.add_argument("--project-title", default=_DEFAULT_PROJECT_TITLE)
     parser.add_argument("--skip-export", action="store_true")

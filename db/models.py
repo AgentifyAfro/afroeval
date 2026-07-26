@@ -27,6 +27,20 @@ class ModelProvider(str, enum.Enum):
     JSONL_UPLOAD = "jsonl_upload"
 
 
+# Providers whose models are EVALUATED — the scoring targets a run can be pointed at.
+# Single source of truth for the operator console and the run_* scripts.
+#
+# Deliberately excludes AZURE_OPENAI: Azure OpenAI (gpt-4.1-mini) is the LLM JUDGE
+# (api.settings.ail_judge_provider / dispatcher._build_judge), and a judge grading its
+# own provider is a self-preferencing flaw — so Azure is the judge, never a target.
+# Also excludes JSONL_UPLOAD, which is a batch-import path, not a live model target.
+EVALUATED_PROVIDERS: tuple[str, ...] = (
+    ModelProvider.ANTHROPIC.value,
+    ModelProvider.OPENAI.value,
+    ModelProvider.GEMINI.value,
+)
+
+
 class VerdictBand(str, enum.Enum):
     DEPLOYMENT_READY = "Deployment-Ready"    # 80–100
     CONDITIONAL = "Conditional"              # 60–79

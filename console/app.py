@@ -35,6 +35,7 @@ from benchmarks.ids import stable_item_uuid
 from benchmarks.loader import PACKS_DIR
 from console.access import can_archive_runs, resolve_views
 from db.models import (
+    EVALUATED_PROVIDERS,
     Assessment,
     BenchmarkItem,
     BenchmarkPack,
@@ -955,7 +956,7 @@ def render_run_evaluation() -> None:
     st.markdown("**Model Configuration**")
 
     def _sync_model_id() -> None:
-        prov  = st.session_state.get("op_provider", "azure_openai")
+        prov  = st.session_state.get("op_provider", EVALUATED_PROVIDERS[0])
         model = PROVIDER_MODEL_DEFAULTS.get(prov, "")
         st.session_state["op_model_id"] = model
         # Clear auto-name tracking so the next render regenerates it with the new model + packs
@@ -966,14 +967,17 @@ def render_run_evaluation() -> None:
     with mc1:
         provider = st.selectbox(
             "Provider",
-            ["azure_openai", "anthropic", "openai", "gemini"],
+            # Azure OpenAI is the LLM judge, not an evaluated target — see EVALUATED_PROVIDERS.
+            list(EVALUATED_PROVIDERS),
             format_func=lambda v: PROVIDER_SHORT.get(v, v),
             key="op_provider",
             on_change=_sync_model_id,
         )
     with mc2:
         if "op_model_id" not in st.session_state:
-            st.session_state["op_model_id"] = PROVIDER_MODEL_DEFAULTS.get(provider, "gpt-4.1-mini")
+            st.session_state["op_model_id"] = PROVIDER_MODEL_DEFAULTS.get(
+                provider, PROVIDER_MODEL_DEFAULTS[EVALUATED_PROVIDERS[0]]
+            )
         model_id = st.text_input(
             "Model Identifier",
             key="op_model_id",
@@ -1497,7 +1501,7 @@ def render_provider_comparison() -> None:
     st.subheader("Provider Comparison")
     st.caption(
         "Side-by-side scorecard results across model providers running the same benchmark packs. "
-        "Validates routing decisions — e.g., whether Anthropic outperforms Azure on Oromo/Somali content."
+        "Validates routing decisions — e.g., whether Anthropic outperforms OpenAI on Oromo/Somali content."
     )
 
     with st.spinner("Loading scorecards…"):
