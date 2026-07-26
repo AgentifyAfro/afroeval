@@ -31,6 +31,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.platypus import (
     HRFlowable,
+    KeepTogether,
     Paragraph,
     SimpleDocTemplate,
     Spacer,
@@ -456,14 +457,13 @@ def _key_observations_section(scorecard, s):
     from reporting.observations import build_key_observations
     from reporting.radar import radar_drawing
 
-    story = [Spacer(1, 0.12 * inch), Paragraph("Key Observations", s["section_head"])]
-
     observations = build_key_observations(scorecard)
     obs_flow = (
         [Paragraph(f"•&nbsp;&nbsp;{o}", s["body"]) for o in observations]
         or [Paragraph("No notable observations for this run.", s["small"])]
     )
 
+    block = [Paragraph("Key Observations", s["section_head"])]
     scores = scorecard.dimension_scores or {}
     if scores:
         # Radar on the left, observations on the right (matches the reference layout).
@@ -479,10 +479,14 @@ def _key_observations_section(scorecard, s):
             ("RIGHTPADDING", (0, 0), (0, 0), 12),   # buffer before the notes column
             ("LEFTPADDING", (1, 0), (1, 0), 8),
         ]))
-        story.append(layout)
+        block.append(layout)
     else:
-        story.extend(obs_flow)
-    return story
+        block.extend(obs_flow)
+
+    # Keep the heading with its radar + notes so a page break never orphans the
+    # "Key Observations" title on one page with its content on the next. KeepTogether
+    # pushes the whole block to the next page when it won't fit on the current one.
+    return [Spacer(1, 0.12 * inch), KeepTogether(block)]
 
 
 def _remediation_section(scorecard, s):
