@@ -94,6 +94,14 @@ def main() -> None:
                 continue
             for v in pair:
                 load.setdefault(v, []).append(item["id"])
+            # SECURITY — do NOT add `is_gold` or the item's known rubric score to this
+            # payload. Gold items are loaded here on purpose (include_gold=True above) because
+            # they still need two human validators, but the payload deliberately carries only
+            # neutral content — no gold flag, no expected score. That omission is what keeps
+            # the calibration set secret: anyone with access to this Label Studio validation
+            # project sees item content but cannot tell which items are gold or what their
+            # known scores are, so the drift-detection anchors can't be gamed. Adding a gold
+            # indicator "to help reviewers" would silently defeat that. Keep it out.
             tasks.append({
                 "item_id": item["id"],
                 "prompt": item["prompt"],
