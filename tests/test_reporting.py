@@ -154,6 +154,12 @@ class TestGenerateScorecardPDF:
         pdf_path = generate_scorecard_pdf(scorecard, run, assessment, output_dir=tmp_path)
         assert Path(pdf_path).read_bytes()[:4] == b"%PDF"
 
+    def test_radar_fits_its_pdf_column(self):
+        # The radar drawing must be narrower than its table column, else axis labels
+        # overflow into the Key Observations notes (regression guard for the overlap).
+        from reporting.generator import _RADAR_COL_IN, _RADAR_SIZE_PT
+        assert _RADAR_SIZE_PT <= _RADAR_COL_IN * 72
+
 
 class TestScorecardJSON:
 

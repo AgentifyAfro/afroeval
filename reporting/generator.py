@@ -444,6 +444,13 @@ def _dimension_table(scorecard, s):
     return story
 
 
+# Radar sizing for the Key Observations section. The radar COLUMN must be wider than
+# the drawing (plus axis-label overhang) so labels like "Hallucination" don't spill
+# into the notes column. Guarded by tests/test_reporting.py::test_radar_fits_its_pdf_column.
+_RADAR_SIZE_PT = 165
+_RADAR_COL_IN = 2.9
+
+
 def _key_observations_section(scorecard, s):
     """Auto-generated observation bullets alongside a radar chart of the six dimensions."""
     from reporting.observations import build_key_observations
@@ -460,11 +467,17 @@ def _key_observations_section(scorecard, s):
     scores = scorecard.dimension_scores or {}
     if scores:
         # Radar on the left, observations on the right (matches the reference layout).
-        radar = radar_drawing(scores, size=190)
-        layout = Table([[radar, obs_flow]], colWidths=[2.2 * inch, 4.3 * inch])
+        # The radar column MUST be wider than the drawing so the axis labels (e.g.
+        # "Hallucination") don't spill into the notes column — see _RADAR_SIZE_PT /
+        # _RADAR_COL_IN and test_radar_fits_its_pdf_column.
+        radar = radar_drawing(scores, size=_RADAR_SIZE_PT)
+        radar.hAlign = "LEFT"
+        layout = Table([[radar, obs_flow]], colWidths=[_RADAR_COL_IN * inch, 3.6 * inch])
         layout.setStyle(TableStyle([
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("LEFTPADDING", (0, 0), (0, 0), 0),
+            ("RIGHTPADDING", (0, 0), (0, 0), 12),   # buffer before the notes column
+            ("LEFTPADDING", (1, 0), (1, 0), 8),
         ]))
         story.append(layout)
     else:
