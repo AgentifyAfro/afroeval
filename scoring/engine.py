@@ -34,8 +34,14 @@ Coverage gate (Methodology v1.1):
 from dataclasses import dataclass, field
 
 from db.models import VerdictBand
+from scoring.statistics import mean_ci_normal
 
 METHODOLOGY_VERSION = "v1.4"
+
+# Dimensions whose per-item "scores" are one run-level statistic replicated across
+# every item (not a real item-level sample), so a confidence interval is meaningless.
+# Excluded by name — a genuinely unanimous item-level dimension still gets its CI.
+_RUN_LEVEL_DIMENSIONS: frozenset[str] = frozenset({"bias_fairness"})
 
 # Default weights — must sum to 1.0.
 # Buyer-specific re-weighting is permitted (see Methodology v1.0, Section 3).
@@ -103,6 +109,8 @@ class ScoringResult:
     confidence_flag: str                                # "standard" | "low_coverage"
     dimension_scores: dict[str, float]                  # dimension → 0–100 (absent = not evaluated)
     dimension_weights: dict[str, float]
+    # dimension → [lo, hi] 95% CI on the 0–100 scale (absent = n<2 or run-level dim)
+    dimension_confidence_intervals: dict[str, list[float]] = field(default_factory=dict)
     safety_veto_applied: bool = False                   # True if safety override triggered
     safety_unverified: bool = False                     # True if safety had no applicable items (not measured)
     low_coverage_dimensions: list[str] = field(default_factory=list)
@@ -161,6 +169,7 @@ def compute_composite_score(
 
     # Average metric scores per dimension → 0–100 dimension score
     dimension_scores: dict[str, float] = {}
+    dimension_cis: dict[str, list[float]] = {}
     low_coverage_dims: list[str] = []
 
     for dim, scores in dimension_raw_scores.items():
@@ -175,6 +184,18 @@ def compute_composite_score(
             avg = None
 
         dimension_scores[dim] = round(avg * 100, 2) if avg is not None else 0.0
+
+        # Descriptive 95% CI over this dimension's per-item score observations
+        # (scaled to 0–100, clamped). Skipped for run-level dims and n<2. Does not
+        # affect the composite/verdict in any way.
+        if dim not in _RUN_LEVEL_DIMENSIONS:
+            ci = mean_ci_normal(scores)
+            if ci is not None:
+                lo, hi = ci
+                dimension_cis[dim] = [
+                    round(max(0.0, min(100.0, lo * 100)), 2),
+                    round(max(0.0, min(100.0, hi * 100)), 2),
+                ]
 
         # Only flag low_coverage for dims that were partially evaluated.
         # Dims with item_count == 0 are "not evaluated", not "low coverage".
@@ -236,6 +257,7 @@ def compute_composite_score(
         confidence_flag=confidence_flag,
         dimension_scores=dimension_scores,
         dimension_weights=active_weights,
+        dimension_confidence_intervals=dimension_cis,
         safety_veto_applied=safety_veto,
         safety_unverified=safety_unverified,
         low_coverage_dimensions=low_coverage_dims,

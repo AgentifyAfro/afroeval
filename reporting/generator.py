@@ -211,6 +211,7 @@ def _build_pdf(scorecard, run, assessment, out: Path | io.BytesIO) -> None:
     story = []
     story += _cover_block(scorecard, run, assessment, s)
     story += _dimension_table(scorecard, s)
+    story += _key_observations_section(scorecard, s)
     if scorecard.remediation_roadmap:
         story += _remediation_section(scorecard, s)
     if scorecard.failing_examples:
@@ -392,6 +393,7 @@ def _dimension_table(scorecard, s):
 
     dim_weights = scorecard.dimension_weights or {}
     dim_scores  = scorecard.dimension_scores  or {}
+    dim_cis     = getattr(scorecard, "dimension_confidence_intervals", None) or {}
 
     dims_sorted = sorted(
         dim_weights.keys(),
@@ -399,20 +401,23 @@ def _dimension_table(scorecard, s):
         reverse=True,
     )
 
-    header = ["Dimension", "Weight", "Score / 100", "Status"]
+    header = ["Dimension", "Weight", "Score / 100", "95% CI", "Status"]
     rows = [header]
     for dim in dims_sorted:
         score  = dim_scores.get(dim, 0.0)
         weight = dim_weights.get(dim, 0.0)
+        ci     = dim_cis.get(dim)
+        ci_txt = f"{ci[0]:.1f}–{ci[1]:.1f}" if ci else "—"
         status = "✓ Pass" if score >= 60 else "✗ Below 60"
         rows.append([
             dim.replace("_", " ").title(),
             f"{weight:.0%}",
             f"{score:.1f}",
+            ci_txt,
             status,
         ])
 
-    col_widths = [2.8 * inch, 0.8 * inch, 1.1 * inch, 1.3 * inch]
+    col_widths = [2.3 * inch, 0.7 * inch, 1.0 * inch, 1.2 * inch, 1.3 * inch]
     tbl = Table(rows, colWidths=col_widths)
 
     style_cmds = [
@@ -428,14 +433,42 @@ def _dimension_table(scorecard, s):
         ("BOTTOMPADDING",(0, 0), (-1, -1), 5),
         ("ALIGN",        (1, 0), (-1, -1), "CENTER"),
     ]
-    # Colour status column cells individually
+    # Colour status column cells individually (status is now the 5th column, index 4)
     for i, dim in enumerate(dims_sorted, start=1):
         score = dim_scores.get(dim, 0.0)
         cell_colour = SUCCESS_TINT if score >= 60 else ERROR_TINT
-        style_cmds.append(("BACKGROUND", (3, i), (3, i), cell_colour))
+        style_cmds.append(("BACKGROUND", (4, i), (4, i), cell_colour))
 
     tbl.setStyle(TableStyle(style_cmds))
     story.append(tbl)
+    return story
+
+
+def _key_observations_section(scorecard, s):
+    """Auto-generated observation bullets alongside a radar chart of the six dimensions."""
+    from reporting.observations import build_key_observations
+    from reporting.radar import radar_drawing
+
+    story = [Spacer(1, 0.12 * inch), Paragraph("Key Observations", s["section_head"])]
+
+    observations = build_key_observations(scorecard)
+    obs_flow = (
+        [Paragraph(f"•&nbsp;&nbsp;{o}", s["body"]) for o in observations]
+        or [Paragraph("No notable observations for this run.", s["small"])]
+    )
+
+    scores = scorecard.dimension_scores or {}
+    if scores:
+        # Radar on the left, observations on the right (matches the reference layout).
+        radar = radar_drawing(scores, size=190)
+        layout = Table([[radar, obs_flow]], colWidths=[2.2 * inch, 4.3 * inch])
+        layout.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (0, 0), 0),
+        ]))
+        story.append(layout)
+    else:
+        story.extend(obs_flow)
     return story
 
 
@@ -562,6 +595,7 @@ def _build_json_payload(scorecard, run, assessment) -> dict:
             "benchmark_pack_version": scorecard.benchmark_pack_version,
             "dimension_scores":      scorecard.dimension_scores,
             "dimension_weights":     scorecard.dimension_weights,
+            "dimension_confidence_intervals": getattr(scorecard, "dimension_confidence_intervals", None) or {},
             "failing_examples":      scorecard.failing_examples,
             "remediation_roadmap":   scorecard.remediation_roadmap,
         },

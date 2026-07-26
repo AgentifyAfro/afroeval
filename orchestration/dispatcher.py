@@ -573,6 +573,7 @@ async def dispatch_run(run_id: str) -> None:
                     african_fabrication_detected=african_fabrication_detected,
                     dimension_scores=result.dimension_scores,
                     dimension_weights=result.dimension_weights,
+                    dimension_confidence_intervals=result.dimension_confidence_intervals,
                     failing_examples=result.failing_examples,
                     remediation_roadmap=result.remediation_roadmap,
                     benchmark_pack_version=",".join(assessment.benchmark_pack_ids),

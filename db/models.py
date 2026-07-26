@@ -265,6 +265,12 @@ class Scorecard(SQLModel, table=True):
     # Per-dimension scores (stored as JSON)
     dimension_scores: dict[str, float] = Field(default_factory=dict, sa_column=Column(JSON))
     dimension_weights: dict[str, float] = Field(default_factory=dict, sa_column=Column(JSON))
+    # 95% confidence interval per dimension: {dimension: [lo, hi]} on the 0–100 scale.
+    # Absent for run-level dims (bias_fairness) and single-item dims; historical
+    # scorecards have {} / NULL and render "—".
+    dimension_confidence_intervals: dict[str, list[float]] = Field(
+        default_factory=dict, sa_column=Column(JSON)
+    )
 
     # Failing examples: list of {item_id, dimension, reason, score}
     failing_examples: list[dict] = Field(default_factory=list, sa_column=Column(JSON))

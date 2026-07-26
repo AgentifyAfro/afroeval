@@ -63,6 +63,12 @@ def _stub_scorecard(run):
             "code_switching_quality": 0.10,
             "safety_robustness": 0.10,
         },
+        dimension_confidence_intervals={
+            "language_performance": [79.1, 88.9],
+            "cultural_appropriateness": [52.0, 68.0],
+            "safety_robustness": [100.0, 100.0],
+            # bias_fairness (run-level) and the rest intentionally absent -> "—"
+        },
         failing_examples=[],
         remediation_roadmap=[
             {
@@ -132,6 +138,43 @@ class TestGenerateScorecardPDF:
 
         pdf_path = generate_scorecard_pdf(scorecard, run, assessment, output_dir=tmp_path)
         assert Path(pdf_path).read_bytes()[:4] == b"%PDF"
+
+    def test_builds_with_confidence_intervals_and_key_observations(self, tmp_path):
+        assessment = _stub_assessment()
+        run = _stub_run(assessment)
+        scorecard = _stub_scorecard(run)  # stub carries CIs -> exercises the new section
+        pdf_path = generate_scorecard_pdf(scorecard, run, assessment, output_dir=tmp_path)
+        assert Path(pdf_path).read_bytes()[:4] == b"%PDF"
+
+    def test_builds_for_historical_scorecard_without_confidence_intervals(self, tmp_path):
+        assessment = _stub_assessment()
+        run = _stub_run(assessment)
+        scorecard = _stub_scorecard(run)
+        del scorecard.dimension_confidence_intervals  # historical scorecard -> "—"
+        pdf_path = generate_scorecard_pdf(scorecard, run, assessment, output_dir=tmp_path)
+        assert Path(pdf_path).read_bytes()[:4] == b"%PDF"
+
+
+class TestScorecardJSON:
+
+    def test_json_includes_dimension_confidence_intervals(self, tmp_path):
+        assessment = _stub_assessment()
+        run = _stub_run(assessment)
+        scorecard = _stub_scorecard(run)
+        json_path = generate_scorecard_json(scorecard, run, assessment, output_dir=tmp_path)
+        data = json.loads(Path(json_path).read_text(encoding="utf-8"))
+        cis = data["scorecard"]["dimension_confidence_intervals"]
+        assert cis["language_performance"] == [79.1, 88.9]
+        assert "bias_fairness" not in cis  # run-level -> absent
+
+    def test_json_confidence_intervals_default_empty_for_historical(self, tmp_path):
+        assessment = _stub_assessment()
+        run = _stub_run(assessment)
+        scorecard = _stub_scorecard(run)
+        del scorecard.dimension_confidence_intervals
+        json_path = generate_scorecard_json(scorecard, run, assessment, output_dir=tmp_path)
+        data = json.loads(Path(json_path).read_text(encoding="utf-8"))
+        assert data["scorecard"]["dimension_confidence_intervals"] == {}
 
     def test_handles_no_remediation_roadmap(self, tmp_path):
         assessment = _stub_assessment()

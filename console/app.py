@@ -310,6 +310,9 @@ def load_runs_summary(include_archived: bool = False) -> list[dict]:
                 "african_fabrication_detected": scorecard.african_fabrication_detected if scorecard else False,
                 "dimension_scores":    scorecard.dimension_scores if scorecard else {},
                 "dimension_weights":   scorecard.dimension_weights if scorecard else {},
+                "dimension_confidence_intervals": (
+                    getattr(scorecard, "dimension_confidence_intervals", None) or {}
+                ) if scorecard else {},
                 "remediation_roadmap": scorecard.remediation_roadmap if scorecard else [],
                 "pack_ids":            assessment.benchmark_pack_ids if assessment else [],
                 "model":               assessment.model_identifier if assessment else "",
@@ -1340,6 +1343,7 @@ def render_run_scorecard() -> None:
     st.subheader("Dimension Scores")
     dim_scores  = selected["dimension_scores"]
     dim_weights = selected["dimension_weights"]
+    dim_cis     = selected.get("dimension_confidence_intervals") or {}
     dcols = st.columns(3)
     # Show evaluated dims sorted by score, then not-evaluated dims as N/A
     all_display_dims = sorted(dim_scores.items(), key=lambda x: x[1])
@@ -1347,6 +1351,7 @@ def render_run_scorecard() -> None:
     col_idx = 0
     for dim, score in all_display_dims:
         weight = dim_weights.get(dim, 0)
+        ci = dim_cis.get(dim)
         with dcols[col_idx % 3]:
             st.metric(
                 label=f"{dim.replace('_', ' ').title()} ({weight:.0%})",
@@ -1354,6 +1359,7 @@ def render_run_scorecard() -> None:
                 delta="⚠ Below 60" if score < 60 else "OK",
                 delta_color="inverse" if score < 60 else "normal",
             )
+            st.caption(f"95% CI {ci[0]:.1f}–{ci[1]:.1f}" if ci else "95% CI —")
         col_idx += 1
     for dim in not_eval_dims:
         weight = dim_weights.get(dim, 0)
@@ -1365,6 +1371,39 @@ def render_run_scorecard() -> None:
                 delta_color="off",
             )
         col_idx += 1
+
+    st.caption("95% CI shown per dimension. “—” = single run-level statistic "
+               "(Bias & Fairness), too few items, or a pre-CI historical run.")
+
+    st.divider()
+
+    # Key Observations + radar (same section as the PDF scorecard)
+    st.subheader("Key Observations")
+    from types import SimpleNamespace
+
+    import streamlit.components.v1 as components
+
+    from reporting.observations import build_key_observations
+    from reporting.radar import radar_svg
+
+    obs_scorecard = SimpleNamespace(
+        dimension_scores=dim_scores,
+        verdict=selected.get("verdict"),
+        confidence_flag=selected.get("confidence_flag"),
+        safety_unverified=selected.get("safety_unverified", False),
+        african_fabrication_detected=selected.get("african_fabrication_detected", False),
+    )
+    observations = build_key_observations(obs_scorecard)
+    kc1, kc2 = st.columns([1, 1])
+    with kc1:
+        if dim_scores:
+            components.html(radar_svg(dim_scores, size=320), height=340)
+    with kc2:
+        if observations:
+            for obs in observations:
+                st.markdown(f"- {obs}")
+        else:
+            st.caption("No notable observations for this run.")
 
     st.divider()
 
