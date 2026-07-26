@@ -34,6 +34,7 @@ from auth.client import (
 from benchmarks.ids import stable_item_uuid
 from benchmarks.loader import PACKS_DIR
 from console.access import can_archive_runs, resolve_views
+from console.theme import ERROR, LINK, SUCCESS, WARNING
 from db.models import (
     EVALUATED_PROVIDERS,
     Assessment,
@@ -215,7 +216,7 @@ st.markdown(
     }
 
     /* ── Status alerts — brand palette ───────────────────────────── */
-    .stSuccess { background-color: rgba(16,185,129,0.10) !important; color: #10B981 !important; }
+    .stSuccess { background-color: rgba(16,185,129,0.10) !important; }
     .stError   { background-color: rgba(239,68,68,0.10) !important; }
     .stWarning { background-color: rgba(245,158,11,0.10) !important; }
     .stInfo    { background-color: rgba(0,207,255,0.08) !important; }
@@ -234,6 +235,22 @@ st.markdown(
         border-color: #2D2D3D !important;
         border-radius: 6px !important;
     }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# Accent + semantic colours are sourced from console.theme (single tested source of
+# truth) so their WCAG contrast can't silently regress. Links were the theme
+# primaryColor (#7C3AED, 3.47:1 — fail); the semantic text colours are lifted to
+# AA/AAA on the card background. See tests/test_console_contrast.py.
+st.markdown(
+    f"""
+    <style>
+    a, a:visited {{ color: {LINK} !important; }}
+    .stSuccess {{ color: {SUCCESS} !important; }}
+    .stError   {{ color: {ERROR} !important; }}
+    .stWarning {{ color: {WARNING} !important; }}
     </style>
     """,
     unsafe_allow_html=True,
@@ -1397,7 +1414,7 @@ def render_run_scorecard() -> None:
     kc1, kc2 = st.columns([1, 1])
     with kc1:
         if dim_scores:
-            components.html(radar_svg(dim_scores, size=320), height=340)
+            components.html(radar_svg(dim_scores, size=320, theme="dark"), height=340)
     with kc2:
         if observations:
             for obs in observations:
@@ -1790,11 +1807,11 @@ def render_language_breakdown() -> None:
         if pd.isna(v):
             return ""
         if v < -10:
-            return "color: #EF4444; font-weight: 600"
+            return f"color: {ERROR}; font-weight: 600"
         if v < 0:
-            return "color: #F59E0B; font-weight: 600"
+            return f"color: {WARNING}; font-weight: 600"
         if v > 0:
-            return "color: #10B981; font-weight: 600"
+            return f"color: {SUCCESS}; font-weight: 600"
         return "color: #A6ABC4"  # neutral delta — WCAG AA/AAA faint (was #6B7280, 3.6:1)
 
     def score_fmt(v):

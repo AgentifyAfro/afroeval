@@ -22,12 +22,20 @@ DIMENSION_LABELS: dict[str, str] = {
     "safety_robustness":        "Safety",
 }
 
-# Brand palette (matches the console / bible).
-_POLY_FILL = "rgba(0,207,255,0.22)"
-_POLY_STROKE = "#4169E1"
-_GRID = "#C7CCDD"
-_AXIS = "#A6ABC4"
-_LABEL = "#33384A"
+# Theme palettes. "light" is tuned for the off-white PDF page; "dark" for the
+# console canvas (#0A0A0F) where the light labels/grid would otherwise be
+# invisible (see tests/test_console_contrast.py). fill = (r, g, b, alpha).
+RADAR_THEMES: dict[str, dict] = {
+    "light": {"grid": "#C7CCDD", "axis": "#A6ABC4", "label": "#33384A",
+              "stroke": "#4169E1", "fill": (0, 207, 255, 0.22)},
+    "dark":  {"grid": "#3A3A4C", "axis": "#4A4A5E", "label": "#C7CCDD",
+              "stroke": "#00CFFF", "fill": (0, 207, 255, 0.20)},
+}
+
+
+def _rgba(fill: tuple) -> str:
+    r, g, b, a = fill
+    return f"rgba({r},{g},{b},{a})"
 
 
 @dataclass
@@ -84,8 +92,11 @@ def _fmt(x: float) -> str:
     return f"{x:.2f}"
 
 
-def radar_svg(scores: dict[str, float], *, size: int = 320, max_score: float = 100.0) -> str:
+def radar_svg(
+    scores: dict[str, float], *, size: int = 320, max_score: float = 100.0, theme: str = "light"
+) -> str:
     """Render the radar as a self-contained inline SVG string (console)."""
+    t = RADAR_THEMES[theme]
     cx = cy = size / 2
     r = size / 2 * 0.64
     g = radar_geometry(scores, radius=r, max_score=max_score)
@@ -106,36 +117,38 @@ def radar_svg(scores: dict[str, float], *, size: int = 320, max_score: float = 1
                                     ring_r * math.sin(math.radians(a.angle_deg))))
                          for a in g.axes)
         )
-        parts.append(f'<polygon points="{pts}" fill="none" stroke="{_GRID}" stroke-width="1"/>')
+        parts.append(f'<polygon points="{pts}" fill="none" stroke="{t["grid"]}" stroke-width="1"/>')
 
     # axes + labels
     for a in g.axes:
         ex, ey = to_screen(a.endpoint)
         parts.append(f'<line x1="{cx:.1f}" y1="{cy:.1f}" x2="{ex:.1f}" y2="{ey:.1f}" '
-                     f'stroke="{_AXIS}" stroke-width="1"/>')
+                     f'stroke="{t["axis"]}" stroke-width="1"/>')
         lx, ly = to_screen((a.endpoint[0] * 1.16, a.endpoint[1] * 1.16))
         anchor = "middle" if abs(a.endpoint[0]) < 1e-6 else ("start" if a.endpoint[0] > 0 else "end")
         label = DIMENSION_LABELS.get(a.key, a.key)
-        parts.append(f'<text x="{lx:.1f}" y="{ly:.1f}" font-size="11" fill="{_LABEL}" '
+        parts.append(f'<text x="{lx:.1f}" y="{ly:.1f}" font-size="11" fill="{t["label"]}" '
                      f'text-anchor="{anchor}" dominant-baseline="middle" '
-                     f'font-family="Segoe UI, system-ui, sans-serif">{label}</text>')
+                     f'font-family="Inter, Segoe UI, system-ui, sans-serif">{label}</text>')
 
     # score polygon
     poly = " ".join(f"{x:.1f},{y:.1f}" for x, y in (to_screen(v) for v in g.polygon))
-    parts.append(f'<polygon points="{poly}" fill="{_POLY_FILL}" stroke="{_POLY_STROKE}" stroke-width="2"/>')
+    parts.append(f'<polygon points="{poly}" fill="{_rgba(t["fill"])}" '
+                 f'stroke="{t["stroke"]}" stroke-width="2"/>')
     for v in g.polygon:
         x, y = to_screen(v)
-        parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="2.5" fill="{_POLY_STROKE}"/>')
+        parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="2.5" fill="{t["stroke"]}"/>')
 
     parts.append("</svg>")
     return "".join(parts)
 
 
-def radar_drawing(scores: dict[str, float], *, size: int = 220, max_score: float = 100.0):
-    """Render the radar as a ReportLab Drawing (PDF flowable)."""
+def radar_drawing(scores: dict[str, float], *, size: int = 220, max_score: float = 100.0, theme: str = "light"):
+    """Render the radar as a ReportLab Drawing (PDF flowable). PDF is off-white → light theme."""
     from reportlab.graphics.shapes import Circle, Drawing, Line, Polygon, String
     from reportlab.lib import colors
 
+    t = RADAR_THEMES[theme]
     cx = cy = size / 2
     r = size / 2 * 0.62
     g = radar_geometry(scores, radius=r, max_score=max_score)
@@ -144,10 +157,12 @@ def radar_drawing(scores: dict[str, float], *, size: int = 220, max_score: float
     def to_canvas(pt: tuple[float, float]) -> tuple[float, float]:
         return cx + pt[0], cy + pt[1]            # ReportLab y is up
 
-    grid = colors.HexColor("#C7CCDD")
-    axis = colors.HexColor("#A6ABC4")
-    stroke = colors.HexColor("#4169E1")
-    fill = colors.Color(0, 207 / 255, 1, alpha=0.22)
+    grid = colors.HexColor(t["grid"])
+    axis = colors.HexColor(t["axis"])
+    stroke = colors.HexColor(t["stroke"])
+    _fr, _fg, _fb, _fa = t["fill"]
+    fill = colors.Color(_fr / 255, _fg / 255, _fb / 255, alpha=_fa)
+    label_color = colors.HexColor(t["label"])
 
     for ring_r in g.rings:
         pts: list[float] = []
@@ -163,8 +178,7 @@ def radar_drawing(scores: dict[str, float], *, size: int = 220, max_score: float
         lx, ly = to_canvas((a.endpoint[0] * 1.14, a.endpoint[1] * 1.14))
         anchor = "middle" if abs(a.endpoint[0]) < 1e-6 else ("start" if a.endpoint[0] > 0 else "end")
         label = DIMENSION_LABELS.get(a.key, a.key)
-        d.add(String(lx, ly - 3, label, fontSize=7.5, fillColor=colors.HexColor("#33384A"),
-                     textAnchor=anchor))
+        d.add(String(lx, ly - 3, label, fontSize=7.5, fillColor=label_color, textAnchor=anchor))
 
     poly: list[float] = []
     for v in g.polygon:
