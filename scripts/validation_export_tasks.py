@@ -33,6 +33,19 @@ def _load_roster() -> list[dict]:
         return json.load(f)
 
 
+def _select_validators(roster: list[dict], ids: list[str] | None) -> list[dict]:
+    """Restrict the roster to `ids` (roster order preserved); falsy `ids` = full roster.
+
+    Lets a round concentrate on a chosen pool — e.g. one non-author pair — so the pair
+    accumulates the MIN_SHARED_BATCH (10) shared items a defensible kappa needs, instead
+    of the load-balancer fragmenting a small pack across many sub-10-item pairs.
+    """
+    if not ids:
+        return roster
+    keep = set(ids)
+    return [r for r in roster if r["validator_id"] in keep]
+
+
 def _already_exported_item_ids(client: LabelStudioClient, project_id: int) -> set[str]:
     """Mirrors scripts/hitl_export_tasks.py's _already_exported_response_ids — without this,
     re-running the export re-imports every item as a duplicate task, corrupting the per-pair
@@ -77,9 +90,14 @@ def main() -> None:
     parser.add_argument("--project-title", default=VALIDATION_PROJECT_TITLE)
     parser.add_argument("--dry-run", action="store_true",
                         help="Report assignments without touching Label Studio.")
+    parser.add_argument("--validators", type=lambda s: [v.strip() for v in s.split(",") if v.strip()],
+                        default=None,
+                        help="Comma-separated validator_ids to restrict this round's pool "
+                             "(e.g. one non-author pair so it clears the 10-item kappa floor). "
+                             "Default: the whole roster.")
     args = parser.parse_args()
 
-    roster = _load_roster()
+    roster = _select_validators(_load_roster(), args.validators)
     pack_ids = args.packs or [p.stem for p in sorted(_PACKS_DIR.glob("*.jsonl"))]
 
     tasks: list[dict] = []
