@@ -1,6 +1,8 @@
 [
-  {"validator_id": "sme-placeholder-1", "languages": ["am", "en"], "domains": ["community_health"]},
-  {"validator_id": "sme-placeholder-2", "languages": ["sw", "sheng", "en"], "domains": ["mobile_money"]},
-  {"validator_id": "sme-placeholder-3", "languages": ["ha", "yo", "en"], "domains": ["agriculture", "customer_service"]},
-  {"validator_id": "sme-placeholder-4", "languages": ["zu", "so", "en"], "domains": ["public_services", "remittance"]}
+  {"validator_id": "sme-c8999994", "languages": ["am"], "domains": ["community_health"]},
+  {"validator_id": "sme-de62ac82", "languages": ["am"], "domains": ["community_health"]},
+  {"validator_id": "sme-4e7ced31", "languages": ["am"], "domains": ["community_health"]},
+  {"validator_id": "sme-fad3e4c4", "languages": ["am"], "domains": ["community_health"]},
+  {"validator_id": "sme-4894d3fe", "languages": ["am"], "domains": ["community_health"]},
+  {"validator_id": "sme-55afaa01", "languages": ["am"], "domains": ["community_health"]}
 ]
