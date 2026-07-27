@@ -73,10 +73,14 @@ _SELF_REFERENTIAL_PROVENANCE = re.compile(
 # retroactive — those items were dual-validated, so two independent reviewers stood behind
 # them. A Tier 2 item has one, which is why its source has to carry more of the weight.
 _CITATION_MARKER = re.compile(
-    r"\b(19|20)\d{2}\b"          # year
-    r"|\b\d+(st|nd|rd|th)\s*ed\b"  # edition
-    r"|\bv?\d+\.\d+\b"           # version
-    r"|§|\bhttps?://",           # section marker or URL
+    # Year uses DIGIT boundaries, not \b word boundaries: \b never fires between a
+    # non-Latin letter (e.g. Amharic, itself a \w char) and a digit, so a year glued
+    # to Amharic text ("በ2021") was missed and well-cited Amharic items were wrongly
+    # marked as not citing a source.
+    r"(?<!\d)(19|20)\d{2}(?!\d)"   # year
+    r"|\d+(st|nd|rd|th)\s*ed\b"    # edition
+    r"|v?\d+\.\d+"                 # version
+    r"|§|https?://",               # section marker or URL
     re.IGNORECASE,
 )
 
