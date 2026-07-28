@@ -5,6 +5,7 @@ All LLM/API calls are mocked; no network required.
 """
 
 import importlib.util
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -246,6 +247,28 @@ class TestFaithfulnessEvaluator:
         assert mock_metric_cls.call_args.kwargs["async_mode"] is False
         FaithfulnessEvaluator(model=MagicMock(), async_mode=True).evaluate("p", "r", "e")
         assert mock_metric_cls.call_args.kwargs["async_mode"] is True
+
+
+# ── Empty-response guard ──────────────────────────────────────────────────────
+
+class TestEmptyResponseGuard:
+    """A systematically failing model call (out of credits / bad key / outage) makes the
+    connector return empty raw_output for every item. Scoring those empties yields a
+    misleadingly inflated composite + low_coverage, so the run must fail loudly instead."""
+
+    def test_all_empty_detects_total_model_failure(self):
+        from orchestration.dispatcher import _all_responses_empty
+        empties = [SimpleNamespace(raw_output=""), SimpleNamespace(raw_output="   ")]
+        assert _all_responses_empty(empties) is True
+
+    def test_any_nonempty_is_not_a_total_failure(self):
+        from orchestration.dispatcher import _all_responses_empty
+        mixed = [SimpleNamespace(raw_output=""), SimpleNamespace(raw_output="real answer")]
+        assert _all_responses_empty(mixed) is False
+
+    def test_no_responses_is_not_this_guards_job(self):
+        from orchestration.dispatcher import _all_responses_empty
+        assert _all_responses_empty([]) is False
 
 
 # ── Connector routing ─────────────────────────────────────────────────────────

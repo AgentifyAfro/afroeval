@@ -206,6 +206,21 @@ def _distinct_item_counts(all_outputs: list, n_evaluators: int) -> dict[str, int
     return {dim: len(items) for dim, items in seen.items()}
 
 
+def _all_responses_empty(raw_responses: list) -> bool:
+    """True when there are responses but EVERY one is empty/whitespace.
+
+    Empty raw_output only comes from the connector's error fallback (rate limit / timeout /
+    API error such as an out-of-credits 400 or a 401). An all-empty batch therefore means
+    the evaluated model call is systematically failing. Scoring it anyway produces a
+    misleadingly inflated composite (empty answers trivially look "safe") flagged
+    low_coverage — so the run fails loudly instead. A partially-empty batch is left to the
+    normal per-metric error-rate / low_coverage machinery.
+    """
+    if not raw_responses:
+        return False
+    return all(not (getattr(r, "raw_output", "") or "").strip() for r in raw_responses)
+
+
 def _fail(session, run, message: str) -> None:
     from db.models import RunStatus
 
@@ -296,6 +311,16 @@ async def dispatch_run(run_id: str) -> None:
                 )
                 # Run connector in a thread so the event loop stays responsive.
                 raw_responses = await asyncio.to_thread(connector.get_responses, all_items)
+
+                # Fail loudly if the model produced nothing at all — otherwise empty
+                # responses get scored into a misleadingly inflated, low_coverage scorecard.
+                if _all_responses_empty(raw_responses):
+                    raise ValueError(
+                        f"Model returned no output for all {len(raw_responses)} items — the "
+                        f"evaluated model call is failing. Check the provider API key and "
+                        f"credits (e.g. Anthropic 'credit balance too low', a 401, a rate-limit "
+                        f"storm, or a provider outage). No scorecard was produced."
+                    )
 
                 # ── Step 3b: Persist ModelResponse rows ───────────────────────
                 # Only write rows for items that have been seeded into benchmark_items.
