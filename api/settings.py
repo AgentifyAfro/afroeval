@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     judge_max_concurrency: int = 3        # single-call LLM-judge metrics run this wide
     deepeval_max_concurrency: int = 1     # token-heavy DeepEval metrics run this wide
 
+    # When True, each DeepEval metric runs its several internal Azure sub-calls
+    # CONCURRENTLY instead of serially (async_mode=True), cutting wall-clock. It also
+    # multiplies the instantaneous token burst, so enable it (DEEPEVAL_ASYNC_MODE=true)
+    # ONLY with Azure TPM headroom — it pairs with raising DEEPEVAL_MAX_CONCURRENCY.
+    # Default off preserves the safe serial behavior.
+    deepeval_async_mode: bool = False
+
     # Reporting
     scorecard_output_dir: str = "./output/scorecards"
 

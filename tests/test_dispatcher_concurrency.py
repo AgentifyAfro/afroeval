@@ -20,6 +20,15 @@ def test_concurrency_is_overridable():
     assert (s.judge_max_concurrency, s.deepeval_max_concurrency) == (8, 2)
 
 
+def test_deepeval_async_mode_defaults_off():
+    # Off preserves the safe serial behavior; enable only with Azure TPM headroom.
+    assert Settings.model_fields["deepeval_async_mode"].default is False
+
+
+def test_deepeval_async_mode_is_overridable():
+    assert Settings(deepeval_async_mode=True).deepeval_async_mode is True
+
+
 def test_dispatcher_reads_limits_from_settings():
     from orchestration.dispatcher import _concurrency_limits
     cfg = SimpleNamespace(judge_max_concurrency=5, deepeval_max_concurrency=2)

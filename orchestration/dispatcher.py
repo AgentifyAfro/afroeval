@@ -341,12 +341,12 @@ async def dispatch_run(run_id: str) -> None:
                 deepeval_model = _build_deepeval_model(cfg)
 
                 evaluators = [
-                    SemanticSimilarityEvaluator(model=deepeval_model),
-                    AnswerCompletenessEvaluator(model=deepeval_model),
+                    SemanticSimilarityEvaluator(model=deepeval_model, async_mode=cfg.deepeval_async_mode),
+                    AnswerCompletenessEvaluator(model=deepeval_model, async_mode=cfg.deepeval_async_mode),
                     FluencyEvaluator(judge=judge),
                     ChrFEvaluator(),
                     MultilingualSimilarityEvaluator(),
-                    FaithfulnessEvaluator(model=deepeval_model),
+                    FaithfulnessEvaluator(model=deepeval_model, async_mode=cfg.deepeval_async_mode),
                     AfricanHallucinationProbeEvaluator(),
                     HarmfulContentEvaluator(judge=judge),
                     RefusalCalibrationEvaluator(judge=judge),

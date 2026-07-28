@@ -132,6 +132,20 @@ class TestSemanticSimilarityEvaluator:
         assert out.score == pytest.approx(0.5)
         assert "unavailable" in out.reason.lower()
 
+    @_needs_deepeval
+    @patch("evaluators.language_performance.AnswerRelevancyMetric")
+    def test_async_mode_defaults_false(self, mock_metric_cls):
+        mock_metric_cls.return_value = MagicMock(score=0.9, reason="ok")
+        SemanticSimilarityEvaluator(model=MagicMock()).evaluate("p", "r", "e")
+        assert mock_metric_cls.call_args.kwargs["async_mode"] is False
+
+    @_needs_deepeval
+    @patch("evaluators.language_performance.AnswerRelevancyMetric")
+    def test_async_mode_true_is_passed_through(self, mock_metric_cls):
+        mock_metric_cls.return_value = MagicMock(score=0.9, reason="ok")
+        SemanticSimilarityEvaluator(model=MagicMock(), async_mode=True).evaluate("p", "r", "e")
+        assert mock_metric_cls.call_args.kwargs["async_mode"] is True
+
 
 # ── AnswerCompletenessEvaluator ───────────────────────────────────────────────
 
@@ -156,6 +170,15 @@ class TestAnswerCompletenessEvaluator:
         ev = AnswerCompletenessEvaluator(model=MagicMock())
         out = ev.evaluate("p", "r", "e")
         assert out.score == pytest.approx(0.75)
+
+    @_needs_deepeval
+    @patch("evaluators.language_performance.GEval")
+    def test_async_mode_passthrough(self, mock_geval_cls):
+        mock_geval_cls.return_value = MagicMock(score=0.75, reason="ok")
+        AnswerCompletenessEvaluator(model=MagicMock()).evaluate("p", "r", "e")
+        assert mock_geval_cls.call_args.kwargs["async_mode"] is False
+        AnswerCompletenessEvaluator(model=MagicMock(), async_mode=True).evaluate("p", "r", "e")
+        assert mock_geval_cls.call_args.kwargs["async_mode"] is True
 
 
 # ── FluencyEvaluator ───────────────────────────────────────────────────────────
@@ -214,6 +237,15 @@ class TestFaithfulnessEvaluator:
         out = ev.evaluate("p", "r", "e", context={"domain": "mobile_money"})
         assert out.score == pytest.approx(0.95)
         assert out.passed is True
+
+    @_needs_deepeval
+    @patch("evaluators.hallucination.FaithfulnessMetric")
+    def test_async_mode_passthrough(self, mock_metric_cls):
+        mock_metric_cls.return_value = MagicMock(score=0.95, reason="ok")
+        FaithfulnessEvaluator(model=MagicMock()).evaluate("p", "r", "e")
+        assert mock_metric_cls.call_args.kwargs["async_mode"] is False
+        FaithfulnessEvaluator(model=MagicMock(), async_mode=True).evaluate("p", "r", "e")
+        assert mock_metric_cls.call_args.kwargs["async_mode"] is True
 
 
 # ── Connector routing ─────────────────────────────────────────────────────────

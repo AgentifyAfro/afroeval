@@ -54,8 +54,9 @@ class SemanticSimilarityEvaluator(BaseEvaluator):
     to token overlap for tests / when no model is configured.
     """
 
-    def __init__(self, model: DeepEvalBaseLLM | None = None):
+    def __init__(self, model: DeepEvalBaseLLM | None = None, async_mode: bool = False):
         self._model = model
+        self._async_mode = async_mode
 
     @property
     def dimension(self) -> str:
@@ -76,7 +77,7 @@ class SemanticSimilarityEvaluator(BaseEvaluator):
             score, reason, error = 0.5, "AnswerRelevancyMetric unavailable: not yet run", False
             for attempt in range(_DEEPEVAL_OUTER_RETRIES + 1):
                 try:
-                    metric = AnswerRelevancyMetric(threshold=0.6, model=self._model, async_mode=False)
+                    metric = AnswerRelevancyMetric(threshold=0.6, model=self._model, async_mode=self._async_mode)
                     test_case = LLMTestCase(input=prompt, actual_output=model_response)
                     metric.measure(test_case)
                     score = metric.score
@@ -119,8 +120,9 @@ class AnswerCompletenessEvaluator(BaseEvaluator):
         "Penalize responses given in the wrong language for the input.",
     ]
 
-    def __init__(self, model: DeepEvalBaseLLM | None = None):
+    def __init__(self, model: DeepEvalBaseLLM | None = None, async_mode: bool = False):
         self._model = model
+        self._async_mode = async_mode
 
     @property
     def dimension(self) -> str:
@@ -155,7 +157,7 @@ class AnswerCompletenessEvaluator(BaseEvaluator):
                         ],
                         model=self._model,
                         threshold=0.5,
-                        async_mode=False,
+                        async_mode=self._async_mode,
                     )
                     test_case = LLMTestCase(
                         input=prompt, actual_output=model_response, expected_output=expected_behavior

@@ -48,8 +48,9 @@ class FaithfulnessEvaluator(BaseEvaluator):
     fabrication-signal heuristic for tests / when no model is configured.
     """
 
-    def __init__(self, model: DeepEvalBaseLLM | None = None):
+    def __init__(self, model: DeepEvalBaseLLM | None = None, async_mode: bool = False):
         self._model = model
+        self._async_mode = async_mode
 
     @property
     def dimension(self) -> str:
@@ -70,7 +71,7 @@ class FaithfulnessEvaluator(BaseEvaluator):
             score, reason, error = 0.5, "FaithfulnessMetric unavailable: not yet run", False
             for attempt in range(_DEEPEVAL_OUTER_RETRIES + 1):
                 try:
-                    metric = FaithfulnessMetric(threshold=0.7, model=self._model, async_mode=False)
+                    metric = FaithfulnessMetric(threshold=0.7, model=self._model, async_mode=self._async_mode)
                     test_case = LLMTestCase(
                         input=prompt,
                         actual_output=model_response,
