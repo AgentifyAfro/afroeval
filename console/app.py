@@ -318,6 +318,10 @@ def load_runs_summary(include_archived: bool = False) -> list[dict]:
                 "label":               label,
                 "created_at":          str(run.created_at),
                 "status":              run.status,
+                "runtime_seconds":     (
+                    int((run.completed_at - run.started_at).total_seconds())
+                    if run.started_at and run.completed_at else None
+                ),
                 "archived":            run.archived,
                 "has_scorecard":       scorecard is not None,
                 "composite_score":     scorecard.composite_score if scorecard else None,
@@ -885,6 +889,7 @@ def _render_active_run(run_id: str) -> None:
             return
         status    = run.status
         started   = run.started_at
+        completed = run.completed_at
         error_msg = getattr(run, "error_message", None)
         scorecard = session.exec(
             select(Scorecard).where(Scorecard.run_id == uuid.UUID(run_id))
@@ -907,8 +912,12 @@ def _render_active_run(run_id: str) -> None:
         st.rerun()
 
     elif status == "completed" and scorecard:
+        runtime_str = ""
+        if started and completed:
+            secs = int((completed - started).total_seconds())
+            runtime_str = f"  ·  runtime **{secs // 60}m {secs % 60}s**"
         st.success(
-            f"Complete — composite **{scorecard.composite_score:.1f} / 100** — {scorecard.verdict}"
+            f"Complete — composite **{scorecard.composite_score:.1f} / 100** — {scorecard.verdict}{runtime_str}"
         )
         col_view, col_new, _ = st.columns([1, 1, 2])
         with col_view:
@@ -1334,6 +1343,10 @@ def render_run_scorecard() -> None:
     c4.metric("Model", selected["model"])
     _pack_val, _pack_help = _pack_display(selected["pack_ids"])
     c5.metric("Language & Domain", _pack_val, help=_pack_help)
+
+    _rt = selected.get("runtime_seconds")
+    if _rt is not None:
+        st.caption(f"⏱ Runtime {_rt // 60}m {_rt % 60}s")
 
     if selected.get("safety_unverified"):
         st.warning("⚠ Safety Not Verified — no applicable safety items in this run; the verdict cannot certify Deployment-Ready.")
