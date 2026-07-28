@@ -12,7 +12,9 @@ for items seeded in the DB (the FK chain requires seeded benchmark items).
 """
 
 import asyncio
+import functools
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 import structlog
@@ -34,6 +36,17 @@ def _concurrency_limits(cfg) -> tuple[int, int]:
     preserve the safe values; raise only with Azure TPM headroom.
     """
     return cfg.judge_max_concurrency, cfg.deepeval_max_concurrency
+
+
+def _eval_pool_size(judge_n: int, deepeval_n: int) -> int:
+    """Worker count for the evaluator thread pool.
+
+    Must be >= judge_n + deepeval_n so both semaphores can be saturated at once —
+    otherwise the CPU-sized default asyncio.to_thread pool (min(32, cpu+4), only ~5-6 on
+    a 1-2 vCPU Cloud box) becomes the real throttle instead of the Azure-TPM-bounded
+    semaphores. The +4 covers the run's other incidental to-thread work.
+    """
+    return judge_n + deepeval_n + 4
 
 # v1.2: metrics that GATE a dimension rather than score it. They are computed and
 # persisted for evidence, but contribute no positive score, no coverage and no
@@ -375,6 +388,18 @@ async def dispatch_run(run_id: str) -> None:
                 _judge_sem = asyncio.Semaphore(judge_n)
                 _deepeval_sem = asyncio.Semaphore(deepeval_n)
 
+                # Evaluator calls are I/O-bound (they wait on Azure), so they need a pool
+                # big enough for BOTH semaphores at once. asyncio.to_thread uses the default
+                # executor sized to CPU cores (min(32, cpu+4)) — only ~5-6 on a 1-2 vCPU
+                # Streamlit Cloud box — which silently caps real concurrency far below the
+                # semaphores, so raising TPM/limits does nothing. A dedicated pool sized to
+                # the semaphore totals makes the semaphores (bounded by Azure TPM) the real
+                # limit, not the host CPU count.
+                _eval_pool = ThreadPoolExecutor(
+                    max_workers=_eval_pool_size(judge_n, deepeval_n), thread_name_prefix="afroeval-eval"
+                )
+                _loop = asyncio.get_running_loop()
+
                 async def _eval_one(raw, item, evaluator):
                     context = {
                         "language": item.get("language", ""),
@@ -384,12 +409,15 @@ async def dispatch_run(run_id: str) -> None:
                     }
                     sem = _deepeval_sem if evaluator.metric_name in _DEEPEVAL_METRIC_NAMES else _judge_sem
                     async with sem:
-                        return await asyncio.to_thread(
-                            evaluator.evaluate,
-                            prompt=raw.prompt,
-                            model_response=raw.raw_output,
-                            expected_behavior=item.get("expected_behavior", ""),
-                            context=context,
+                        return await _loop.run_in_executor(
+                            _eval_pool,
+                            functools.partial(
+                                evaluator.evaluate,
+                                prompt=raw.prompt,
+                                model_response=raw.raw_output,
+                                expected_behavior=item.get("expected_behavior", ""),
+                                context=context,
+                            ),
                         )
 
                 tasks = [
@@ -397,7 +425,10 @@ async def dispatch_run(run_id: str) -> None:
                     for raw, item in zip(raw_responses, all_items)
                     for ev in evaluators
                 ]
-                all_outputs = await asyncio.gather(*tasks)
+                try:
+                    all_outputs = await asyncio.gather(*tasks)
+                finally:
+                    _eval_pool.shutdown(wait=False)
 
                 # Per-metric error tracking for metric_error_rates → confidence_flag.
                 _metric_error_counts: dict[str, int] = {}

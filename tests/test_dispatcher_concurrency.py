@@ -33,3 +33,12 @@ def test_dispatcher_reads_limits_from_settings():
     from orchestration.dispatcher import _concurrency_limits
     cfg = SimpleNamespace(judge_max_concurrency=5, deepeval_max_concurrency=2)
     assert _concurrency_limits(cfg) == (5, 2)
+
+
+def test_eval_pool_is_at_least_the_semaphore_totals():
+    # The eval thread pool must never be smaller than judge + deepeval concurrency, or the
+    # pool (not the Azure-TPM-bounded semaphores) becomes the real throttle — the exact
+    # trap the CPU-sized default asyncio.to_thread pool caused on low-vCPU Cloud hosts.
+    from orchestration.dispatcher import _eval_pool_size
+    for judge_n, deepeval_n in [(3, 1), (10, 8), (16, 12)]:
+        assert _eval_pool_size(judge_n, deepeval_n) >= judge_n + deepeval_n

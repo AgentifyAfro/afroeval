@@ -15,8 +15,8 @@ weight table above, so they don't count toward the dimension score.
 
 from __future__ import annotations
 
-import functools
 import random
+import threading
 import time as _time
 
 try:
@@ -294,16 +294,32 @@ class ChrFEvaluator(BaseEvaluator):
         )
 
 
-@functools.lru_cache(maxsize=1)
+_MULTILINGUAL_MODEL = None
+_MULTILINGUAL_MODEL_LOCK = threading.Lock()
+
+
 def _get_multilingual_model():
-    """Load the multilingual sentence-transformer model once and cache it."""
-    from sentence_transformers import SentenceTransformer  # noqa: PLC0415
-    # L12 is the real multilingual paraphrase MiniLM. There is NO "L6" multilingual
-    # variant — an earlier "L6" typo pointed at a nonexistent repo, so HF returned a
-    # 401 "repository not found" that silently disabled this metric on every run.
-    # token=False downloads anonymously (the model is public) and ignores any stale
-    # ambient HF_TOKEN; set HF_TOKEN only if anonymous download rate limits become an issue.
-    return SentenceTransformer("paraphrase-multilingual-MiniLM-L12-v2", token=False)
+    """Load the multilingual sentence-transformer model once, thread-safely.
+
+    A plain lru_cache stampedes when many eval threads first-call it at once (each
+    concurrent miss loads its own ~120MB copy — wasted time and a memory spike that can
+    OOM a small Cloud box). Double-checked locking loads exactly one shared copy.
+    """
+    global _MULTILINGUAL_MODEL
+    if _MULTILINGUAL_MODEL is None:
+        with _MULTILINGUAL_MODEL_LOCK:
+            if _MULTILINGUAL_MODEL is None:
+                from sentence_transformers import SentenceTransformer  # noqa: PLC0415
+                # L12 is the real multilingual paraphrase MiniLM. There is NO "L6"
+                # multilingual variant — an earlier "L6" typo pointed at a nonexistent
+                # repo, so HF returned a 401 "repository not found" that silently disabled
+                # this metric on every run. token=False downloads anonymously (the model is
+                # public) and ignores any stale ambient HF_TOKEN; set HF_TOKEN only if
+                # anonymous download rate limits become an issue.
+                _MULTILINGUAL_MODEL = SentenceTransformer(
+                    "paraphrase-multilingual-MiniLM-L12-v2", token=False
+                )
+    return _MULTILINGUAL_MODEL
 
 
 class MultilingualSimilarityEvaluator(BaseEvaluator):
