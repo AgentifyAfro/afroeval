@@ -36,6 +36,8 @@ from benchmarks.loader import PACKS_DIR
 from console.access import can_archive_runs, resolve_views
 from console.branding import (
     inject_brand_css,
+    render_dimension_cards,
+    render_scorecard_header,
     render_section_divider,
     render_section_header,
 )
@@ -1237,18 +1239,17 @@ def render_run_scorecard() -> None:
 
     run_id = selected["run_id"]
 
-    # Scorecard header metrics
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Composite Score", f"{selected['composite_score']:.1f} / 100")
-    c2.metric("Verdict", _verdict_badge(selected["verdict"]))
-    c3.metric("Confidence", selected["confidence_flag"])
-    c4.metric("Model", selected["model"])
-    _pack_val, _pack_help = _pack_display(selected["pack_ids"])
-    c5.metric("Language & Domain", _pack_val, help=_pack_help)
-
+    # Scorecard header — hero composite + KPI cards (custom components)
+    _pack_val, _ = _pack_display(selected["pack_ids"])
     _rt = selected.get("runtime_seconds")
-    if _rt is not None:
-        st.caption(f"⏱ Runtime {_rt // 60}m {_rt % 60}s")
+    render_scorecard_header(
+        composite=selected["composite_score"],
+        verdict=selected["verdict"],
+        confidence=selected["confidence_flag"],
+        model=selected["model"],
+        lang_domain=_pack_val,
+        runtime=(f"{_rt // 60}m {_rt % 60}s" if _rt is not None else None),
+    )
 
     if selected.get("safety_unverified"):
         st.warning("⚠ Safety Not Verified — no applicable safety items in this run; the verdict cannot certify Deployment-Ready.")
@@ -1271,38 +1272,27 @@ def render_run_scorecard() -> None:
 
     render_section_divider()
 
-    # Dimension scores
-    st.subheader("Dimension Scores")
+    # Dimension scores — custom cards (score · CI · status pill · gradient bar)
+    render_section_header("Quality dimensions", "Dimension scores")
     dim_scores  = selected["dimension_scores"]
     dim_weights = selected["dimension_weights"]
     dim_cis     = selected.get("dimension_confidence_intervals") or {}
-    dcols = st.columns(3)
-    # Show evaluated dims sorted by score, then not-evaluated dims as N/A
-    all_display_dims = sorted(dim_scores.items(), key=lambda x: x[1])
-    not_eval_dims = [d for d in dim_weights if d not in dim_scores]
-    col_idx = 0
-    for dim, score in all_display_dims:
-        weight = dim_weights.get(dim, 0)
-        ci = dim_cis.get(dim)
-        with dcols[col_idx % 3]:
-            st.metric(
-                label=f"{dim.replace('_', ' ').title()} ({weight:.0%})",
-                value=f"{score:.1f}",
-                delta="⚠ Below 60" if score < 60 else "OK",
-                delta_color="inverse" if score < 60 else "normal",
-            )
-            st.caption(f"95% CI {ci[0]:.1f}–{ci[1]:.1f}" if ci else "95% CI —")
-        col_idx += 1
-    for dim in not_eval_dims:
-        weight = dim_weights.get(dim, 0)
-        with dcols[col_idx % 3]:
-            st.metric(
-                label=f"{dim.replace('_', ' ').title()} ({weight:.0%})",
-                value="N/A",
-                delta="Not evaluated — no applicable items",
-                delta_color="off",
-            )
-        col_idx += 1
+    _cards: list[dict] = [
+        {
+            "name": dim.replace("_", " ").title(),
+            "weight": dim_weights.get(dim, 0),
+            "score": score,
+            "ci": dim_cis.get(dim),
+            "status": "fail" if score < 60 else "pass",
+        }
+        for dim, score in sorted(dim_scores.items(), key=lambda x: x[1])
+    ]
+    _cards += [
+        {"name": dim.replace("_", " ").title(), "weight": dim_weights.get(dim, 0),
+         "score": None, "ci": None, "status": "na"}
+        for dim in dim_weights if dim not in dim_scores
+    ]
+    render_dimension_cards(_cards)
 
     st.caption("95% CI shown per dimension. “—” = single run-level statistic "
                "(Bias & Fairness), too few items, or a pre-CI historical run.")

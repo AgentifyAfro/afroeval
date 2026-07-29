@@ -60,3 +60,24 @@ def test_inject_brand_css_covers_the_key_surfaces():
     assert ".stApp" in css and "#000000" in css  # pure-black canvas
     assert "role-badge" in css                     # admin/viewer tier badge
     assert "stDataFrame" in css                    # table overrides
+    assert "sc-hero" in css and "sc-dcard" in css  # scorecard hero + dimension cards
+
+
+def test_scorecard_header_renders_hero_and_kpis():
+    with patch("console.branding.st.markdown") as m:
+        branding.render_scorecard_header(89.6, "Deployment-Ready", "standard",
+                                         "claude-haiku", "Amharic · Community Health", "2m 37s")
+    html = m.call_args[0][0]
+    assert "89.6" in html and "sc-hero" in html
+    assert "Deployment-Ready" in html and "Runtime 2m 37s" in html
+
+
+def test_dimension_cards_render_scores_ci_and_status():
+    with patch("console.branding.st.markdown") as m:
+        branding.render_dimension_cards([
+            {"name": "Cultural", "weight": 0.20, "score": 31.2, "ci": (23.2, 39.3), "status": "fail"},
+            {"name": "Bias Fairness", "weight": 0.15, "score": None, "ci": None, "status": "na"},
+        ])
+    html = m.call_args[0][0]
+    assert "31.2" in html and "Below 60" in html
+    assert "N/A" in html and "95% CI 23.2" in html and "sc-dcard" in html

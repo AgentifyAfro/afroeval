@@ -119,6 +119,36 @@ def inject_brand_css() -> None:
     .role-badge.vw {{ background:{RAISED}; border:1px solid {BORDER}; color:{CAPTION}; }}
     .admin-tag {{ font-size:9px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;
          color:{WARNING}; border:1px solid {_tint(WARNING, 0.5)}; border-radius:4px; padding:1px 5px; margin-left:6px; }}
+
+    /* ── scorecard hero + KPI + dimension cards (custom components) ── */
+    .sc-top {{ display:grid; grid-template-columns:minmax(280px,1fr) 2fr; gap:16px; margin-bottom:6px; }}
+    @media (max-width:900px) {{ .sc-top {{ grid-template-columns:1fr; }} }}
+    .sc-hero {{ background:{SURFACE}; border:1px solid {BORDER}; border-left:4px solid #7C3AED;
+         border-radius:0 10px 10px 0; padding:20px 24px; }}
+    .sc-hero .lab {{ font-size:11px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:{CAPTION}; }}
+    .sc-hero .score {{ font-size:64px; font-weight:700; line-height:1; margin:0.15rem 0; letter-spacing:-0.03em;
+         background:{GRADIENT}; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }}
+    .sc-hero .score small {{ font-size:22px; color:{CAPTION}; -webkit-text-fill-color:{CAPTION}; }}
+    .sc-kpis {{ display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }}
+    @media (min-width:1100px) {{ .sc-kpis {{ grid-template-columns:repeat(4,1fr); }} }}
+    .sc-kpi {{ background:{SURFACE}; border:1px solid {BORDER}; border-radius:9px; padding:14px 16px; }}
+    .sc-kpi .l {{ font-size:11px; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; color:{CAPTION}; }}
+    .sc-kpi .v {{ font-size:17px; font-weight:700; color:#FFFFFF; margin-top:4px; }}
+    .sc-badge {{ display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:4px;
+         font-size:11px; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; }}
+    .sc-badge.pass {{ background:{_tint(SUCCESS)}; border:1px solid {SUCCESS}; color:{SUCCESS}; }}
+    .sc-badge.warn {{ background:{_tint(WARNING)}; border:1px solid {WARNING}; color:{WARNING}; }}
+    .sc-badge.fail {{ background:{_tint(ERROR)}; border:1px solid {ERROR}; color:{ERROR}; }}
+    .sc-badge.na   {{ background:{RAISED}; border:1px solid {BORDER}; color:{CAPTION}; }}
+    .sc-dims {{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }}
+    @media (max-width:820px) {{ .sc-dims {{ grid-template-columns:1fr; }} }}
+    .sc-dcard {{ background:{SURFACE}; border:1px solid {BORDER}; border-radius:9px; padding:14px 16px; }}
+    .sc-dcard .dt {{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; }}
+    .sc-dcard .nm {{ font-size:11px; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; color:{CAPTION}; }}
+    .sc-dcard .vl {{ font-size:30px; font-weight:700; color:#FFFFFF; line-height:1; margin:6px 0 2px; }}
+    .sc-dcard .ci {{ font-size:11px; color:{CAPTION}; font-variant-numeric:tabular-nums; }}
+    .sc-dcard .bar {{ height:5px; border-radius:3px; background:{RAISED}; margin-top:10px; overflow:hidden; }}
+    .sc-dcard .bar > i {{ display:block; height:100%; border-radius:3px; background:{GRADIENT}; }}
     </style>
     """,
         unsafe_allow_html=True,
@@ -152,3 +182,55 @@ def render_status_badge(label: str, status: str) -> str:
         f'background:{_tint(color)};border:1px solid {color};color:{color};font-size:11px;font-weight:600;'
         f'letter-spacing:0.05em;text-transform:uppercase;">{label}</span>'
     )
+
+
+def _esc(s: object) -> str:
+    return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+_VERDICT_STATUS = {
+    "Deployment-Ready": ("pass", "✓"), "Conditional": ("warn", "◐"),
+    "Not-Ready": ("warn", "△"), "High-Risk": ("fail", "✕"),
+}
+
+
+def render_scorecard_header(
+    composite: float, verdict: str, confidence: str, model: str,
+    lang_domain: str, runtime: str | None = None,
+) -> None:
+    """Hero composite score (gradient) + a row of KPI cards. Data only; no computation."""
+    vstatus, vicon = _VERDICT_STATUS.get(verdict, ("na", "•"))
+    rt = (f'<div style="color:{CAPTION};font-size:12px;margin-top:9px">⏱ Runtime {_esc(runtime)}</div>'
+          if runtime else "")
+    kpis = "".join(
+        f'<div class="sc-kpi"><div class="l">{_esc(lbl)}</div><div class="v">{_esc(val)}</div></div>'
+        for lbl, val in (("Verdict", verdict), ("Confidence", confidence),
+                         ("Model", model), ("Language & Domain", lang_domain))
+    )
+    st.markdown(
+        f'<div class="sc-top"><div class="sc-hero"><div class="lab">Composite score · {_esc(model)}</div>'
+        f'<div class="score">{composite:.1f}<small> / 100</small></div>'
+        f'<div><span class="sc-badge {vstatus}">{vicon} {_esc(verdict)}</span></div>{rt}</div>'
+        f'<div class="sc-kpis">{kpis}</div></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_dimension_cards(cards: list[dict]) -> None:
+    """Grid of dimension cards. Each card: name, weight(0-1), score(float|None), ci(tuple|None), status."""
+    _badge = {"pass": ("pass", "OK"), "fail": ("fail", "Below 60"), "na": ("na", "N/A")}
+    html = ['<div class="sc-dims">']
+    for c in cards:
+        cls, txt = _badge.get(c["status"], ("na", "—"))
+        val = "N/A" if c["score"] is None else f'{c["score"]:.1f}'
+        ci = c.get("ci")
+        ci_txt = f"95% CI {ci[0]:.1f}–{ci[1]:.1f}" if ci else "95% CI —"
+        width = 0 if c["score"] is None else max(0.0, min(100.0, float(c["score"])))
+        html.append(
+            f'<div class="sc-dcard"><div class="dt"><span class="nm">{_esc(c["name"])} '
+            f'({c["weight"]:.0%})</span><span class="sc-badge {cls}">{txt}</span></div>'
+            f'<div class="vl">{val}</div><div class="ci">{ci_txt}</div>'
+            f'<div class="bar"><i style="width:{width}%"></i></div></div>'
+        )
+    html.append("</div>")
+    st.markdown("".join(html), unsafe_allow_html=True)
