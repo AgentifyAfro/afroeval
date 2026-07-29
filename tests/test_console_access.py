@@ -3,7 +3,7 @@ Tests for console/access.py — pure function, no Streamlit or Supabase dependen
 """
 
 from auth.client import AuthUser
-from console.access import CATEGORY_1_VIEWS, CATEGORY_2_VIEWS, can_archive_runs, resolve_views
+from console.access import CATEGORY_1_VIEWS, VIEW_ORDER, can_archive_runs, resolve_views
 
 
 def test_no_auth_no_override_returns_empty():
@@ -12,21 +12,28 @@ def test_no_auth_no_override_returns_empty():
 
 def test_logged_in_no_role_returns_category1_only():
     user = AuthUser(id="u1", email="viewer@agentifyafro.ai", role=None)
+    # Read-only viewer sees the Category-1 views in display order (Run Evaluation is
+    # Category-2, so it's absent and the menu leads with Run Scorecard).
     assert resolve_views(auth_user=user, operator_unlocked=False) == CATEGORY_1_VIEWS
 
 
-def test_logged_in_admin_role_returns_both_categories():
+def test_logged_in_admin_role_returns_all_views_in_display_order():
     user = AuthUser(id="u2", email="admin@agentifyafro.ai", role="admin")
-    assert resolve_views(auth_user=user, operator_unlocked=False) == CATEGORY_1_VIEWS + CATEGORY_2_VIEWS
+    assert resolve_views(auth_user=user, operator_unlocked=False) == VIEW_ORDER
 
 
-def test_operator_override_without_login_returns_both_categories():
-    assert resolve_views(auth_user=None, operator_unlocked=True) == CATEGORY_1_VIEWS + CATEGORY_2_VIEWS
+def test_operator_override_without_login_returns_all_views_in_display_order():
+    assert resolve_views(auth_user=None, operator_unlocked=True) == VIEW_ORDER
 
 
-def test_operator_override_combined_with_non_admin_login_returns_both_categories():
+def test_operator_override_combined_with_non_admin_login_returns_all_views_in_display_order():
     user = AuthUser(id="u3", email="viewer@agentifyafro.ai", role=None)
-    assert resolve_views(auth_user=user, operator_unlocked=True) == CATEGORY_1_VIEWS + CATEGORY_2_VIEWS
+    assert resolve_views(auth_user=user, operator_unlocked=True) == VIEW_ORDER
+
+
+def test_run_evaluation_leads_the_menu_for_operators():
+    admin = AuthUser(id="u2", email="admin@agentifyafro.ai", role="admin")
+    assert resolve_views(auth_user=admin, operator_unlocked=False)[0] == "Run Evaluation"
 
 
 # ── can_archive_runs: archiving is a Category 2 (admin/operator) action ──────
