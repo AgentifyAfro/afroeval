@@ -90,6 +90,7 @@ LANGUAGE_NAMES = {
     "en":    "English (US)",
     "sw":    "Swahili",
     "yo":    "Yoruba",
+    "ig":    "Igbo",
     "am":    "Amharic",
     "ha":    "Hausa",
     "om":    "Oromo",
