@@ -36,6 +36,7 @@ from benchmarks.loader import PACKS_DIR
 from console.access import can_archive_runs, resolve_views
 from console.branding import (
     inject_brand_css,
+    render_comparison_bars,
     render_dimension_cards,
     render_scorecard_header,
     render_section_divider,
@@ -1503,33 +1504,18 @@ def render_provider_comparison() -> None:
         st.caption(_verdict_badge(row["verdict"]))
         return
 
-    # ── Composite score header ──────────────────────────────────────────
-    st.subheader("Composite Scores")
-    hcols = st.columns(len(providers) + (1 if len(providers) == 2 else 0))
-    scores: dict[str, float] = {}
-
-    for i, prov in enumerate(providers):
-        row = latest[prov]
-        scores[prov] = row["composite_score"]
-        with hcols[i]:
-            st.metric(
-                label=f"{_provider_short(prov)} — {row['model_identifier']}",
-                value=f"{row['composite_score']:.1f} / 100",
-                help=f"Run: {row['run_id'][:8]}… | Completed: {row['completed_at']} | Confidence: {row['confidence_flag']}",
-            )
-            st.caption(_verdict_badge(row["verdict"]))
-
+    # ── Composite ranking bars ──────────────────────────────────────────
+    render_section_header("Ranking", "Composite by provider")
+    scores: dict[str, float] = {prov: latest[prov]["composite_score"] for prov in providers}
+    render_comparison_bars(
+        [(f"{_provider_short(prov)} — {latest[prov]['model_identifier']}", scores[prov])
+         for prov in providers]
+    )
     if len(providers) == 2:
         p0, p1 = providers[0], providers[1]
         delta = scores[p1] - scores[p0]
-        sign = "+" if delta >= 0 else ""
-        with hcols[-1]:
-            st.metric(
-                label=f"Δ ({_provider_short(p1)} − {_provider_short(p0)})",
-                value=f"{sign}{delta:.1f}",
-                delta=f"{sign}{delta:.1f}",
-                delta_color="normal" if delta >= 0 else "inverse",
-            )
+        st.caption(f"Δ ({_provider_short(p1)} − {_provider_short(p0)}): "
+                   f"{'+' if delta >= 0 else ''}{delta:.1f}")
 
     render_section_divider()
 

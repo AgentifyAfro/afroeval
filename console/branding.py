@@ -15,7 +15,7 @@ Public surface:
 
 import streamlit as st
 
-from console.theme import BORDER, ERROR, LINK, SUCCESS, TEXT_FAINT, WARNING
+from console.theme import BORDER, ERROR, LINK, SUCCESS, TEXT_FAINT, TEXT_MUTED, WARNING
 
 # ── Structural brand tokens (3-step elevation) ──────────────────────────────────
 CANVAS = "#000000"   # pure-black page canvas
@@ -149,6 +149,16 @@ def inject_brand_css() -> None:
     .sc-dcard .ci {{ font-size:11px; color:{CAPTION}; font-variant-numeric:tabular-nums; }}
     .sc-dcard .bar {{ height:5px; border-radius:3px; background:{RAISED}; margin-top:10px; overflow:hidden; }}
     .sc-dcard .bar > i {{ display:block; height:100%; border-radius:3px; background:{GRADIENT}; }}
+
+    /* ── comparison ranking bars ── */
+    .cmp {{ display:flex; flex-direction:column; gap:12px; max-width:720px; }}
+    .cmp-row {{ display:grid; grid-template-columns:minmax(140px,240px) 1fr auto; align-items:center; gap:14px; }}
+    .cmp-l {{ font-size:13px; color:{TEXT_MUTED}; }}
+    .cmp-track {{ height:26px; background:{RAISED}; border-radius:6px; overflow:hidden; }}
+    .cmp-fill {{ height:100%; border-radius:6px; }}
+    .cmp-fill.f1 {{ background:{GRADIENT}; }}
+    .cmp-fill.f2 {{ background:linear-gradient(90deg,#4169E1,#00CFFF); }}
+    .cmp-v {{ font-size:14px; font-weight:700; color:#FFFFFF; font-variant-numeric:tabular-nums; }}
     </style>
     """,
         unsafe_allow_html=True,
@@ -231,6 +241,21 @@ def render_dimension_cards(cards: list[dict]) -> None:
             f'({c["weight"]:.0%})</span><span class="sc-badge {cls}">{txt}</span></div>'
             f'<div class="vl">{val}</div><div class="ci">{ci_txt}</div>'
             f'<div class="bar"><i style="width:{width}%"></i></div></div>'
+        )
+    html.append("</div>")
+    st.markdown("".join(html), unsafe_allow_html=True)
+
+
+def render_comparison_bars(rows: list[tuple[str, float]], max_value: float = 100.0) -> None:
+    """Horizontal ranking bars (descending). rows = [(label, value), ...]; value on max_value scale."""
+    html = ['<div class="cmp">']
+    for i, (label, val) in enumerate(sorted(rows, key=lambda r: r[1], reverse=True)):
+        width = 0.0 if not max_value else max(0.0, min(100.0, val / max_value * 100))
+        fill = "f1" if i == 0 else "f2"
+        html.append(
+            f'<div class="cmp-row"><span class="cmp-l">{_esc(label)}</span>'
+            f'<div class="cmp-track"><div class="cmp-fill {fill}" style="width:{width}%"></div></div>'
+            f'<span class="cmp-v">{val:.1f}</span></div>'
         )
     html.append("</div>")
     st.markdown("".join(html), unsafe_allow_html=True)
