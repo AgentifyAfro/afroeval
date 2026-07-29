@@ -3,7 +3,8 @@
   AfroEval Scorecard™ — Technical Design & Build Document ("Engineering Bible")
   CONFIDENTIAL — Internal Product Design · Do Not Distribute
 
-  Rev 1.5 · Methodology v1.5 (stamped METHODOLOGY_VERSION constant stays v1.4 by design) · Source of record for the current build.
+  Rev 1.6 · Methodology v1.5 (stamped METHODOLOGY_VERSION constant stays v1.4 by design) · Source of record for the current build.
+  Rev 1.6 (2026-07-29): run-time engineering (dedicated eval thread pool, DEEPEVAL_ASYNC_MODE, 2M TPM), all-empty guard, coverage-floor pipeline §6.7, Amharic v1.2.0 catalog default. No methodology bump.
 
   Published (rendered) artifact:
     https://claude.ai/code/artifact/cd7683e1-851a-4e71-8606-c6ebfa6da4d4
@@ -341,7 +342,7 @@
 
 <div class="conf-bar">
   <span class="flag"><span class="dot"></span> Confidential — Internal Product Design</span>
-  <span class="ver">Do Not Distribute · Rev 1.5 · Methodology v1.5</span>
+  <span class="ver">Do Not Distribute · Rev 1.6 · Methodology v1.5</span>
 </div>
 
 <div class="shell">
@@ -1005,6 +1006,14 @@ stable_pack_uuid(name, ver) <span class="op">=</span> uuid5(NAMESPACE, f"{name}_
           <div><div class="k why">Why &amp; trade-offs</div><p>Per <span class="mono">ADR-005</span>, Community Edition is free and self-hosted — right for an SME network under ~20 people. Auth uses a JWT refresh token with ~5-min access tokens cached 270s. Trade-off: no advanced IRR tooling built in — reliability is computed off exported annotations.</p></div>
           <div><div class="k life">Continuous Feedback</div><p>This is the loop that closes the lifecycle: SME reviews calibrate the automated judges and feed new and corrected items back into the library.</p></div>
         </div>
+
+        <h3>6.7 · Coverage-floor &amp; promotion pipeline <span class="badge built">As-Built</span></h3>
+        <div class="pm">
+          <div><div class="k problem">Problem</div><p>Eleven of twelve packs sat below the 10-item coverage floor (<code>MIN_ITEMS_PER_DIMENSION</code>) on <em>scored</em> items. Turning SME-authored drafts into validated pack items had to run <strong>per language, incrementally</strong> — not one global lockstep — and must never mutate a released pack.</p></div>
+          <div><div class="k mech">Mechanism</div><p>Three small tools over the existing validation loop: <code>coverage_report.py</code> (read-only tracker — scored vs floor, Tier-1/2/pending, a "ready-to-flip" flag), <code>promote_pack.py</code> (idempotently appends authored items into a <em>working</em> <code>v_next</code>, keyed on item id so re-runs never duplicate; released versions stay immutable), and <code>dry_run_pipeline.py</code> (a synthetic end-to-end harness for promote→writeback, no DB/Label&nbsp;Studio). Runbook: <code>docs/FLOOR_RUNBOOK.md</code>.</p></div>
+          <div><div class="k why">Why &amp; trade-offs</div><p>Closes the previously-deferred <strong>gap 6</strong> (staged candidates + validation records → versioned pack) as a per-pack, re-runnable path. Draft supply is <em>not</em> the constraint — Label Studio project 9 already holds ~150 un-authored drafts across 10 languages; the bottleneck is SME authoring throughput.</p></div>
+          <div><div class="k life">Lifecycle fit</div><p>First graduate: <strong><code>community_health_am_v1.2.0</code></strong> — 26/26 dual-validated (κ = 0.772), Tier-2 share 0, now the catalog default. The path runs per language as authoring lands.</p></div>
+        </div>
       </section>
 
       <!-- ════════ 07 SYSTEM COMPONENTS ════════ -->
@@ -1159,7 +1168,7 @@ stable_pack_uuid(name, ver) <span class="op">=</span> uuid5(NAMESPACE, f"{name}_
             <thead><tr><th>Layer</th><th>Current design</th><th>Binds when</th><th>Mitigation</th></tr></thead>
             <tbody>
               <tr><td>Run execution</td><td>FastAPI BackgroundTasks, ~1 concurrent run (ADR-003)</td><td>&gt;10 concurrent runs / queued backlog</td><td><span class="badge rec">Design Rec</span> Celery/RQ + Redis worker pool.</td></tr>
-              <tr><td>Judge throughput</td><td>Azure judge, semaphore(3)</td><td>Large packs → long wall-clock from 429 backoff</td><td>Provisioned-throughput deployment; batch judging; cache identical judge calls.</td></tr>
+              <tr><td>Evaluator throughput</td><td>Two <strong>env-tunable</strong> semaphores over the Azure judge — <code>JUDGE_MAX_CONCURRENCY</code> + a tighter <code>DEEPEVAL_MAX_CONCURRENCY</code> (DeepEval metrics each fire several internal calls) — on a <strong>dedicated evaluator thread pool</strong>.</td><td>Azure TPM ceiling; host CPU count</td><td><strong>Largely closed (<span class="mono">7ab4e6c</span>, <span class="mono">5ff1397</span>):</strong> the eval loop's default <code>asyncio.to_thread</code> pool was sized to CPU cores (~5–6 on a 1–2 vCPU Cloud box), silently capping concurrency below the semaphores regardless of TPM; a dedicated <code>ThreadPoolExecutor</code> sized to the semaphore totals makes Azure TPM the real limit. Judge deployment raised to <strong>2M TPM</strong>; <code>DEEPEVAL_ASYNC_MODE</code> parallelizes each metric's internal calls. <strong>Local and Cloud tune separately</strong> — a low-vCPU host throws <code>APITimeoutError</code> (not 429) when over-driven, so Cloud runs gentler. Cut a 23-item pack ≈5.6→2.6 min local.</td></tr>
               <tr><td>Connector fan-out</td><td>ThreadPool, 5 workers/provider</td><td>Very large item sets</td><td>Tune workers; async connectors.</td></tr>
               <tr><td>Console</td><td>Streamlit, direct DB reads</td><td>&gt;$50K ARR / multi-tenant (ADR-001)</td><td><span class="badge rec">Design Rec</span> React/Next SPA over the API.</td></tr>
               <tr><td>Database</td><td>Supabase Postgres</td><td>Time-series monitoring needs (ADR-002)</td><td>TimescaleDB/partitioning for metric history.</td></tr>
@@ -1176,6 +1185,7 @@ stable_pack_uuid(name, ver) <span class="op">=</span> uuid5(NAMESPACE, f"{name}_
               <tr><td>Benchmark contamination (items leak into training).</td><td><span class="pill cond">Med</span></td><td>Held-out set never transmitted/published; provenance tracking; versioned packs.</td></tr>
               <tr><td>Provider drift (a model version silently changes).</td><td><span class="pill cond">Med</span></td><td>Pinned model identifiers per Assessment; <span class="badge rec">Design Rec</span> re-eval trigger on version change.</td></tr>
               <tr><td>Safety-score distortion from infra-error fallbacks (fail-open 1.0, or 0.5 elsewhere) entering the score.</td><td><span class="pill ready">Low</span> <em>— largely closed</em></td><td><strong>Closed at the mechanism level in <span class="mono">f78c799</span>:</strong> error-flagged outputs are excluded from the score, pass-rate and coverage aggregates, so a fallback can no longer inflate (or deflate) a dimension, and a fully-errored dimension becomes <code>not_evaluated</code> rather than scoring on artifacts. The gates introduced in v1.1 still stand — any <em>present</em> low safety score vetoes, absent/unverified safety caps to Conditional, error rate &gt; 50% raises <code>low_coverage</code> — and because errored items no longer count as coverage, thin remaining evidence now trips the &lt;10-item <code>low_coverage</code> rule sooner. <strong>Narrow residual:</strong> the exclusion is not random (content-filter blocks correlate with unsafe content), so a heavily-filtered run can still read cleaner than it is — surfaced via the <code>error</code> flag, SME safety review, and raw-≤2 SAFETY FLAG on human review.</td></tr>
+              <tr><td>Provider failure (out of credits, bad key, outage) returns empty output — empty answers trivially look "safe", silently inflating the composite.</td><td><span class="pill ready">Low</span> <em>— closed</em></td><td><strong>Closed in <span class="mono">148ab75</span>:</strong> an <strong>all-empty</strong> model-response batch fails the run loudly (<code>RunStatus.FAILED</code> with an actionable "check provider key/credits" message) instead of scoring empties into a misleadingly high, <code>low_coverage</code> scorecard. All-or-nothing by design (zero false positives — a working model never returns all-empty); a <em>partially</em>-empty batch is left to the normal per-metric error-rate / <code>low_coverage</code> machinery.</td></tr>
               <tr><td>Single-operator key management.</td><td><span class="pill cond">Med</span></td><td>Rotate the dev key; per-user Supabase auth for the console; <span class="badge rec">Design Rec</span> per-tenant API keys.</td></tr>
             </tbody>
           </table>
@@ -1196,7 +1206,7 @@ stable_pack_uuid(name, ver) <span class="op">=</span> uuid5(NAMESPACE, f"{name}_
         <h3>11.1 · Versioning model <span class="badge built">As-Built</span></h3>
         <ul class="body">
           <li><strong>Methodology version</strong> (<span class="mono">v1.4</span>) — stamped on every Scorecard. Any change to weights, thresholds, or aggregation is a methodology release; old scorecards remain interpretable under their own version.</li>
-          <li><strong>Pack version</strong> (<span class="mono">v1.0.0</span>) — packs are immutable once published; a change is a new version, and the deterministic UUIDv5 keeps identities stable across environments.</li>
+          <li><strong>Pack version</strong> (<span class="mono">v1.0.0</span>) — packs are immutable once published; a change is a new version, and the deterministic UUIDv5 keeps identities stable across environments. The §6.7 promotion pipeline builds each <code>v_next</code> without touching the released file — e.g. <code>community_health_am</code> is now the catalog default at <span class="mono">v1.2.0</span> (26/26 Tier-1).</li>
           <li><strong>Evaluator version</strong> — each <code>MetricResult</code> carries an <code>evaluator_version</code> so a single response's scores are traceable to the exact scorer that produced them.</li>
         </ul>
         <div class="callout key"><span class="ic">◆</span><p><strong>The plug-in contract:</strong> a new dimension or evaluator only has to (1) implement <code>BaseEvaluator</code> → <code>MetricOutput</code>, (2) register in the dispatcher's evaluator list, and (3) declare a weight in <code>DEFAULT_WEIGHTS</code> / <code>DEFAULT_METRIC_WEIGHTS</code>. The engine's renormalization means adding a dimension does not silently break historical comparability — it is a versioned methodology bump.</p></div>
@@ -1207,7 +1217,7 @@ stable_pack_uuid(name, ver) <span class="op">=</span> uuid5(NAMESPACE, f"{name}_
             <thead><tr><th class="num">P</th><th>Enhancement</th><th>Plugs into</th></tr></thead>
             <tbody>
               <tr><td class="num">1</td><td>Automated IRR + gold-drift dashboards</td><td>Existing <code>response_reviews</code> + gold items; new console view.</td></tr>
-              <tr><td class="num">2</td><td>Confidence intervals on dimension scores</td><td>Scoring engine; already has per-item distribution.</td></tr>
+              <tr><td class="num">2</td><td>Confidence intervals on dimension scores — <strong>shipped</strong> (<span class="mono">b1547d0</span>)</td><td>Scoring engine (normal-approx 95% CI per dimension) on PDF + console, with a radar chart &amp; Key-Observations section. CI only on post-migration runs; historical → "—".</td></tr>
               <tr><td class="num">3</td><td>Worker-queue scale-out (Celery/Redis)</td><td>Swap the BackgroundTask entry; <code>dispatch_run</code> unchanged.</td></tr>
               <tr><td class="num">4</td><td>Expand hallucination probe corpus</td><td>Africa Intelligence Layer marker lists.</td></tr>
               <tr><td class="num">5</td><td>Re-evaluation triggers on model/version change</td><td>Assessment metadata + scheduler.</td></tr>
@@ -1286,7 +1296,8 @@ stable_pack_uuid(name, ver) <span class="op">=</span> uuid5(NAMESPACE, f"{name}_
               <tr><td class="mono">FAILING_THRESHOLD</td><td class="num">60.0</td><td>Below → failing-example evidence.</td></tr>
               <tr><td class="mono">DISPARITY_PASS_THRESHOLD</td><td class="num">0.80</td><td>Four-fifths fairness pass flag. Does <em>not</em> scale the score (v1.4).</td></tr>
               <tr><td class="mono">weight bounds</td><td class="num">0.05–0.40</td><td>Per-dimension validation band.</td></tr>
-              <tr><td class="mono">judge semaphore</td><td class="num">3</td><td>Max concurrent judge calls.</td></tr>
+              <tr><td class="mono">JUDGE_MAX_CONCURRENCY</td><td class="num">3*</td><td>Concurrent judge calls (env-tunable; * default). Runs on a dedicated evaluator thread pool sized to the semaphore totals.</td></tr>
+              <tr><td class="mono">DEEPEVAL_MAX_CONCURRENCY</td><td class="num">1*</td><td>Concurrent DeepEval metrics (env-tunable; * default). Each fires several internal calls; <code>DEEPEVAL_ASYNC_MODE</code> parallelizes them.</td></tr>
             </tbody>
           </table>
         </div>
@@ -1301,6 +1312,7 @@ stable_pack_uuid(name, ver) <span class="op">=</span> uuid5(NAMESPACE, f"{name}_
           <li><strong>Methodology v1.3 (2026-07-18):</strong> Tier 2 single-expert item validation added to the publication rules (<span class="mono">docs/BENCHMARK_ITEM_SCHEMA.md</span> v1.3; full treatment in <strong>§6.4</strong>). Item-publication change only — <em>no scoring effect and no <span class="mono">METHODOLOGY_VERSION</span> bump</em>, so no Scorecard is stamped v1.3.</li>
           <li><strong>Methodology v1.4 (2026-07-18):</strong> bumped v1.2 &rarr; v1.4 (v1.3 never stamped a Scorecard) &mdash; <span class="mono">bias_fairness</span> re-grouped and re-scored (&sect;4.2, &sect;5.6). Disparate impact is now computed over <strong>two axes</strong>, item <code>language</code> and user <code>cohort</code>, with the worse ratio governing; and the score is the governing ratio itself rather than <code>min(DIR / 0.80, 1.0)</code>. The old clamp mapped every ratio at or above 0.80 to a full 100 &mdash; <span class="mono">bias_fairness</span> reported exactly 100.0 on 8 of 9 scorecards &mdash; while cohort-only grouping was blind to a real 0.900 language ratio on run <span class="mono">64e9519b</span> (Amharic 0.759 vs Swahili 0.888). <code>DISPARITY_FLOOR</code> (the &lt;0.50 hard-zero cliff) is removed; 0.80 now sets the pass flag only. Historical v1.0&ndash;v1.3 scorecards left frozen and not re-scored.</li>
           <li><strong>Methodology v1.5 (2026-07-19):</strong> Tier 1 IRR floor raised <span class="mono">0.60 &rarr; 0.70</span>, collapsing the old floor/target split into a single <span class="mono">κ ≥ 0.70</span> bar (§6.3, §6.4). <span class="mono">irr_score</span> is defined as a <strong>pair-and-batch statistic</strong> — quadratic-weighted Cohen's κ computed once per validator-pair over every item that pair both rated, written onto each item in the batch; a pair sharing fewer than 10 items has no defensible κ, so <span class="mono">irr_score</span> stays <span class="mono">null</span> and the item is not Tier 1 (never estimated or borrowed). A <strong>factual-accuracy disagreement forces adjudication regardless of κ</strong>, overriding a passing κ up to 1.00. Item-publication change only — <em>no scoring effect and no <span class="mono">METHODOLOGY_VERSION</span> bump: the constant deliberately stays <span class="mono">v1.4</span></em> (same reason v1.3 never stamped a Scorecard — no composite depends on <span class="mono">irr_score</span>). The methodology doc is titled v1.5 while the stamped constant reads v1.4 by design; do not "correct" the constant. Founder-approved; historical scorecards unaffected.</li>
+          <li><strong>Run-time &amp; robustness engineering (2026-07-28/29) — no methodology change:</strong> the evaluator loop moved to a <strong>dedicated thread pool</strong> sized to the concurrency semaphores (<span class="mono">5ff1397</span>) after the CPU-sized default <code>asyncio.to_thread</code> pool was found to cap real concurrency below the semaphores (worst on a low-vCPU Cloud host); the env flag <code>DEEPEVAL_ASYNC_MODE</code> (<span class="mono">7ab4e6c</span>) parallelizes each DeepEval metric's internal Azure calls; the gpt-4.1-mini judge deployment was raised to <strong>2M TPM</strong>, with local and Cloud concurrency tuned separately (a low-vCPU host throws <code>APITimeoutError</code>, not 429, when over-driven). An <strong>all-empty model-response guard</strong> (<span class="mono">148ab75</span>) now fails a run loudly instead of scoring empty output into an inflated scorecard. The <strong>coverage-floor promotion pipeline</strong> (§6.7) and <strong>per-dimension confidence intervals + radar</strong> (§11.2) shipped; <code>community_health_am</code> was promoted to <span class="mono">v1.2.0</span> (Tier-1) and made the catalog default, and the console now shows run duration. None of these touch weights, thresholds, or aggregation — <span class="mono">METHODOLOGY_VERSION</span> is unchanged.</li>
           <li><strong>Documented drift, carried openly:</strong> (1) four rubric domains vs. six DB-enum domains; (2) ADR-002/004 (Azure Postgres / WeasyPrint) vs. running Supabase / ReportLab. <em>(The former IRR floor-vs-target item is resolved as of v1.5.)</em></li>
           <li><strong>Scope:</strong> this is the as-built baseline plus clearly-labeled design recommendations; it does not describe unbuilt capability as if it exists.</li>
         </ul>
@@ -1308,7 +1320,7 @@ stable_pack_uuid(name, ver) <span class="op">=</span> uuid5(NAMESPACE, f"{name}_
 
       <div class="end">
         <div class="rule"></div>
-        AfroEval Scorecard™ · Technical Design &amp; Build · Rev 1.5 · Methodology v1.5<br>
+        AfroEval Scorecard™ · Technical Design &amp; Build · Rev 1.6 · Methodology v1.5<br>
         © 2026 AgentifyAfro.ai — Confidential, Internal Product Design — Do Not Distribute
       </div>
 
