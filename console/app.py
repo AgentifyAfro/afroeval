@@ -33,7 +33,7 @@ from auth.client import (
 )
 from benchmarks.ids import stable_item_uuid
 from benchmarks.loader import PACKS_DIR
-from console.access import can_archive_runs, resolve_views
+from console.access import CATEGORY_2_VIEWS, can_archive_runs, resolve_views
 from console.branding import (
     inject_brand_css,
     render_comparison_bars,
@@ -105,6 +105,14 @@ LANGUAGE_NAMES = {
     "zu":    "Zulu",
     "so":    "Somali",
     "sheng": "Sheng",
+}
+
+# Sidebar nav glyphs — display only (the radio option values stay the plain view names,
+# so routing / access.py are unaffected).
+_NAV_ICONS = {
+    "Run Evaluation": "▶", "Run Scorecard": "◧", "Provider Comparison": "⇄",
+    "Language Comparison": "◈", "SME Calibration": "✎",
+    "Pack Management": "▦", "HITL Management": "◑",
 }
 
 PACK_CATALOG = [
@@ -1856,7 +1864,11 @@ def main() -> None:
             if st.session_state.get("nav_view") not in all_views:
                 st.session_state["nav_view"] = all_views[0]
             _nav_idx = all_views.index(st.session_state["nav_view"])
-            selected = st.radio("View", all_views, label_visibility="collapsed", index=_nav_idx)
+            selected = st.radio(
+                "View", all_views, label_visibility="collapsed", index=_nav_idx,
+                format_func=lambda v: f"{_NAV_ICONS.get(v, '•')}  {v}"
+                + ("   ·  ADMIN" if v in CATEGORY_2_VIEWS else ""),
+            )
             st.session_state["nav_view"] = selected
             view = selected
         else:
