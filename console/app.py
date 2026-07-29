@@ -34,7 +34,12 @@ from auth.client import (
 from benchmarks.ids import stable_item_uuid
 from benchmarks.loader import PACKS_DIR
 from console.access import can_archive_runs, resolve_views
-from console.theme import ERROR, LINK, SUCCESS, WARNING
+from console.branding import (
+    inject_brand_css,
+    render_section_divider,
+    render_section_header,
+)
+from console.theme import ERROR, SUCCESS, WARNING
 from db.models import (
     EVALUATED_PROVIDERS,
     Assessment,
@@ -147,115 +152,11 @@ st.logo(
     icon_image=str(_ASSETS / "agentifyafro-mark.png"),
 )
 
-# Brand CSS — AgentifyAfro dark theme + Inter font + gradient accents.
-st.markdown(
-    """
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-
-    /* ── Base font ─────────────────────────────────────────────── */
-    html, body, [class*="css"] {
-        font-family: 'Inter', 'Segoe UI', system-ui, sans-serif !important;
-    }
-
-    /* ── Hide Cloud toolbar ─────────────────────────────────────── */
-    [data-testid="stToolbarActions"] { display: none !important; }
-
-    /* ── Canvas ─────────────────────────────────────────────────── */
-    .stApp { background-color: #0A0A0F !important; }
-    .main .block-container { padding-top: 2rem; }
-
-    /* ── Sidebar ─────────────────────────────────────────────────── */
-    [data-testid="stSidebar"] {
-        background-color: #1A1A24 !important;
-        border-right: 1px solid #2D2D3D !important;
-    }
-
-    /* ── Brand logo — bump past st.logo's "large" preset (32px) ─────── */
-    [data-testid="stSidebarLogo"] { height: 3.5rem !important; }
-    [data-testid="stHeaderLogo"]  { height: 2.25rem !important; }
-
-    /* ── H1 — gradient title text ────────────────────────────────── */
-    h1 {
-        font-weight: 700 !important;
-        background: linear-gradient(90deg, #7C3AED 0%, #4169E1 50%, #00CFFF 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        letter-spacing: -0.02em;
-    }
-    h2, h3 { font-weight: 600 !important; }
-
-    /* ── Buttons — gradient primary ──────────────────────────────── */
-    .stButton > button {
-        background: linear-gradient(90deg, #7C3AED 0%, #4169E1 100%) !important;
-        color: #FFFFFF !important;
-        border: none !important;
-        font-weight: 600 !important;
-        border-radius: 6px !important;
-        transition: opacity 0.15s ease !important;
-    }
-    .stButton > button:hover { opacity: 0.85 !important; border: none !important; }
-    .stButton > button:active { opacity: 0.70 !important; }
-
-    /* ── Metric cards ─────────────────────────────────────────────── */
-    [data-testid="stMetric"] {
-        background-color: #1A1A24 !important;
-        border-radius: 8px !important;
-        padding: 1rem 1.25rem !important;
-        border: 1px solid #2D2D3D !important;
-    }
-    [data-testid="stMetricValue"] div { color: #00CFFF !important; font-weight: 700 !important; }
-    [data-testid="stMetricLabel"] div {
-        /* #6B7280 was 3.57:1 on the #1A1A24 card — below WCAG AA. #A6ABC4 is 7.6:1
-           (AAA), matching the Engineering Bible's --text-faint (commit 47a7ab5). */
-        color: #A6ABC4 !important;
-        font-size: 0.72rem !important;
-        text-transform: uppercase !important;
-        letter-spacing: 0.06em !important;
-        font-weight: 500 !important;
-    }
-
-    /* ── Status alerts — brand palette ───────────────────────────── */
-    .stSuccess { background-color: rgba(16,185,129,0.10) !important; }
-    .stError   { background-color: rgba(239,68,68,0.10) !important; }
-    .stWarning { background-color: rgba(245,158,11,0.10) !important; }
-    .stInfo    { background-color: rgba(0,207,255,0.08) !important; }
-
-    /* ── Expanders ─────────────────────────────────────────────────── */
-    [data-testid="stExpander"] {
-        background-color: #1A1A24 !important;
-        border: 1px solid #2D2D3D !important;
-        border-radius: 8px !important;
-    }
-
-    /* ── Selectbox / text input ────────────────────────────────────── */
-    [data-testid="stSelectbox"] > div > div { border-color: #2D2D3D !important; border-radius: 6px !important; }
-    [data-testid="stTextInput"] > div > div > input {
-        background-color: #1A1A24 !important;
-        border-color: #2D2D3D !important;
-        border-radius: 6px !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-# Accent + semantic colours are sourced from console.theme (single tested source of
-# truth) so their WCAG contrast can't silently regress. Links were the theme
-# primaryColor (#7C3AED, 3.47:1 — fail); the semantic text colours are lifted to
-# AA/AAA on the card background. See tests/test_console_contrast.py.
-st.markdown(
-    f"""
-    <style>
-    a, a:visited {{ color: {LINK} !important; }}
-    .stSuccess {{ color: {SUCCESS} !important; }}
-    .stError   {{ color: {ERROR} !important; }}
-    .stWarning {{ color: {WARNING} !important; }}
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+# Master AgentifyAfro brand stylesheet (pure-black canvas, gradient accents, Inter,
+# WCAG-AA palette). All CSS + the section/badge helpers live in console.branding; the
+# accent/semantic colours it uses come from console.theme (tested — see
+# tests/test_console_contrast.py). Call once, before any view renders.
+inject_brand_css()
 
 
 def render_console_header() -> None:
@@ -649,7 +550,7 @@ def _verdict_badge(verdict: str) -> str:
 def _render_remediation(roadmap: list[dict]) -> None:
     if not roadmap:
         return
-    st.divider()
+    render_section_divider()
     st.subheader("Remediation Roadmap")
     priority_icon = {"high": "🔴", "medium": "🟡", "low": "🟢"}
     priority_rank = {"high": 0, "medium": 1, "low": 2}
@@ -770,7 +671,7 @@ def _render_calibration_detail(cal_df: pd.DataFrame) -> None:
 
     row = cal_df.iloc[sel_rows[0]]
 
-    st.divider()
+    render_section_divider()
     st.markdown(f"### Calibration Detail — **{row['item_id']}** (reviewed by {row['reviewer_id']})")
 
     tc1, tc2 = st.columns(2)
@@ -948,7 +849,7 @@ def _render_active_run(run_id: str) -> None:
 
 def render_run_evaluation() -> None:
     render_console_header()
-    st.subheader("Run Evaluation")
+    render_section_header("Configure", "Run Evaluation")
     st.caption("Configure and launch a new evaluation run against selected benchmark packs.")
 
     active = st.session_state.get("op_active_run_id")
@@ -980,7 +881,7 @@ def render_run_evaluation() -> None:
             if checked:
                 selected_packs.append(p["id"])
 
-    st.divider()
+    render_section_divider()
 
     # ── Model configuration ───────────────────────────────────────────────
     st.markdown("**Model Configuration**")
@@ -1013,7 +914,7 @@ def render_run_evaluation() -> None:
             key="op_model_id",
         )
 
-    st.divider()
+    render_section_divider()
 
     # Auto-name includes model + selected pack labels + a fixed timestamp.
     # op_name_auto=None means new code has never run this session — always override then.
@@ -1034,7 +935,7 @@ def render_run_evaluation() -> None:
         st.session_state["op_name"] = _auto
     assessment_name = st.text_input("Assessment Name", key="op_name")
 
-    st.divider()
+    render_section_divider()
 
     can_launch = len(selected_packs) > 0 and bool(model_id.strip())
     if not selected_packs:
@@ -1047,7 +948,7 @@ def render_run_evaluation() -> None:
 
 def render_pack_management() -> None:
     render_console_header()
-    st.subheader("Pack Management")
+    render_section_header("Benchmarks", "Pack Management")
     st.caption("Seed JSONL benchmark packs into the Supabase database. Idempotent — safe to re-run.")
 
     with st.spinner("Checking DB…"):
@@ -1090,7 +991,7 @@ def render_pack_management() -> None:
 
 def render_hitl_management() -> None:
     render_console_header()
-    st.subheader("HITL Management")
+    render_section_header("Human-in-the-loop", "HITL Management")
     st.caption(
         "Export model responses to Label Studio for SME annotation, "
         "then import completed reviews back into the database."
@@ -1107,7 +1008,7 @@ def render_hitl_management() -> None:
     mc2.metric("Reviewed", reviewed)
     mc3.metric("Awaiting Review", total - reviewed)
 
-    st.divider()
+    render_section_divider()
 
     st.markdown("### Export to Label Studio")
     st.caption("Pushes unreviewed ModelResponse rows into the Label Studio annotation project.")
@@ -1128,7 +1029,7 @@ def render_hitl_management() -> None:
             st.error("Export failed.")
             st.text(result.stderr)
 
-    st.divider()
+    render_section_divider()
 
     st.markdown("### Import from Label Studio")
     st.caption("Pulls completed annotations from Label Studio and saves them as ResponseReview rows.")
@@ -1153,7 +1054,7 @@ def render_hitl_management() -> None:
 
 def render_calibration_view() -> None:
     render_console_header()
-    st.subheader("SME Calibration")
+    render_section_header("Calibration", "SME Calibration")
     st.caption(
         "Compares SME ResponseReview scores (Label Studio HITL pipeline) against the automated "
         "MetricResult scores for the same model responses — cross-run, since calibration is a "
@@ -1171,7 +1072,7 @@ def render_calibration_view() -> None:
         return
 
     _render_calibration_summary(cal_df)
-    st.divider()
+    render_section_divider()
     _render_calibration_detail(cal_df)
 
 
@@ -1319,7 +1220,7 @@ def render_run_scorecard() -> None:
 
         # ── Clear the list: one-click archive-all, pinned at the sidebar bottom ──
         if may_archive:
-            st.divider()
+            render_section_divider()
             confirm_all = st.checkbox(
                 "Confirm — archive every run in the list",
                 key="op_archive_all_confirm",
@@ -1368,7 +1269,7 @@ def render_run_scorecard() -> None:
     else:
         st.caption("Scorecard data not found for this run.")
 
-    st.divider()
+    render_section_divider()
 
     # Dimension scores
     st.subheader("Dimension Scores")
@@ -1406,7 +1307,7 @@ def render_run_scorecard() -> None:
     st.caption("95% CI shown per dimension. “—” = single run-level statistic "
                "(Bias & Fairness), too few items, or a pre-CI historical run.")
 
-    st.divider()
+    render_section_divider()
 
     # Key Observations + radar (same section as the PDF scorecard)
     st.subheader("Key Observations")
@@ -1436,7 +1337,7 @@ def render_run_scorecard() -> None:
         else:
             st.caption("No notable observations for this run.")
 
-    st.divider()
+    render_section_divider()
 
     # Per-item table
     st.subheader("Item Drill-Down")
@@ -1514,7 +1415,7 @@ def render_run_scorecard() -> None:
     row     = fdf.iloc[sel_rows[0]]
     resp_id = row["response_id"]
 
-    st.divider()
+    render_section_divider()
     badges = []
     if row["is_filtered"]:
         badges.append("🔴 CONTENT FILTER BLOCK — likely false positive for African-language content")
@@ -1568,7 +1469,7 @@ def render_run_scorecard() -> None:
 
 def render_provider_comparison() -> None:
     render_console_header()
-    st.subheader("Provider Comparison")
+    render_section_header("Compare", "Provider Comparison")
     st.caption(
         "Side-by-side scorecard results across model providers running the same benchmark packs. "
         "Validates routing decisions — e.g., whether Anthropic outperforms OpenAI on Oromo/Somali content."
@@ -1640,7 +1541,7 @@ def render_provider_comparison() -> None:
                 delta_color="normal" if delta >= 0 else "inverse",
             )
 
-    st.divider()
+    render_section_divider()
 
     # ── Dimension breakdown table ───────────────────────────────────────
     st.subheader("Dimension Breakdown")
@@ -1683,11 +1584,11 @@ def render_provider_comparison() -> None:
 
     # ── Interpretation ──────────────────────────────────────────────────
     if len(providers) == 2:
-        st.divider()
+        render_section_divider()
         st.subheader("Interpretation")
         _render_comparison_insight(latest[providers[0]], latest[providers[1]], dims_sorted)
 
-    st.divider()
+    render_section_divider()
 
     # ── Run history ─────────────────────────────────────────────────────
     with st.expander(f"All runs against these packs ({len(group)} total)"):
@@ -1704,7 +1605,7 @@ def render_provider_comparison() -> None:
 
 def render_language_breakdown() -> None:
     render_console_header()
-    st.subheader("Language Comparison")
+    render_section_header("Coverage", "Language Comparison")
     st.caption(
         "Per-language aggregate scores across evaluation runs. English (US) is the "
         "high-resource baseline — the gap between EN and African language scores "
@@ -1859,7 +1760,7 @@ def render_language_breakdown() -> None:
                     gaps_b.append(en_comp_b - g)
             avg_gap_b = round(sum(gaps_b) / len(gaps_b), 1) if gaps_b else None
 
-        st.divider()
+        render_section_divider()
         st.subheader("EN Baseline Gap")
         st.caption(
             "Points by which English score exceeds the mean African-language score for the same model. "
@@ -1873,7 +1774,7 @@ def render_language_breakdown() -> None:
                 st.metric(model_b, f"{avg_gap_b:+.1f} pts" if avg_gap_b is not None else "—")
 
     # ── Table 2: Dimension × Language pivot ────────────────────────────────
-    st.divider()
+    render_section_divider()
     st.subheader("Dimension × Language Comparison")
     st.caption(
         "Rows = evaluation dimensions. Columns = each language found in the selected runs. "
@@ -1960,10 +1861,16 @@ def main() -> None:
             'margin:-1rem -1rem 0.75rem -1rem;"></div>',
             unsafe_allow_html=True,
         )
-        st.header("View")
-
         auth_user: AuthUser | None = st.session_state.get("auth_user")
         unlocked = st.session_state.get("operator_unlocked", False)
+
+        # Access-tier badge — reflects console/access.py (informational; changes no gating).
+        if (auth_user is not None and auth_user.role == "admin") or unlocked:
+            st.markdown('<div class="role-badge op">🔓 Operator · admin</div>', unsafe_allow_html=True)
+        elif auth_user is not None:
+            st.markdown('<div class="role-badge vw">👁 Viewer · read-only</div>', unsafe_allow_html=True)
+
+        st.header("View")
         all_views = resolve_views(auth_user, unlocked)
 
         if all_views:
@@ -1983,7 +1890,7 @@ def main() -> None:
             st.cache_data.clear()
             st.rerun()
 
-        st.divider()
+        render_section_divider()
 
         if auth_user is not None:
             role_label = auth_user.role or "viewer"
