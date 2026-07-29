@@ -140,8 +140,7 @@ def inject_brand_css() -> None:
     .sc-badge.warn {{ background:{_tint(WARNING)}; border:1px solid {WARNING}; color:{WARNING}; }}
     .sc-badge.fail {{ background:{_tint(ERROR)}; border:1px solid {ERROR}; color:{ERROR}; }}
     .sc-badge.na   {{ background:{RAISED}; border:1px solid {BORDER}; color:{CAPTION}; }}
-    .sc-dims {{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }}
-    @media (max-width:820px) {{ .sc-dims {{ grid-template-columns:1fr; }} }}
+    .sc-dims {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px; }}
     .sc-dcard {{ background:{SURFACE}; border:1px solid {BORDER}; border-radius:9px; padding:14px 16px; }}
     .sc-dcard .dt {{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; }}
     .sc-dcard .nm {{ font-size:11px; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; color:{CAPTION}; }}
@@ -210,17 +209,15 @@ def render_scorecard_header(
 ) -> None:
     """Hero composite score (gradient) + a row of KPI cards. Data only; no computation."""
     vstatus, vicon = _VERDICT_STATUS.get(verdict, ("na", "•"))
-    rt = (f'<div style="color:{CAPTION};font-size:12px;margin-top:9px">⏱ Runtime {_esc(runtime)}</div>'
-          if runtime else "")
     kpis = "".join(
         f'<div class="sc-kpi"><div class="l">{_esc(lbl)}</div><div class="v">{_esc(val)}</div></div>'
-        for lbl, val in (("Verdict", verdict), ("Confidence", confidence),
-                         ("Model", model), ("Language & Domain", lang_domain))
+        for lbl, val in (("Language & Domain", lang_domain), ("Confidence", confidence),
+                         ("Verdict", verdict), ("Runtime", runtime or "—"))
     )
     st.markdown(
         f'<div class="sc-top"><div class="sc-hero"><div class="lab">Composite score · {_esc(model)}</div>'
         f'<div class="score">{composite:.1f}<small> / 100</small></div>'
-        f'<div><span class="sc-badge {vstatus}">{vicon} {_esc(verdict)}</span></div>{rt}</div>'
+        f'<div><span class="sc-badge {vstatus}">{vicon} {_esc(verdict)}</span></div></div>'
         f'<div class="sc-kpis">{kpis}</div></div>',
         unsafe_allow_html=True,
     )

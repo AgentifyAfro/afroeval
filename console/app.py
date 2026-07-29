@@ -1274,7 +1274,7 @@ def render_run_scorecard() -> None:
     render_section_divider()
 
     # Dimension scores — custom cards (score · CI · status pill · gradient bar)
-    render_section_header("Quality dimensions", "Dimension scores")
+    render_section_header("Quality dimensions", "Dimension breakdown")
     dim_scores  = selected["dimension_scores"]
     dim_weights = selected["dimension_weights"]
     dim_cis     = selected.get("dimension_confidence_intervals") or {}
@@ -1293,22 +1293,28 @@ def render_run_scorecard() -> None:
          "score": None, "ci": None, "status": "na"}
         for dim in dim_weights if dim not in dim_scores
     ]
-    render_dimension_cards(_cards)
+    # Radar beside the dimension cards (matches the mock's dimension layout). The radar is
+    # a Streamlit components.html iframe, so it can't live inside the HTML card grid — a
+    # column places it alongside instead.
+    import streamlit.components.v1 as components
 
+    from reporting.radar import radar_svg
+    rc1, rc2 = st.columns([1, 1.8])
+    with rc1:
+        if dim_scores:
+            components.html(radar_svg(dim_scores, size=300, theme="dark"), height=320)
+    with rc2:
+        render_dimension_cards(_cards)
     st.caption("95% CI shown per dimension. “—” = single run-level statistic "
                "(Bias & Fairness), too few items, or a pre-CI historical run.")
 
     render_section_divider()
 
-    # Key Observations + radar (same section as the PDF scorecard)
-    st.subheader("Key Observations")
+    # Key Observations
+    render_section_header("Summary", "Key Observations")
     from types import SimpleNamespace
 
-    import streamlit.components.v1 as components
-
     from reporting.observations import build_key_observations
-    from reporting.radar import radar_svg
-
     obs_scorecard = SimpleNamespace(
         dimension_scores=dim_scores,
         verdict=selected.get("verdict"),
@@ -1317,16 +1323,11 @@ def render_run_scorecard() -> None:
         african_fabrication_detected=selected.get("african_fabrication_detected", False),
     )
     observations = build_key_observations(obs_scorecard)
-    kc1, kc2 = st.columns([1, 1])
-    with kc1:
-        if dim_scores:
-            components.html(radar_svg(dim_scores, size=320, theme="dark"), height=340)
-    with kc2:
-        if observations:
-            for obs in observations:
-                st.markdown(f"- {obs}")
-        else:
-            st.caption("No notable observations for this run.")
+    if observations:
+        for obs in observations:
+            st.markdown(f"- {obs}")
+    else:
+        st.caption("No notable observations for this run.")
 
     render_section_divider()
 

@@ -69,7 +69,8 @@ def test_scorecard_header_renders_hero_and_kpis():
                                          "claude-haiku", "Amharic · Community Health", "2m 37s")
     html = m.call_args[0][0]
     assert "89.6" in html and "sc-hero" in html
-    assert "Deployment-Ready" in html and "Runtime 2m 37s" in html
+    assert "Deployment-Ready" in html
+    assert "Runtime" in html and "2m 37s" in html  # runtime is now a KPI card
 
 
 def test_dimension_cards_render_scores_ci_and_status():
