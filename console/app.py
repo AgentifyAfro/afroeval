@@ -37,7 +37,10 @@ from console.access import CATEGORY_2_VIEWS, can_archive_runs, resolve_views
 from console.branding import (
     inject_brand_css,
     render_comparison_bars,
+    render_detail_placeholder,
     render_dimension_cards,
+    render_item_detail,
+    render_kpi_row,
     render_scorecard_header,
     render_section_divider,
     render_section_header,
@@ -635,7 +638,7 @@ def _agreement_badge(mean_delta: float) -> str:
 
 
 def _render_calibration_summary(cal_df: pd.DataFrame) -> None:
-    st.subheader("Calibration Summary — SME vs Automated, by Dimension")
+    render_section_header("Agreement", "Calibration summary — SME vs automated")
     summary_rows = []
     for dim in DIM_SHORT:
         sme_col, auto_col, delta_col = f"sme_{dim}", f"auto_{dim}", f"delta_{dim}"
@@ -664,7 +667,7 @@ def _render_calibration_summary(cal_df: pd.DataFrame) -> None:
 
 
 def _render_calibration_detail(cal_df: pd.DataFrame) -> None:
-    st.subheader(f"Reviewed Items ({len(cal_df)})")
+    render_section_header("Detail", f"Reviewed items ({len(cal_df)})")
 
     display_cols = ["item_id", "reviewer_id", "language", "domain", "reviewed_at"]
     disp = cal_df[display_cols].copy()
@@ -1024,10 +1027,14 @@ def render_hitl_management() -> None:
         total          = len(all_responses)
         reviewed       = sum(1 for r in all_responses if r.id in reviewed_ids)
 
-    mc1, mc2, mc3 = st.columns(3)
-    mc1.metric("Total Responses", total)
-    mc2.metric("Reviewed", reviewed)
-    mc3.metric("Awaiting Review", total - reviewed)
+    render_kpi_row([
+        {"label": "Total Responses", "value": f"{total}"},
+        {"label": "Reviewed", "value": f"{reviewed}",
+         "sub": "SME-annotated" if reviewed else "none yet", "trend": "up" if reviewed else "flat"},
+        {"label": "Awaiting Review", "value": f"{total - reviewed}",
+         "sub": "queued for HITL" if total - reviewed else "all caught up",
+         "trend": "down" if total - reviewed else "flat"},
+    ])
 
     render_section_divider()
 
@@ -1351,7 +1358,7 @@ def render_run_scorecard() -> None:
     render_section_divider()
 
     # Per-item table
-    st.subheader("Item Drill-Down")
+    render_section_header("Per-item evidence", "Item drill-down")
     with st.spinner("Loading items…"):
         df, metrics_by_resp = load_run_items(run_id)
 
@@ -1418,62 +1425,45 @@ def render_run_scorecard() -> None:
     sel_rows = event.selection.rows if event and hasattr(event, "selection") else []
 
     if not sel_rows:
-        st.caption("Select a row above to see full item detail.")
+        render_detail_placeholder(
+            "Select a row above to render its prompt, model response, and per-metric results."
+        )
         _render_remediation(selected["remediation_roadmap"])
         return
 
-    # Item detail
+    # Item detail — branded panel (presentation only; data straight from the selected row)
     row     = fdf.iloc[sel_rows[0]]
     resp_id = row["response_id"]
 
-    render_section_divider()
-    badges = []
+    flags = []
     if row["is_filtered"]:
-        badges.append("🔴 CONTENT FILTER BLOCK — likely false positive for African-language content")
+        flags.append("⚠ filter-blocked")
     if row["is_gold"]:
-        badges.append("⭐ Gold calibration item")
-    st.markdown("### Item Detail — **{}**{}".format(
-        row["item_id"],
-        "  —  " + "  |  ".join(badges) if badges else "",
-    ))
+        flags.append("★ gold")
 
-    tc1, tc2 = st.columns(2)
-    with tc1:
-        st.markdown("**Prompt**")
-        st.text_area("_p", value=row["prompt"], height=130, disabled=True, label_visibility="collapsed")
-        st.markdown("**Expected Behavior**")
-        st.text_area("_e", value=row["expected_behavior"], height=130, disabled=True, label_visibility="collapsed")
-    with tc2:
-        st.markdown("**Model Output**")
-        st.text_area("_o", value=row["raw_output"], height=280, disabled=True, label_visibility="collapsed")
-        meta = [f"Language: {row['language']}", f"Domain: {row['domain']}"]
-        if row.get("latency_ms"):
-            meta.append(f"Latency: {row['latency_ms']}ms")
-        if row.get("tokens_used"):
-            meta.append(f"Tokens: {row['tokens_used']}")
-        st.caption("  |  ".join(meta))
+    foot_bits = [f"Language: {row['language']}", f"Domain: {row['domain']}"]
+    if row.get("latency_ms"):
+        foot_bits.append(f"Latency: {row['latency_ms']}ms")
+    if row.get("tokens_used"):
+        foot_bits.append(f"Tokens: {row['tokens_used']}")
 
-    st.markdown("**Metric Results**")
     item_metrics = metrics_by_resp.get(resp_id, [])
-    if item_metrics:
-        mdf = pd.DataFrame(item_metrics)[["dimension", "metric_name", "score", "passed", "reason"]]
-        mdf = mdf.sort_values("dimension").reset_index(drop=True)
-        mdf["score"]  = mdf["score"].map(lambda x: f"{x * 100:.1f}")
-        mdf["passed"] = mdf["passed"].map({True: "✓", False: "✗"})
-        st.dataframe(
-            mdf,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "dimension":   st.column_config.TextColumn("Dimension"),
-                "metric_name": st.column_config.TextColumn("Metric"),
-                "score":       st.column_config.TextColumn("Score", width="small"),
-                "passed":      st.column_config.TextColumn("Pass", width="small"),
-                "reason":      st.column_config.TextColumn("Reason"),
-            },
-        )
-    else:
-        st.info("No MetricResult rows found for this item.")
+    metrics = [
+        (m["dimension"], m["metric_name"], (m["score"] or 0) * 100,
+         "pass" if m["passed"] else "fail", m.get("reason") or "")
+        for m in sorted(item_metrics, key=lambda m: m["dimension"])
+    ]
+
+    render_item_detail({
+        "id":       row["item_id"],
+        "cohort":   row["language"],
+        "tags":     " · ".join([row["domain"], *flags]),
+        "prompt":   row["prompt"],
+        "expected": row["expected_behavior"],
+        "response": row["raw_output"],
+        "foot":     "  |  ".join(foot_bits),
+        "metrics":  metrics,
+    })
 
     _render_remediation(selected["remediation_roadmap"])
 
@@ -1524,6 +1514,17 @@ def render_provider_comparison() -> None:
         st.caption(_verdict_badge(row["verdict"]))
         return
 
+    # ── Summary KPIs ────────────────────────────────────────────────────
+    _top_prov = max(providers, key=lambda p: latest[p]["composite_score"])
+    render_kpi_row([
+        {"label": "Top model", "value": latest[_top_prov]["model_identifier"], "sm": True,
+         "sub": f"{latest[_top_prov]['composite_score']:.1f} composite", "trend": "up"},
+        {"label": "Models compared", "value": f"{len(providers)}",
+         "sub": " · ".join(_provider_short(p) for p in providers)},
+        {"label": "Benchmark", "value": selected_label, "sm": True},
+    ])
+    render_section_divider()
+
     # ── Composite ranking bars ──────────────────────────────────────────
     render_section_header("Ranking", "Composite by provider")
     scores: dict[str, float] = {prov: latest[prov]["composite_score"] for prov in providers}
@@ -1540,7 +1541,7 @@ def render_provider_comparison() -> None:
     render_section_divider()
 
     # ── Dimension breakdown table ───────────────────────────────────────
-    st.subheader("Dimension Breakdown")
+    render_section_header("Detail", "Dimension scores by model")
 
     all_dims: set[str] = set()
     for row in latest.values():
@@ -1581,7 +1582,7 @@ def render_provider_comparison() -> None:
     # ── Interpretation ──────────────────────────────────────────────────
     if len(providers) == 2:
         render_section_divider()
-        st.subheader("Interpretation")
+        render_section_header("Read-out", "Interpretation")
         _render_comparison_insight(latest[providers[0]], latest[providers[1]], dims_sorted)
 
     render_section_divider()

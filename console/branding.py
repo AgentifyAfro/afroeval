@@ -151,6 +151,7 @@ def inject_brand_css() -> None:
     .sc-badge.warn {{ background:{_tint(WARNING)}; border:1px solid {WARNING}; color:{WARNING}; }}
     .sc-badge.fail {{ background:{_tint(ERROR)}; border:1px solid {ERROR}; color:{ERROR}; }}
     .sc-badge.na   {{ background:{RAISED}; border:1px solid {BORDER}; color:{CAPTION}; }}
+    .sc-badge.info {{ background:rgba(0,207,255,0.10); border:1px solid {INFO}; color:{INFO}; }}
     .sc-dims {{ display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }}
     @media (max-width:560px) {{ .sc-dims {{ grid-template-columns:1fr; }} }}
     .sc-dcard {{ background:{SURFACE}; border:1px solid {BORDER}; border-radius:9px; padding:14px 16px; }}
@@ -161,6 +162,47 @@ def inject_brand_css() -> None:
     .sc-dcard .obs {{ font-size:12.5px; color:{TEXT_MUTED}; margin-top:8px; line-height:1.5; }}
     .sc-dcard .bar {{ height:5px; border-radius:3px; background:{RAISED}; margin-top:10px; overflow:hidden; }}
     .sc-dcard .bar > i {{ display:block; height:100%; border-radius:3px; background:{GRADIENT}; }}
+
+    /* ── standalone KPI row (Provider / HITL headers) ── */
+    .kpi-row {{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin:0 0 6px; }}
+    .kpi-row.k2 {{ grid-template-columns:repeat(2,1fr); }}
+    .kpi-row.k4 {{ grid-template-columns:repeat(4,1fr); }}
+    @media (max-width:760px) {{ .kpi-row, .kpi-row.k2, .kpi-row.k4 {{ grid-template-columns:1fr; }} }}
+    .kpi-row .k {{ background:{SURFACE}; border:1px solid {BORDER}; border-radius:9px;
+         padding:16px 18px; display:flex; flex-direction:column; gap:6px; }}
+    .kpi-row .k .l {{ font-size:11px; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; color:{CAPTION}; }}
+    .kpi-row .k .v {{ font-size:26px; font-weight:700; color:#FFFFFF; line-height:1.1; }}
+    .kpi-row .k .v.sm {{ font-size:17px; }}
+    .kpi-row .k .v.grad {{ background:{GRADIENT}; -webkit-background-clip:text; background-clip:text;
+         -webkit-text-fill-color:transparent; }}
+    .kpi-row .k .d {{ font-size:12px; font-weight:600; color:{CAPTION}; }}
+    .kpi-row .k .d.up {{ color:{SUCCESS}; }}
+    .kpi-row .k .d.down {{ color:{WARNING}; }}
+
+    /* ── callout (coverage / methodology notes) ── */
+    .brand-callout {{ background:rgba(0,207,255,0.07); border-left:4px solid {INFO}; border-radius:0 8px 8px 0;
+         padding:14px 18px; color:{TEXT_MUTED}; font-size:13.5px; line-height:1.55; margin:6px 0; }}
+    .brand-callout.warn {{ background:rgba(245,158,11,0.07); border-left-color:{WARNING}; }}
+    .brand-callout b {{ color:#FFFFFF; }}
+    .brand-callout code {{ background:{RAISED}; padding:1px 6px; border-radius:4px; font-size:12.5px; }}
+
+    /* ── item drill-down detail panel ── */
+    .idetail {{ background:{SURFACE}; border:1px solid {BORDER}; border-radius:10px; padding:20px 22px; }}
+    .idetail .ihead {{ display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:14px; }}
+    .idetail .ihead .id {{ font-size:15px; font-weight:700; color:#FFFFFF; font-variant-numeric:tabular-nums; }}
+    .idetail .field {{ margin:14px 0; }}
+    .idetail .field .fl {{ font-size:11px; font-weight:600; letter-spacing:0.05em; text-transform:uppercase;
+         color:{CAPTION}; margin-bottom:5px; }}
+    .idetail .field .fc {{ font-size:14px; color:{TEXT_MUTED}; line-height:1.6; }}
+    .idetail .field .resp {{ background:{CANVAS}; border:1px solid {BORDER}; border-radius:8px;
+         padding:12px 14px; white-space:pre-wrap; }}
+    .idetail .mtable {{ width:100%; border-collapse:collapse; font-size:12.5px; margin-top:6px; }}
+    .idetail .mtable th {{ text-align:left; font-size:10.5px; letter-spacing:0.04em; text-transform:uppercase;
+         color:{CAPTION}; padding:6px 8px; border-bottom:1px solid {BORDER}; font-weight:600; }}
+    .idetail .mtable td {{ padding:7px 8px; border-bottom:1px solid {BORDER}; color:{TEXT_MUTED}; vertical-align:top; }}
+    .idetail .mtable td.num {{ text-align:right; font-variant-numeric:tabular-nums; color:#FFFFFF; font-weight:600; }}
+    .idetail-empty {{ background:{SURFACE}; border:1px dashed {BORDER}; border-radius:10px;
+         padding:44px 22px; text-align:center; color:{CAPTION}; font-size:13.5px; }}
 
     /* ── comparison ranking bars ── */
     .cmp {{ display:flex; flex-direction:column; gap:12px; max-width:720px; }}
@@ -271,3 +313,73 @@ def render_comparison_bars(rows: list[tuple[str, float]], max_value: float = 100
         )
     html.append("</div>")
     st.markdown("".join(html), unsafe_allow_html=True)
+
+
+def render_kpi_row(kpis: list[dict], columns: int = 3) -> None:
+    """Row of branded KPI cards (display only). Each kpi dict:
+    label, value, sub?(str), trend?('up'|'down'|'flat'), sm?(bool), grad?(bool)."""
+    grid = {2: "k2", 4: "k4"}.get(columns, "")
+    cells = []
+    for k in kpis:
+        vcls = "v" + (" sm" if k.get("sm") else "") + (" grad" if k.get("grad") else "")
+        sub = ""
+        if k.get("sub"):
+            trend = k.get("trend", "flat")
+            arrow = {"up": "▲ ", "down": "▼ "}.get(trend, "")
+            sub = f'<span class="d {trend}">{arrow}{_esc(k["sub"])}</span>'
+        cells.append(
+            f'<div class="k"><span class="l">{_esc(k["label"])}</span>'
+            f'<span class="{vcls}">{_esc(k["value"])}</span>{sub}</div>'
+        )
+    st.markdown(f'<div class="kpi-row {grid}">{"".join(cells)}</div>', unsafe_allow_html=True)
+
+
+def render_callout(body_html: str, kind: str = "info") -> None:
+    """Left-bordered note. body_html is trusted markup built by the caller (may hold <b>/<code>)."""
+    cls = "brand-callout warn" if kind == "warn" else "brand-callout"
+    st.markdown(f'<div class="{cls}">{body_html}</div>', unsafe_allow_html=True)
+
+
+_METRIC_BADGE = {"pass": ("pass", "Pass"), "warn": ("warn", "Attention"), "fail": ("fail", "Fail")}
+
+
+def render_item_detail(detail: dict) -> None:
+    """Drill-down detail panel (custom HTML; data only, no computation). Keys:
+    id, cohort?(str), tags?(str), prompt, gloss?(str), expected, response, foot?(str),
+    metrics(list of (dimension, metric, score_0_100, status, reason))."""
+    m_rows = []
+    for dim, metric, score, status, reason in detail.get("metrics", []):
+        cls, lbl = _METRIC_BADGE.get(status, ("na", "—"))
+        m_rows.append(
+            f"<tr><td>{_esc(dim)}</td><td>{_esc(metric)}</td>"
+            f'<td class="num">{score:.1f}</td>'
+            f'<td><span class="sc-badge {cls}">{lbl}</span></td><td>{_esc(reason)}</td></tr>'
+        )
+    body = "".join(m_rows) or '<tr><td colspan="5">No metric results for this item.</td></tr>'
+    cohort = f'<span class="sc-badge info">{_esc(detail["cohort"])}</span>' if detail.get("cohort") else ""
+    tags = (f'<span style="color:{CAPTION};font-size:12px">{_esc(detail["tags"])}</span>'
+            if detail.get("tags") else "")
+    gloss = (f'<div style="color:{CAPTION};font-size:12px;margin-top:3px">{_esc(detail["gloss"])}</div>'
+             if detail.get("gloss") else "")
+    foot = (f'<div class="field"><div class="fl">Response metadata</div>'
+            f'<div class="fc">{_esc(detail["foot"])}</div></div>' if detail.get("foot") else "")
+    st.markdown(
+        f'<div class="idetail">'
+        f'<div class="ihead"><span class="id">{_esc(detail["id"])}</span>{cohort}{tags}</div>'
+        f'<div class="field"><div class="fl">Prompt</div>'
+        f'<div class="fc">{_esc(detail["prompt"])}{gloss}</div></div>'
+        f'<div class="field"><div class="fl">Expected behavior</div>'
+        f'<div class="fc">{_esc(detail["expected"])}</div></div>'
+        f'<div class="field"><div class="fl">Model response</div>'
+        f'<div class="fc resp">{_esc(detail["response"])}</div></div>'
+        f'<div class="field"><div class="fl">Metric results</div>'
+        f'<table class="mtable"><thead><tr><th>Dimension</th><th>Metric</th>'
+        f'<th style="text-align:right">Score</th><th>Status</th><th>Reason</th></tr></thead>'
+        f"<tbody>{body}</tbody></table></div>{foot}</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def render_detail_placeholder(message: str) -> None:
+    """Dashed empty-state card shown in the detail pane before a row is selected."""
+    st.markdown(f'<div class="idetail-empty">{_esc(message)}</div>', unsafe_allow_html=True)

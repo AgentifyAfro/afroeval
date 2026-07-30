@@ -82,3 +82,59 @@ def test_dimension_cards_render_scores_ci_and_status():
     html = m.call_args[0][0]
     assert "31.2" in html and "Below 60" in html
     assert "N/A" in html and "95% CI 23.2" in html and "sc-dcard" in html
+
+
+def test_kpi_row_renders_label_value_sub_and_grid_class():
+    with patch("console.branding.st.markdown") as m:
+        branding.render_kpi_row([
+            {"label": "Top model", "value": "claude-haiku", "sm": True, "sub": "89.6 composite", "trend": "up"},
+            {"label": "Models compared", "value": "3"},
+        ], columns=3)
+    html = m.call_args[0][0]
+    assert "kpi-row" in html and "Top model" in html and "claude-haiku" in html
+    assert "v sm" in html                    # text KPI uses the small variant
+    assert "▲ 89.6 composite" in html        # up-trend sub-line with arrow
+
+
+def test_kpi_row_two_column_variant_sets_k2():
+    with patch("console.branding.st.markdown") as m:
+        branding.render_kpi_row([{"label": "A", "value": "1"}, {"label": "B", "value": "2"}], columns=2)
+    assert "kpi-row k2" in m.call_args[0][0]
+
+
+def test_callout_default_is_info_and_warn_flag_switches_class():
+    with patch("console.branding.st.markdown") as m:
+        branding.render_callout("<b>Note.</b> body")
+    assert "brand-callout" in m.call_args[0][0] and "warn" not in m.call_args[0][0]
+    with patch("console.branding.st.markdown") as m:
+        branding.render_callout("<b>Coverage.</b> below floor", kind="warn")
+    assert "brand-callout warn" in m.call_args[0][0]
+
+
+def test_item_detail_renders_fields_metrics_and_escapes():
+    with patch("console.branding.st.markdown") as m:
+        branding.render_item_detail({
+            "id": "ch-am-201", "cohort": "informal_rural", "tags": "child health",
+            "prompt": "a <script> b", "expected": "ask danger signs", "response": "go to clinic",
+            "foot": "Language: am  |  Domain: community_health",
+            "metrics": [("cultural_appropriateness", "cultural_score", 90.0, "pass", "warm framing"),
+                        ("language_performance", "fluency", 80.0, "warn", "a touch stiff")],
+        })
+    html = m.call_args[0][0]
+    assert "ch-am-201" in html and "idetail" in html
+    assert "cultural_appropriateness" in html and "90.0" in html
+    assert "Attention" in html               # warn status maps to the "Attention" label
+    assert "&lt;script&gt;" in html          # prompt is HTML-escaped
+
+
+def test_detail_placeholder_uses_empty_state_class():
+    with patch("console.branding.st.markdown") as m:
+        branding.render_detail_placeholder("Select a row")
+    assert "idetail-empty" in m.call_args[0][0] and "Select a row" in m.call_args[0][0]
+
+
+def test_inject_brand_css_covers_new_component_surfaces():
+    with patch("console.branding.st.markdown") as m:
+        branding.inject_brand_css()
+    css = m.call_args[0][0]
+    assert "kpi-row" in css and "brand-callout" in css and "idetail" in css
