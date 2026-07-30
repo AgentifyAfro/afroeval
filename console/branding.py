@@ -131,7 +131,11 @@ def inject_brand_css() -> None:
     [data-testid="stSidebar"] [role="radiogroup"] > label {{ width:100%; padding:8px 12px; margin:0;
          border-radius:7px; cursor:pointer; transition:background .15s; }}
     [data-testid="stSidebar"] [role="radiogroup"] > label:hover {{ background:{RAISED}; }}
-    [data-testid="stSidebar"] [role="radiogroup"] > label > div:first-child {{ display:none; }}
+    /* Collapse the radio dot but KEEP it in the interaction tree — display:none removes the
+       BaseWeb input it contains, which caused the "click twice to register" nav behavior. */
+    [data-testid="stSidebar"] [role="radiogroup"] > label > div:first-child {{
+         width:0 !important; height:0 !important; min-width:0 !important; margin:0 !important;
+         padding:0 !important; opacity:0 !important; overflow:hidden !important; }}
     [data-testid="stSidebar"] [role="radiogroup"] > label:has(input:checked) {{
          background:{RAISED}; box-shadow:inset 3px 0 0 #7C3AED; }}
     [data-testid="stSidebar"] [role="radiogroup"] label p {{ font-size:14px !important; font-weight:500 !important; }}
