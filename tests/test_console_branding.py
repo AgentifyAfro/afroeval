@@ -138,3 +138,23 @@ def test_inject_brand_css_covers_new_component_surfaces():
         branding.inject_brand_css()
     css = m.call_args[0][0]
     assert "kpi-row" in css and "brand-callout" in css and "idetail" in css
+    assert "brand-table" in css
+
+
+def test_data_table_renders_headers_rows_and_alignment_classes():
+    with patch("console.branding.st.markdown") as m:
+        branding.render_data_table(
+            ["Language", "Staged", "Status"],
+            [["Amharic (am)", "12", '<span class="sc-badge pass">Complete</span>']],
+            right_cols={1}, score_cols={1},
+        )
+    html = m.call_args[0][0]
+    assert "brand-table" in html and "Amharic (am)" in html
+    assert '<span class="sc-badge pass">Complete</span>' in html   # badge cell kept as trusted markup
+    assert 'class="r score"' in html                                # col 1 is right-aligned + score-styled
+
+
+def test_data_table_escapes_headers():
+    with patch("console.branding.st.markdown") as m:
+        branding.render_data_table(["A<b>", "B"], [["1", "2"]])
+    assert "A&lt;b&gt;" in m.call_args[0][0]

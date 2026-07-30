@@ -204,6 +204,18 @@ def inject_brand_css() -> None:
     .idetail-empty {{ background:{SURFACE}; border:1px dashed {BORDER}; border-radius:10px;
          padding:44px 22px; text-align:center; color:{CAPTION}; font-size:13.5px; }}
 
+    /* ── branded static table (badge-bearing summary tables) ── */
+    .brand-tw {{ overflow-x:auto; border:1px solid {BORDER}; border-radius:10px; }}
+    .brand-table {{ width:100%; border-collapse:collapse; font-size:13.5px; color:{TEXT_MUTED}; }}
+    .brand-table th {{ text-align:left; font-size:11px; font-weight:600; letter-spacing:0.04em;
+         text-transform:uppercase; color:{CAPTION}; padding:13px 16px; border-bottom:1px solid {BORDER};
+         background:{RAISED}; white-space:nowrap; }}
+    .brand-table td {{ padding:12px 16px; border-bottom:1px solid {BORDER}; }}
+    .brand-table tbody tr:last-child td {{ border-bottom:none; }}
+    .brand-table tbody tr:hover td {{ background:rgba(255,255,255,0.02); }}
+    .brand-table th.r, .brand-table td.r {{ text-align:right; font-variant-numeric:tabular-nums; }}
+    .brand-table td.score {{ color:#FFFFFF; font-weight:700; }}
+
     /* ── comparison ranking bars ── */
     .cmp {{ display:flex; flex-direction:column; gap:12px; max-width:720px; }}
     .cmp-row {{ display:grid; grid-template-columns:minmax(140px,240px) 1fr auto; align-items:center; gap:14px; }}
@@ -383,3 +395,27 @@ def render_item_detail(detail: dict) -> None:
 def render_detail_placeholder(message: str) -> None:
     """Dashed empty-state card shown in the detail pane before a row is selected."""
     st.markdown(f'<div class="idetail-empty">{_esc(message)}</div>', unsafe_allow_html=True)
+
+
+def render_data_table(headers: list[str], rows: list[list[str]],
+                      right_cols: set[int] | None = None, score_cols: set[int] | None = None) -> None:
+    """Branded static HTML table (display only). Header text is escaped; ROW CELLS ARE TRUSTED
+    markup built by the caller (so badge HTML renders) — callers must _esc any free-form text."""
+    right = right_cols or set()
+    score = score_cols or set()
+    thead = "".join(
+        f'<th class="r">{_esc(h)}</th>' if i in right else f"<th>{_esc(h)}</th>"
+        for i, h in enumerate(headers)
+    )
+    body = []
+    for row in rows:
+        tds = []
+        for i, cell in enumerate(row):
+            cls = " ".join(c for c, on in (("r", i in right), ("score", i in score)) if on)
+            tds.append(f'<td class="{cls}">{cell}</td>' if cls else f"<td>{cell}</td>")
+        body.append(f'<tr>{"".join(tds)}</tr>')
+    st.markdown(
+        f'<div class="brand-tw"><table class="brand-table"><thead><tr>{thead}</tr></thead>'
+        f'<tbody>{"".join(body)}</tbody></table></div>',
+        unsafe_allow_html=True,
+    )
