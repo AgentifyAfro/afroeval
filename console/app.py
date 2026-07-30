@@ -1318,7 +1318,7 @@ def render_run_scorecard() -> None:
     import streamlit.components.v1 as components
 
     from reporting.radar import radar_svg
-    rc1, rc2 = st.columns([1, 1.8])
+    rc1, rc2 = st.columns([1, 2])
     with rc1:
         if dim_scores:
             components.html(radar_svg(dim_scores, size=300, theme="dark"), height=320)

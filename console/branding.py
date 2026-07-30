@@ -65,8 +65,8 @@ def inject_brand_css() -> None:
          -webkit-text-fill-color:transparent; letter-spacing:-0.02em; }}
     h2, h3 {{ font-weight:600 !important; }}
     .brand-eyebrow {{ font-size:11px; font-weight:600; letter-spacing:0.09em; text-transform:uppercase;
-         color:{CAPTION}; margin-bottom:6px; }}
-    .brand-sec-title {{ font-size:22px; font-weight:700; color:#FFFFFF; line-height:1.2; margin:0 0 4px; }}
+         color:{CAPTION}; margin-bottom:8px; }}
+    .brand-sec-title {{ font-size:22px; font-weight:700; color:#FFFFFF; line-height:1.2; margin:0 0 20px; }}
     .gradient-text {{ background:{GRADIENT}; -webkit-background-clip:text; background-clip:text;
          -webkit-text-fill-color:transparent; font-weight:700; }}
     .brand-divider {{ height:1px; background:{GRADIENT}; opacity:0.55; margin:30px 0; }}
@@ -131,33 +131,34 @@ def inject_brand_css() -> None:
     [data-testid="stSidebar"] [role="radiogroup"] label p {{ font-size:14px !important; font-weight:500 !important; }}
 
     /* ── scorecard hero + KPI + dimension cards (custom components) ── */
-    .sc-top {{ display:grid; grid-template-columns:minmax(280px,1fr) 2fr; gap:16px; margin-bottom:6px; }}
+    .sc-top {{ display:grid; grid-template-columns:minmax(300px,1.05fr) 2fr; gap:18px; margin-bottom:6px; }}
     @media (max-width:900px) {{ .sc-top {{ grid-template-columns:1fr; }} }}
     .sc-hero {{ background:{SURFACE}; border:1px solid {BORDER}; border-left:4px solid #7C3AED;
-         border-radius:0 10px 10px 0; padding:20px 24px; }}
+         border-radius:0 10px 10px 0; padding:22px 26px; }}
     .sc-hero .lab {{ font-size:11px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:{CAPTION}; }}
-    .sc-hero .score {{ font-size:64px; font-weight:700; line-height:1; margin:0.15rem 0; letter-spacing:-0.03em;
+    .sc-hero .score {{ font-size:72px; font-weight:700; line-height:1; margin:0.2rem 0; letter-spacing:-0.03em;
          background:{GRADIENT}; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }}
-    .sc-hero .score small {{ font-size:22px; color:{CAPTION}; -webkit-text-fill-color:{CAPTION}; }}
-    .sc-kpis {{ display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }}
+    .sc-hero .score small {{ font-size:24px; color:{CAPTION}; -webkit-text-fill-color:{CAPTION}; }}
+    .sc-kpis {{ display:grid; grid-template-columns:repeat(2,1fr); gap:14px; }}
     @media (min-width:1100px) {{ .sc-kpis {{ grid-template-columns:repeat(4,1fr); }} }}
-    .sc-kpi {{ background:{SURFACE}; border:1px solid {BORDER}; border-radius:9px; padding:14px 16px; }}
+    .sc-kpi {{ background:{SURFACE}; border:1px solid {BORDER}; border-radius:9px; padding:16px 18px; }}
     .sc-kpi .l {{ font-size:11px; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; color:{CAPTION}; }}
-    .sc-kpi .v {{ font-size:17px; font-weight:700; color:#FFFFFF; margin-top:4px; }}
-    .sc-badge {{ display:inline-flex; align-items:center; gap:5px; padding:3px 10px; border-radius:4px;
+    .sc-kpi .v {{ font-size:26px; font-weight:700; color:#FFFFFF; margin-top:6px; line-height:1.1; }}
+    .sc-kpi .v.sm {{ font-size:17px; }}
+    .sc-badge {{ display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border-radius:4px;
          font-size:11px; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; }}
     .sc-badge.pass {{ background:{_tint(SUCCESS)}; border:1px solid {SUCCESS}; color:{SUCCESS}; }}
     .sc-badge.warn {{ background:{_tint(WARNING)}; border:1px solid {WARNING}; color:{WARNING}; }}
     .sc-badge.fail {{ background:{_tint(ERROR)}; border:1px solid {ERROR}; color:{ERROR}; }}
     .sc-badge.na   {{ background:{RAISED}; border:1px solid {BORDER}; color:{CAPTION}; }}
-    .sc-dims {{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }}
-    @media (max-width:760px) {{ .sc-dims {{ grid-template-columns:1fr; }} }}
+    .sc-dims {{ display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }}
+    @media (max-width:560px) {{ .sc-dims {{ grid-template-columns:1fr; }} }}
     .sc-dcard {{ background:{SURFACE}; border:1px solid {BORDER}; border-radius:9px; padding:14px 16px; }}
     .sc-dcard .dt {{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; }}
-    .sc-dcard .nm {{ font-size:11px; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; color:{CAPTION}; }}
-    .sc-dcard .vl {{ font-size:30px; font-weight:700; color:#FFFFFF; line-height:1; margin:6px 0 2px; }}
-    .sc-dcard .ci {{ font-size:11px; color:{CAPTION}; font-variant-numeric:tabular-nums; }}
-    .sc-dcard .obs {{ font-size:12px; color:{TEXT_MUTED}; margin-top:8px; line-height:1.5; }}
+    .sc-dcard .nm {{ font-size:12px; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; color:{CAPTION}; }}
+    .sc-dcard .vl {{ font-size:28px; font-weight:700; color:#FFFFFF; line-height:1; margin:0; }}
+    .sc-dcard .ci {{ font-size:11px; color:{CAPTION}; font-variant-numeric:tabular-nums; margin-top:2px; }}
+    .sc-dcard .obs {{ font-size:12.5px; color:{TEXT_MUTED}; margin-top:8px; line-height:1.5; }}
     .sc-dcard .bar {{ height:5px; border-radius:3px; background:{RAISED}; margin-top:10px; overflow:hidden; }}
     .sc-dcard .bar > i {{ display:block; height:100%; border-radius:3px; background:{GRADIENT}; }}
 
@@ -184,7 +185,7 @@ def render_section_header(eyebrow: str, title: str, accent_word: str = "") -> No
         else title
     )
     st.markdown(
-        f'<div style="margin-bottom:18px"><div class="brand-eyebrow">{eyebrow}</div>'
+        f'<div><div class="brand-eyebrow">{eyebrow}</div>'
         f'<div class="brand-sec-title">{inner}</div></div>',
         unsafe_allow_html=True,
     )
@@ -221,10 +222,11 @@ def render_scorecard_header(
 ) -> None:
     """Hero composite score (gradient) + a row of KPI cards. Data only; no computation."""
     vstatus, vicon = _VERDICT_STATUS.get(verdict, ("na", "•"))
+    # Text KPIs use the smaller `.v.sm` (17px); numeric ones (Runtime) use `.v` (26px) — as the mock.
     kpis = "".join(
-        f'<div class="sc-kpi"><div class="l">{_esc(lbl)}</div><div class="v">{_esc(val)}</div></div>'
-        for lbl, val in (("Language & Domain", lang_domain), ("Confidence", confidence),
-                         ("Verdict", verdict), ("Runtime", runtime or "—"))
+        f'<div class="sc-kpi"><div class="l">{_esc(lbl)}</div><div class="v{sm}">{_esc(val)}</div></div>'
+        for lbl, val, sm in (("Language & Domain", lang_domain, " sm"), ("Confidence", confidence, " sm"),
+                             ("Verdict", verdict, " sm"), ("Runtime", runtime or "—", ""))
     )
     st.markdown(
         f'<div class="sc-top"><div class="sc-hero"><div class="lab">Composite score · {_esc(model)}</div>'
