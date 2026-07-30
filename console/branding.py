@@ -120,6 +120,16 @@ def inject_brand_css() -> None:
     .admin-tag {{ font-size:9px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase;
          color:{WARNING}; border:1px solid {_tint(WARNING, 0.5)}; border-radius:4px; padding:1px 5px; margin-left:6px; }}
 
+    /* ── sidebar nav — restyle the radio as nav rows (icons+ADMIN come from format_func) ── */
+    [data-testid="stSidebar"] [role="radiogroup"] {{ gap:3px; }}
+    [data-testid="stSidebar"] [role="radiogroup"] > label {{ width:100%; padding:8px 12px; margin:0;
+         border-radius:7px; cursor:pointer; transition:background .15s; }}
+    [data-testid="stSidebar"] [role="radiogroup"] > label:hover {{ background:{RAISED}; }}
+    [data-testid="stSidebar"] [role="radiogroup"] > label > div:first-child {{ display:none; }}
+    [data-testid="stSidebar"] [role="radiogroup"] > label:has(input:checked) {{
+         background:{RAISED}; box-shadow:inset 3px 0 0 #7C3AED; }}
+    [data-testid="stSidebar"] [role="radiogroup"] label p {{ font-size:14px !important; font-weight:500 !important; }}
+
     /* ── scorecard hero + KPI + dimension cards (custom components) ── */
     .sc-top {{ display:grid; grid-template-columns:minmax(280px,1fr) 2fr; gap:16px; margin-bottom:6px; }}
     @media (max-width:900px) {{ .sc-top {{ grid-template-columns:1fr; }} }}
@@ -140,12 +150,14 @@ def inject_brand_css() -> None:
     .sc-badge.warn {{ background:{_tint(WARNING)}; border:1px solid {WARNING}; color:{WARNING}; }}
     .sc-badge.fail {{ background:{_tint(ERROR)}; border:1px solid {ERROR}; color:{ERROR}; }}
     .sc-badge.na   {{ background:{RAISED}; border:1px solid {BORDER}; color:{CAPTION}; }}
-    .sc-dims {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px; }}
+    .sc-dims {{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }}
+    @media (max-width:760px) {{ .sc-dims {{ grid-template-columns:1fr; }} }}
     .sc-dcard {{ background:{SURFACE}; border:1px solid {BORDER}; border-radius:9px; padding:14px 16px; }}
     .sc-dcard .dt {{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; }}
     .sc-dcard .nm {{ font-size:11px; font-weight:600; letter-spacing:0.04em; text-transform:uppercase; color:{CAPTION}; }}
     .sc-dcard .vl {{ font-size:30px; font-weight:700; color:#FFFFFF; line-height:1; margin:6px 0 2px; }}
     .sc-dcard .ci {{ font-size:11px; color:{CAPTION}; font-variant-numeric:tabular-nums; }}
+    .sc-dcard .obs {{ font-size:12px; color:{TEXT_MUTED}; margin-top:8px; line-height:1.5; }}
     .sc-dcard .bar {{ height:5px; border-radius:3px; background:{RAISED}; margin-top:10px; overflow:hidden; }}
     .sc-dcard .bar > i {{ display:block; height:100%; border-radius:3px; background:{GRADIENT}; }}
 
@@ -233,10 +245,11 @@ def render_dimension_cards(cards: list[dict]) -> None:
         ci = c.get("ci")
         ci_txt = f"95% CI {ci[0]:.1f}–{ci[1]:.1f}" if ci else "95% CI —"
         width = 0 if c["score"] is None else max(0.0, min(100.0, float(c["score"])))
+        obs = f'<div class="obs">{_esc(c["blurb"])}</div>' if c.get("blurb") else ""
         html.append(
             f'<div class="sc-dcard"><div class="dt"><span class="nm">{_esc(c["name"])} '
             f'({c["weight"]:.0%})</span><span class="sc-badge {cls}">{txt}</span></div>'
-            f'<div class="vl">{val}</div><div class="ci">{ci_txt}</div>'
+            f'<div class="vl">{val}</div><div class="ci">{ci_txt}</div>{obs}'
             f'<div class="bar"><i style="width:{width}%"></i></div></div>'
         )
     html.append("</div>")

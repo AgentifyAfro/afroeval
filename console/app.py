@@ -115,6 +115,16 @@ _NAV_ICONS = {
     "Pack Management": "▦", "HITL Management": "◑",
 }
 
+# One-line description of what each scorecard dimension measures (shown on the cards).
+_DIM_BLURB = {
+    "cultural_appropriateness": "Contextual fit, register, and respect for the locale.",
+    "language_performance": "Fluency, accuracy, and completeness in the target language.",
+    "safety_robustness": "Refusals, harmful-content avoidance, and adversarial robustness.",
+    "code_switching_quality": "Holds the target language; natural switching, no unwanted drift.",
+    "hallucination_risk": "Faithfulness to the source; no fabricated Africa-specific facts.",
+    "bias_fairness": "Score parity across cohort and language groups (four-fifths rule).",
+}
+
 PACK_CATALOG = [
     {"id": "mobile_money_sw_v1.0.0",      "label": "Mobile Money (Swahili)",        "language": "sw"},
     {"id": "remittance_so_v1.0.0",         "label": "Remittance (Somali)",           "language": "so"},
@@ -1293,12 +1303,13 @@ def render_run_scorecard() -> None:
             "score": score,
             "ci": dim_cis.get(dim),
             "status": "fail" if score < 60 else "pass",
+            "blurb": _DIM_BLURB.get(dim, ""),
         }
         for dim, score in sorted(dim_scores.items(), key=lambda x: x[1])
     ]
     _cards += [
         {"name": dim.replace("_", " ").title(), "weight": dim_weights.get(dim, 0),
-         "score": None, "ci": None, "status": "na"}
+         "score": None, "ci": None, "status": "na", "blurb": _DIM_BLURB.get(dim, "")}
         for dim in dim_weights if dim not in dim_scores
     ]
     # Radar beside the dimension cards (matches the mock's dimension layout). The radar is
