@@ -64,6 +64,7 @@ from db.models import (
 )
 from db.session import get_engine
 from hitl.label_config import AUTHORING_PROJECT_TITLE
+from scoring.aggregate import composite_from_metric_means
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -499,7 +500,7 @@ def load_language_breakdown(run_ids_a: tuple[str, ...], run_ids_b: tuple[str, ..
         model_label: str | None = None
         provider: str = ""
         lang_counts:    dict[str, int]                  = {}
-        lang_dim_scores: dict[str, dict[str, list[float]]] = {}
+        lang_metric_scores: dict[str, dict[str, dict[str, list[float]]]] = {}
 
         for run_id_str in group_run_ids:
             with Session(engine) as session:
@@ -535,18 +536,24 @@ def load_language_breakdown(run_ids_a: tuple[str, ...], run_ids_b: tuple[str, ..
                     lang = item.language if item else "unknown"
                     resp_to_lang[str(r.id)] = lang
                     lang_counts[lang] = lang_counts.get(lang, 0) + 1
-                    if lang not in lang_dim_scores:
-                        lang_dim_scores[lang] = {dim: [] for dim in DIM_SHORT}
+                    if lang not in lang_metric_scores:
+                        lang_metric_scores[lang] = {dim: {} for dim in DIM_SHORT}
 
                 for m in metrics:
                     lang = resp_to_lang.get(str(m.response_id), "unknown")
-                    if m.dimension in lang_dim_scores.get(lang, {}):
-                        lang_dim_scores[lang][m.dimension].append(m.score)
+                    dims = lang_metric_scores.get(lang, {})
+                    if m.dimension in dims:
+                        dims[m.dimension].setdefault(m.metric_name, []).append(m.score)
 
         # Use the most-recent run_id (group_run_ids[0]) as the row key so that
         # _get(lang, run_id_a, col) lookups in render_language_breakdown resolve correctly.
         key_run_id = group_run_ids[0]
-        for lang, dim_data in lang_dim_scores.items():
+        for lang, dim_metrics in lang_metric_scores.items():
+            metric_means = {
+                dim: {mn: sum(s) / len(s) for mn, s in metric_scores.items() if s}
+                for dim, metric_scores in dim_metrics.items()
+            }
+            dim_scores, composite = composite_from_metric_means(metric_means)
             row: dict = {
                 "language":   lang,
                 "model":      model_label or "unknown",
@@ -554,14 +561,10 @@ def load_language_breakdown(run_ids_a: tuple[str, ...], run_ids_b: tuple[str, ..
                 "run_id":     key_run_id,
                 "item_count": lang_counts.get(lang, 0),
             }
-            dim_means = []
             for dim, short in DIM_SHORT.items():
-                scores = dim_data[dim]
-                mean   = round(sum(scores) / len(scores) * 100, 1) if scores else None
-                row[short] = mean
-                if mean is not None:
-                    dim_means.append(mean)
-            row["composite"] = round(sum(dim_means) / len(dim_means), 1) if dim_means else None
+                val = dim_scores.get(dim)
+                row[short] = round(val, 1) if val is not None else None
+            row["composite"] = round(composite, 1) if composite is not None else None
             rows.append(row)
 
     return pd.DataFrame(rows)
