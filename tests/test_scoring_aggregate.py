@@ -49,7 +49,9 @@ def test_composite_weighted_and_renormalized_when_bias_absent():
     dim_scores, composite = composite_from_metric_means(metric_means)
     assert dim_scores["language_performance"] == pytest.approx(80.35, abs=0.01)
     assert dim_scores.get("bias_fairness") is None  # absent input -> not in dict / None
-    assert round(composite, 1) == 78.0  # weighted over 0.85 (bias 0.15 dropped), renormalized
+    # weighted over 0.85 (bias 0.15 dropped), renormalized; raw = 77.95.
+    # (Real-data means give ~77.9; these idealized inputs land exactly on 77.95.)
+    assert composite == pytest.approx(77.95, abs=0.01)
 
 
 def test_no_dimensions_composite_none():

@@ -550,8 +550,8 @@ def load_language_breakdown(run_ids_a: tuple[str, ...], run_ids_b: tuple[str, ..
         key_run_id = group_run_ids[0]
         for lang, dim_metrics in lang_metric_scores.items():
             metric_means = {
-                dim: {mn: sum(s) / len(s) for mn, s in metrics.items() if s}
-                for dim, metrics in dim_metrics.items()
+                dim: {mn: sum(s) / len(s) for mn, s in metric_scores.items() if s}
+                for dim, metric_scores in dim_metrics.items()
             }
             dim_scores, composite = composite_from_metric_means(metric_means)
             row: dict = {

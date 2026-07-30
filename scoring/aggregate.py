@@ -36,7 +36,7 @@ def composite_from_metric_means(
     """Return (dimension_scores_0-100, composite_0-100) from {dimension: {metric_name: mean_0-1}},
     applying scoring.engine.DEFAULT_WEIGHTS + DEFAULT_METRIC_WEIGHTS. The composite is a weighted
     mean over the dimensions present, renormalized over their weights (mirrors engine.py). Composite
-    is None when no weighted dimension is present."""
+    is None when no dimension with a DEFAULT_WEIGHTS entry is present."""
     dim_scores: dict[str, float | None] = {
         dim: _dimension_score(dim, mm) for dim, mm in metric_means.items()
     }
