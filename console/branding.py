@@ -47,8 +47,11 @@ def inject_brand_css() -> None:
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
     /* Scoped universal (.stApp *) instead of the [class*="css"] substring match, which forced
        the browser to scan every element's class string on every style recalc — the main cause
-       of laggy sidebar hover/click. Same visual result (Inter everywhere), far cheaper to match. */
-    html, body, .stApp * {{ font-family:'Inter','Segoe UI',system-ui,sans-serif !important; }}
+       of laggy sidebar hover. Same visual result (Inter everywhere), far cheaper to match.
+       Exclude Material icon spans (data-testid=stIconMaterial): they render glyphs via a
+       ligature font, so forcing Inter on them shows the raw ligature name (e.g. "arrow_right"). */
+    html, body, .stApp *:not([data-testid="stIconMaterial"]) {{
+         font-family:'Inter','Segoe UI',system-ui,sans-serif !important; }}
     [data-testid="stToolbarActions"] {{ display:none !important; }}
 
     /* ── canvas & 3-step elevation ── */
