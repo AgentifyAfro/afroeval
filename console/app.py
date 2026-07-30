@@ -1115,7 +1115,7 @@ def render_run_evaluation() -> None:
     if not selected_packs:
         st.caption("Select at least one pack to enable Launch.")
 
-    if st.button("🚀 Launch Run", type="primary", disabled=not can_launch, key="op_launch"):
+    if st.button("▶ Launch evaluation", type="primary", disabled=not can_launch, key="op_launch"):
         _launch_run(assessment_name, provider, model_id, selected_packs)
         st.rerun()
 
