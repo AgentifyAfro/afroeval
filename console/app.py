@@ -647,6 +647,27 @@ def load_validation_status() -> dict:
     }
 
 
+@st.cache_data(ttl=60, show_spinner=False)
+def load_adjudication_count() -> int | None:
+    """Items whose two SMEs genuinely DISAGREE — factual mismatch, pair κ < 0.70, or cultural
+    scores > 1 rubric point apart — computed with the SAME logic as scripts/validation_adjudicate
+    (compute_item_results). Distinct from a 'needs_revision' verdict (one SME's opinion).
+    Returns None if the packs/validations can't be read."""
+    try:
+        from scripts.validation_writeback import _load_validations, compute_item_results
+
+        items: list[dict] = []
+        for path in sorted((PROJECT_ROOT / "benchmarks" / "packs").glob("*.jsonl")):
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if line.strip():
+                    items.append(json.loads(line))
+        validations, _skipped = _load_validations(items)
+        results = compute_item_results(validations, items)
+        return sum(1 for r in results.values() if r["needs_adjudication"])
+    except Exception:
+        return None
+
+
 def _run_pipeline(argv: list[str], *, spinner: str, timeout: int = 300, clear_cache: bool = False) -> None:
     """Run a pipeline script as a subprocess and surface the result. Same pattern used by
     every HITL action button; keeps the tabbed action UI DRY. argv is script + flags."""
@@ -1263,6 +1284,15 @@ def _render_hitl_authoring() -> None:
 def _render_hitl_validation() -> None:
     """Two-validator item-validation status (item_validations) + validation-pipeline actions."""
     vs = load_validation_status()
+    adj = load_adjudication_count()
+
+    if adj is None:
+        adj_kpi = {"label": "Needs adjudication", "value": "—", "sub": "unavailable", "trend": "flat"}
+    elif adj == 0:
+        adj_kpi = {"label": "Needs adjudication", "value": "0", "sub": "all agree", "trend": "up"}
+    else:
+        adj_kpi = {"label": "Needs adjudication", "value": str(adj),
+                   "sub": "run Adjudicate", "trend": "down"}
 
     render_kpi_row([
         {"label": "Items validated", "value": f"{vs['items_validated']}",
@@ -1271,7 +1301,14 @@ def _render_hitl_validation() -> None:
          "sub": "≥ 2 SMEs (Tier-1)", "trend": "up" if vs["fully_validated"] else "flat"},
         {"label": "Validators", "value": f"{vs['validators']}",
          "sub": "distinct reviewers"},
-    ])
+        adj_kpi,
+    ], columns=4)
+    st.caption(
+        "**Needs revision** (in the table below) is one SME's verdict on an item. "
+        "**Needs adjudication** is separate — it fires only when the two SMEs actually disagree: "
+        "factual accuracy, pair κ < 0.70, or cultural scores > 1 rubric point apart. "
+        "Run **Adjudicate disputes** to export any that qualify."
+    )
 
     render_section_divider()
     render_section_header("Agreement", "Ratings by validator")
