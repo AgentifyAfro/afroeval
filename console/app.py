@@ -9,6 +9,7 @@ Run:
 """
 
 import json
+import os
 import subprocess
 import sys
 import threading
@@ -649,6 +650,9 @@ def load_validation_status() -> dict:
 def _run_pipeline(argv: list[str], *, spinner: str, timeout: int = 300, clear_cache: bool = False) -> None:
     """Run a pipeline script as a subprocess and surface the result. Same pattern used by
     every HITL action button; keeps the tabbed action UI DRY. argv is script + flags."""
+    # Suppress the SQLAlchemy echo firehose (dev env) so the action output shows the script's
+    # own summary, not every SQL statement. AFROEVAL_SQL_ECHO=0 is read by db.session.get_engine.
+    env = {**os.environ, "AFROEVAL_SQL_ECHO": "0"}
     with st.spinner(spinner):
         result = subprocess.run(
             [sys.executable, *argv],
@@ -656,6 +660,7 @@ def _run_pipeline(argv: list[str], *, spinner: str, timeout: int = 300, clear_ca
             capture_output=True,
             text=True,
             timeout=timeout,
+            env=env,
         )
     if result.returncode == 0:
         if clear_cache:
