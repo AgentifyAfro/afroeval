@@ -36,7 +36,9 @@ from benchmarks.loader import PACKS_DIR
 from console.access import CATEGORY_2_VIEWS, can_archive_runs, resolve_views
 from console.branding import (
     inject_brand_css,
+    render_callout,
     render_comparison_bars,
+    render_data_table,
     render_detail_placeholder,
     render_dimension_cards,
     render_item_detail,
@@ -51,6 +53,7 @@ from db.models import (
     Assessment,
     BenchmarkItem,
     BenchmarkPack,
+    ItemValidation,
     MetricResult,
     ModelResponse,
     ResponseReview,
@@ -564,6 +567,99 @@ def load_seeded_pack_ids() -> set:
         return {f"{p.name}_{p.version}" for p in packs}
 
 
+# Title of the SME authoring project in Label Studio (mirrors scripts/coverage_report.py).
+_AUTHORING_PROJECT_TITLE = "AfroEval — SME Item Authoring v2 (2026-07-19)"
+
+
+@st.cache_data(ttl=900, show_spinner=False)
+def load_authoring_status() -> dict | None:
+    """Live (cached 15 min) Label Studio project-9 authoring queue. Best-effort:
+    returns None if Label Studio is unconfigured/unreachable so the view degrades
+    gracefully. Mirrors scripts/coverage_report._live_authoring_counts — keep in sync.
+    'authored' = a task that carries at least one annotation."""
+    try:
+        from collections import defaultdict
+
+        from hitl.client import LabelStudioClient
+
+        client = LabelStudioClient()
+        project = client.find_project_by_title(_AUTHORING_PROJECT_TITLE)
+        if project is None:
+            return None
+        counts: dict[str, list[int]] = defaultdict(lambda: [0, 0])
+        for task in client.list_tasks(project["id"]):
+            lang = task.get("data", {}).get("target_language", "?")
+            counts[lang][0] += 1
+            if task.get("total_annotations", 0) > 0 or task.get("is_labeled"):
+                counts[lang][1] += 1
+        return {
+            "project_id":    project["id"],
+            "project_title": project.get("title", _AUTHORING_PROJECT_TITLE),
+            "by_lang":       {k: (v[0], v[1]) for k, v in counts.items()},
+        }
+    except Exception:
+        return None
+
+
+_EMPTY_VALIDATION = {"total_ratings": 0, "items_validated": 0, "validators": 0,
+                     "fully_validated": 0, "by_validator": {}}
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def load_validation_status() -> dict:
+    """SME item-validation status from the item_validations table (Tier-1 path).
+    Counts only — no live LS call. 'fully validated' = an item with >= 2 distinct SMEs.
+    Returns a zeroed status if the table is unavailable so the tab degrades gracefully."""
+    from collections import defaultdict
+
+    try:
+        with Session(get_engine()) as session:
+            vals = session.exec(select(ItemValidation)).all()
+    except Exception:
+        return dict(_EMPTY_VALIDATION)
+
+    by_item: dict = defaultdict(set)
+    by_validator: dict = defaultdict(lambda: {"rated": 0, "validated": 0, "needs_revision": 0})
+    for v in vals:
+        by_item[v.item_id].add(v.validator_id)
+        bucket = by_validator[v.validator_id]
+        bucket["rated"] += 1
+        if v.verdict == "validated":
+            bucket["validated"] += 1
+        else:
+            bucket["needs_revision"] += 1
+
+    return {
+        "total_ratings":   len(vals),
+        "items_validated": len(by_item),
+        "validators":      len(by_validator),
+        "fully_validated": sum(1 for sme in by_item.values() if len(sme) >= 2),
+        "by_validator":    dict(by_validator),
+    }
+
+
+def _run_pipeline(argv: list[str], *, spinner: str, timeout: int = 300, clear_cache: bool = False) -> None:
+    """Run a pipeline script as a subprocess and surface the result. Same pattern used by
+    every HITL action button; keeps the tabbed action UI DRY. argv is script + flags."""
+    with st.spinner(spinner):
+        result = subprocess.run(
+            [sys.executable, *argv],
+            cwd=str(PROJECT_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    if result.returncode == 0:
+        if clear_cache:
+            st.cache_data.clear()
+        st.success("Done.")
+        with st.expander("Script output"):
+            st.text(result.stdout or "(no output)")
+    else:
+        st.error("Failed.")
+        st.text(result.stderr or "(no stderr)")
+
+
 # ── UI helpers ────────────────────────────────────────────────────────────────
 
 def _verdict_badge(verdict: str) -> str:
@@ -1017,67 +1113,179 @@ def render_hitl_management() -> None:
     render_console_header()
     render_section_header("Human-in-the-loop", "HITL Management")
     st.caption(
-        "Export model responses to Label Studio for SME annotation, "
-        "then import completed reviews back into the database."
+        "The Label Studio operations hub — SME item **authoring**, two-validator "
+        "**validation**, and response **calibration**, each with its live status and "
+        "pipeline actions. Actions run the same scripts as the CLI; output is shown inline."
     )
 
-    with Session(get_engine()) as session:
-        all_responses  = session.exec(select(ModelResponse)).all()
-        reviewed_ids   = {r.response_id for r in session.exec(select(ResponseReview)).all()}
-        total          = len(all_responses)
-        reviewed       = sum(1 for r in all_responses if r.id in reviewed_ids)
+    tab_auth, tab_val, tab_cal = st.tabs(["✍ Authoring", "✔ Validation", "🎯 Calibration"])
+    with tab_auth:
+        _render_hitl_authoring()
+    with tab_val:
+        _render_hitl_validation()
+    with tab_cal:
+        _render_hitl_calibration()
+
+
+def _render_hitl_authoring() -> None:
+    """SME item-authoring status (Label Studio project 9) + authoring-pipeline actions."""
+    status = load_authoring_status()
+
+    if status is None:
+        render_callout(
+            "<b>Label Studio not reachable.</b> The authoring queue needs Label Studio "
+            "credentials configured (LS refresh token in secrets). The pipeline actions "
+            "below still work once credentials are set.",
+            kind="warn",
+        )
+        if st.button("↻ Retry authoring query", key="auth_retry"):
+            load_authoring_status.clear()
+            st.rerun()
+    else:
+        by_lang        = status["by_lang"]
+        total_authored = sum(a for _s, a in by_lang.values())
+        total_pending  = sum(s - a for s, a in by_lang.values())
+        done           = [LANGUAGE_NAMES.get(lg, lg) for lg, (s, a) in by_lang.items() if s > 0 and a == s]
+        authored_sub   = (", ".join(done) + " complete") if done else "in progress"
+        proj_title     = status["project_title"]
+        proj_short     = "SME Authoring v2" if "Authoring v2" in proj_title else (proj_title[:22] or "SME Authoring")
+
+        render_kpi_row([
+            {"label": "Label Studio project", "value": proj_short, "sm": True,
+             "sub": f"project {status['project_id']}"},
+            {"label": "Authored", "value": f"{total_authored}",
+             "sub": authored_sub, "trend": "up" if total_authored else "flat"},
+            {"label": "Pending", "value": f"{total_pending}",
+             "sub": "awaiting SMEs" if total_pending else "all authored",
+             "trend": "down" if total_pending else "flat"},
+        ])
+
+        render_section_divider()
+        render_section_header("Authoring queue", "Staged vs authored by language")
+
+        pack_langs   = {p["language"] for p in PACK_CATALOG}
+        status_badge = {"pass": ("pass", "Complete"), "warn": ("warn", "Pending"), "info": ("info", "No pack yet")}
+        rows = []
+        for lang, (staged, authored) in sorted(by_lang.items(), key=lambda kv: (-kv[1][0], kv[0])):
+            if staged > 0 and authored == staged:
+                key = "pass"
+            elif lang not in pack_langs:
+                key = "info"
+            else:
+                key = "warn"
+            cls, label = status_badge[key]
+            rows.append([
+                f"{LANGUAGE_NAMES.get(lang, lang)} ({lang})",
+                str(staged), str(authored), str(staged - authored),
+                f'<span class="sc-badge {cls}">{label}</span>',
+            ])
+        render_data_table(
+            ["Language", "Staged", "Authored", "Pending", "Status"],
+            rows, right_cols={1, 2, 3}, score_cols={2},
+        )
+
+    render_section_divider()
+    render_section_header("Actions", "Authoring pipeline")
+    st.caption("Draft placeholders live in Label Studio; SMEs author the real in-language item there.")
+    ac1, ac2 = st.columns(2)
+    with ac1:
+        if st.button("🏗 Create / sync authoring project", key="auth_create", use_container_width=True):
+            _run_pipeline(["scripts/create_authoring_project.py"],
+                          spinner="Creating / syncing authoring project…", clear_cache=True)
+    with ac2:
+        if st.button("📥 Import authored items → staging", key="auth_import", use_container_width=True):
+            _run_pipeline(["scripts/import_authored_items.py"],
+                          spinner="Importing approved authored items…", clear_cache=True)
+    st.caption("Promote staged items into a pack's next version from **Pack Management**.")
+
+
+def _render_hitl_validation() -> None:
+    """Two-validator item-validation status (item_validations) + validation-pipeline actions."""
+    vs = load_validation_status()
 
     render_kpi_row([
-        {"label": "Total Responses", "value": f"{total}"},
-        {"label": "Reviewed", "value": f"{reviewed}",
-         "sub": "SME-annotated" if reviewed else "none yet", "trend": "up" if reviewed else "flat"},
-        {"label": "Awaiting Review", "value": f"{total - reviewed}",
-         "sub": "queued for HITL" if total - reviewed else "all caught up",
-         "trend": "down" if total - reviewed else "flat"},
+        {"label": "Items validated", "value": f"{vs['items_validated']}",
+         "sub": f"{vs['total_ratings']} ratings"},
+        {"label": "Fully validated", "value": f"{vs['fully_validated']}",
+         "sub": "≥ 2 SMEs (Tier-1)", "trend": "up" if vs["fully_validated"] else "flat"},
+        {"label": "Validators", "value": f"{vs['validators']}",
+         "sub": "distinct reviewers"},
     ])
 
     render_section_divider()
-
-    st.markdown("### Export to Label Studio")
-    st.caption("Pushes unreviewed ModelResponse rows into the Label Studio annotation project.")
-    if st.button("📤 Export to Label Studio", type="primary", key="op_export"):
-        with st.spinner("Exporting…"):
-            result = subprocess.run(
-                [sys.executable, "scripts/hitl_export_tasks.py"],
-                cwd=str(PROJECT_ROOT),
-                capture_output=True,
-                text=True,
-                timeout=600,
-            )
-        if result.returncode == 0:
-            st.success("Export complete.")
-            with st.expander("Script output"):
-                st.text(result.stdout or "(no output)")
-        else:
-            st.error("Export failed.")
-            st.text(result.stderr)
+    render_section_header("Agreement", "Ratings by validator")
+    if vs["by_validator"]:
+        rows = [
+            [vid, str(d["rated"]), str(d["validated"]), str(d["needs_revision"])]
+            for vid, d in sorted(vs["by_validator"].items(), key=lambda kv: -kv[1]["rated"])
+        ]
+        render_data_table(
+            ["Validator", "Rated", "Validated", "Needs revision"],
+            rows, right_cols={1, 2, 3}, score_cols={2},
+        )
+    else:
+        st.info("No validator ratings imported yet. Export items, collect ratings in Label Studio, "
+                "then import them below.")
 
     render_section_divider()
+    render_section_header("Actions", "Validation pipeline")
+    st.caption("Each item goes to exactly two eligible SMEs who did not author it; writeback stamps "
+               "`validation_count` / `irr_score` onto the pack files. Writing actions default to dry-run.")
+    vc1, vc2, vc3 = st.columns(3)
+    with vc1:
+        if st.button("📤 Export items (dry-run)", key="val_export", use_container_width=True):
+            _run_pipeline(["scripts/validation_export_tasks.py", "--dry-run"],
+                          spinner="Previewing validation export…")
+        if st.button("⚖ Adjudicate disputes (dry-run)", key="val_adj", use_container_width=True):
+            _run_pipeline(["scripts/validation_adjudicate.py", "--dry-run"],
+                          spinner="Previewing adjudication…")
+    with vc2:
+        if st.button("📥 Import validator ratings", key="val_import", use_container_width=True):
+            _run_pipeline(["scripts/validation_import_ratings.py"],
+                          spinner="Importing validator ratings…", clear_cache=True)
+    with vc3:
+        if st.button("✍ Writeback IRR (dry-run)", key="val_wb_dry", use_container_width=True):
+            _run_pipeline(["scripts/validation_writeback.py", "--dry-run"],
+                          spinner="Previewing IRR writeback…")
+        if st.button("✅ Writeback IRR (apply)", key="val_wb_apply", type="primary", use_container_width=True):
+            _run_pipeline(["scripts/validation_writeback.py", "--apply"],
+                          spinner="Writing validation_count / irr_score…", clear_cache=True)
 
-    st.markdown("### Import from Label Studio")
-    st.caption("Pulls completed annotations from Label Studio and saves them as ResponseReview rows.")
-    if st.button("📥 Import Reviews", type="primary", key="op_import"):
-        with st.spinner("Importing…"):
-            result = subprocess.run(
-                [sys.executable, "scripts/hitl_import_reviews.py"],
-                cwd=str(PROJECT_ROOT),
-                capture_output=True,
-                text=True,
-                timeout=120,
-            )
-        if result.returncode == 0:
-            st.cache_data.clear()
-            st.success("Import complete.")
-            with st.expander("Script output"):
-                st.text(result.stdout or "(no output)")
-        else:
-            st.error("Import failed.")
-            st.text(result.stderr)
+
+def _render_hitl_calibration() -> None:
+    """SME-vs-automated calibration status (response_reviews) + response export/import actions."""
+    with st.spinner("Loading SME reviews…"):
+        cal_df = load_calibration_data()
+
+    n = len(cal_df)
+    render_kpi_row([
+        {"label": "Reviews imported", "value": f"{n}", "sub": "SME ResponseReviews"},
+        {"label": "Items reviewed", "value": f"{cal_df['item_id'].nunique() if n else 0}"},
+        {"label": "Reviewers", "value": f"{cal_df['reviewer_id'].nunique() if n else 0}",
+         "sub": "distinct SMEs"},
+    ])
+
+    if n:
+        render_section_divider()
+        _render_calibration_summary(cal_df)
+        st.caption("Full SME-vs-automated, per-item drill-down lives in the **SME Calibration** view.")
+    else:
+        st.info("No SME reviews imported yet. Export responses, annotate them in Label Studio, "
+                "then import the reviews below.")
+
+    render_section_divider()
+    render_section_header("Actions", "Calibration pipeline")
+    st.caption("Pushes unreviewed ModelResponse rows to Label Studio for SME scoring, then pulls "
+               "completed annotations back as ResponseReview rows.")
+    cc1, cc2 = st.columns(2)
+    with cc1:
+        if st.button("📤 Export responses for review", key="cal_export", use_container_width=True):
+            _run_pipeline(["scripts/hitl_export_tasks.py"],
+                          spinner="Exporting responses to Label Studio…", timeout=600)
+    with cc2:
+        if st.button("📥 Import SME reviews", key="cal_import", use_container_width=True):
+            _run_pipeline(["scripts/hitl_import_reviews.py"],
+                          spinner="Importing SME reviews…", clear_cache=True)
 
 
 def render_calibration_view() -> None:
