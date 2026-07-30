@@ -105,9 +105,10 @@ def _live_authoring_counts() -> dict[str, tuple[int, int]]:
     from collections import defaultdict
 
     from hitl.client import LabelStudioClient
+    from hitl.label_config import AUTHORING_PROJECT_TITLE
 
     client = LabelStudioClient()
-    project = client.find_project_by_title("AfroEval — SME Item Authoring v2 (2026-07-19)")
+    project = client.find_project_by_title(AUTHORING_PROJECT_TITLE)
     if project is None:
         return {}
     out: dict[str, list[int]] = defaultdict(lambda: [0, 0])

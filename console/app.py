@@ -62,6 +62,7 @@ from db.models import (
     Scorecard,
 )
 from db.session import get_engine
+from hitl.label_config import AUTHORING_PROJECT_TITLE
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -573,8 +574,9 @@ def load_seeded_pack_ids() -> set:
         return {f"{p.name}_{p.version}" for p in packs}
 
 
-# Title of the SME authoring project in Label Studio (mirrors scripts/coverage_report.py).
-_AUTHORING_PROJECT_TITLE = "AfroEval — SME Item Authoring v2 (2026-07-19)"
+# Canonical SME authoring project title — single source of truth in hitl/label_config.py,
+# shared with the authoring scripts and coverage_report so console + CLI never disagree.
+_AUTHORING_PROJECT_TITLE = AUTHORING_PROJECT_TITLE
 
 
 @st.cache_data(ttl=900, show_spinner=False)

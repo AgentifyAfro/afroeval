@@ -50,7 +50,12 @@ def build_calibration_label_config() -> str:
 # and the provenance. Nothing here is validated data until an SME approves it and
 # it clears the two-validator + IRR pipeline (see docs/BENCHMARK_ITEM_SCHEMA.md).
 
-AUTHORING_PROJECT_TITLE = "AfroEval — SME Item Authoring"
+# The canonical SME authoring project in Label Studio — the single source of truth for the
+# project title, referenced by the authoring scripts, coverage_report, and the console. This is
+# the exact LS project name (it carries a date because that is how the project was created);
+# if the LS project is ever renamed, update this one line. Do NOT date-stamp it per run — that
+# is what spawned duplicate near-empty projects.
+AUTHORING_PROJECT_TITLE = "AfroEval — SME Item Authoring v2 (2026-07-19)"
 
 _LANGUAGES = ["sw", "yo", "am", "ha", "zu", "sheng", "om", "so", "en"]
 _DOMAINS = ["mobile_money", "customer_service", "community_health",

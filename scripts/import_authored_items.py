@@ -24,7 +24,7 @@ never applies the Tier 2 tag itself, since that tag represents the founder's sig
 
 Usage (from afroeval/):
     .\\.venv\\Scripts\\python.exe scripts/import_authored_items.py
-    .\\.venv\\Scripts\\python.exe scripts/import_authored_items.py --project-title "AfroEval — SME Item Authoring (2026-07-16)"
+    (defaults to the canonical AUTHORING_PROJECT_TITLE; pass --project-title to override)
 """
 
 import argparse
@@ -283,9 +283,8 @@ def import_authored_items(project_title: str) -> None:
 
 
 def main() -> None:
-    default_title = f"{AUTHORING_PROJECT_TITLE} ({datetime.now(UTC).strftime('%Y-%m-%d')})"
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--project-title", default=default_title)
+    parser.add_argument("--project-title", default=AUTHORING_PROJECT_TITLE)
     args = parser.parse_args()
     import_authored_items(args.project_title)
 
