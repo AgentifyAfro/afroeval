@@ -148,6 +148,12 @@ PACK_CATALOG = [
 
 _PACK_META: dict[str, str] = {p["id"]: p["label"] for p in PACK_CATALOG}
 
+# Languages that have SME drafts staged in Label Studio but no runnable pack yet — surfaced
+# (disabled) in Run Evaluation so the roster reflects the pipeline. (label, language, draft_count)
+_COMING_PACKS: list[tuple[str, str, int]] = [
+    ("Community Health (Igbo)", "ig", 12),
+]
+
 PROVIDER_MODEL_DEFAULTS = {
     "azure_openai": "gpt-4.1-mini",
     "anthropic":    "claude-haiku-4-5-20251001",
@@ -660,6 +666,28 @@ def _run_pipeline(argv: list[str], *, spinner: str, timeout: int = 300, clear_ca
         st.text(result.stderr or "(no stderr)")
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def load_coverage_summary() -> dict:
+    """Local pack-file coverage against the 10-item scored floor (no DB/LS). Best-effort —
+    reuses scripts.coverage_report so the console and CLI agree on 'clears the floor'."""
+    try:
+        from scripts.coverage_report import _PACKS_DIR, _load_items, newest_versions, pack_status
+
+        newest  = newest_versions(_PACKS_DIR)
+        below   = []
+        cleared = 0
+        for base, path in newest.items():
+            stt = pack_status(_load_items(path))
+            if stt["clears_floor"]:
+                cleared += 1
+            else:
+                below.append((base, stt["floor_gap"]))
+        return {"total": len(newest), "cleared": cleared,
+                "below": sorted(below, key=lambda x: -x[1])}
+    except Exception:
+        return {}
+
+
 # ── UI helpers ────────────────────────────────────────────────────────────────
 
 def _verdict_badge(verdict: str) -> str:
@@ -978,7 +1006,7 @@ def render_run_evaluation() -> None:
         return
 
     # ── Pack selection ────────────────────────────────────────────────────
-    st.markdown("**Select Benchmark Packs**")
+    render_section_header("Configure", "Select benchmark packs")
     btn1, btn2 = st.columns([1, 1])
     with btn1:
         if st.button("Select All", key="op_sel_all"):
@@ -1001,10 +1029,23 @@ def render_run_evaluation() -> None:
             if checked:
                 selected_packs.append(p["id"])
 
+    # Languages with drafts staged but no runnable pack yet — shown disabled so the roster
+    # matches the pipeline (and the redesign mock). Not selectable: launching would have no
+    # pack data. Track authoring progress in HITL Management → Authoring.
+    for j, (label, lang, drafts) in enumerate(_COMING_PACKS):
+        with pack_cols[(len(PACK_CATALOG) + j) % 2]:
+            st.checkbox(
+                f"{label}  ·  authoring",
+                value=False,
+                disabled=True,
+                key=f"op_pack_soon_{lang}",
+                help=f"Authoring in progress — {drafts} drafts staged in Label Studio, no pack yet.",
+            )
+
     render_section_divider()
 
     # ── Model configuration ───────────────────────────────────────────────
-    st.markdown("**Model Configuration**")
+    render_section_header("Model configuration", "Target model")
 
     def _sync_model_id() -> None:
         prov  = st.session_state.get("op_provider", EVALUATED_PROVIDERS[0])
@@ -1056,6 +1097,19 @@ def render_run_evaluation() -> None:
     assessment_name = st.text_input("Assessment Name", key="op_name")
 
     render_section_divider()
+
+    cov = load_coverage_summary()
+    if cov and cov.get("total"):
+        below_n = cov["total"] - cov["cleared"]
+        if below_n:
+            render_callout(
+                f"<b>Coverage note.</b> {below_n} of {cov['total']} packs are below the 10-item "
+                f"scored floor — only floor-clearing packs yield Tier-1 results. {cov['cleared']} "
+                f"cleared. See <b>Pack Management</b> for the per-pack gap.",
+                kind="warn",
+            )
+        else:
+            render_callout(f"<b>Coverage.</b> All {cov['total']} packs clear the 10-item scored floor.")
 
     can_launch = len(selected_packs) > 0 and bool(model_id.strip())
     if not selected_packs:
@@ -1868,10 +1922,11 @@ def render_language_breakdown() -> None:
         return float(val) if val is not None else None
 
     # ── Table 1: Composite Score by Language × Model ───────────────────────
-    st.subheader("Composite Score by Language")
+    render_section_header("Coverage", "Composite by language × model")
     st.caption(
-        "Δ vs EN = language composite minus English (US) composite for the same model. "
-        "Negative values indicate an equity deficit."
+        "Sequential tint on the score columns — darker = lower, cyan = higher; status colours "
+        "stay reserved for the Δ columns. Δ vs EN = language composite minus English (US) "
+        "composite for the same model; negative values indicate an equity deficit."
     )
 
     en_comp_a = _get("en", run_id_a, "composite")
@@ -1934,17 +1989,44 @@ def render_language_breakdown() -> None:
             return f"color: {SUCCESS}; font-weight: 600"
         return "color: #A6ABC4"  # neutral delta — WCAG AA/AAA faint (was #6B7280, 3.6:1)
 
+    def _heat_bg(v):
+        # Sequential ramp (dark → royal → cyan), tuned for the 70–92 composite band, mirroring
+        # the redesign mock. Purely a background tint on the score cells — never the Δ columns.
+        if pd.isna(v):
+            return ""
+        x = max(0.0, min(100.0, float(v)))
+        lo, mid, hi = (26, 26, 36), (65, 105, 225), (0, 207, 255)
+        if x < 80:
+            a, b, t = lo, mid, max(0.0, (x - 70) / 10)
+        else:
+            a, b, t = mid, hi, min(1.0, (x - 80) / 12)
+        c = [round(a[i] + (b[i] - a[i]) * min(1.0, t)) for i in range(3)]
+        return f"background-color: rgb({c[0]},{c[1]},{c[2]}); color: #FFFFFF; font-weight: 600"
+
     def score_fmt(v):
         return "—" if pd.isna(v) else f"{v:.1f}"
 
     def delta_fmt(v):
         return "—" if pd.isna(v) else (f"+{v:.1f}" if v > 0 else f"{v:.1f}")
 
-    fmt: dict = {c: score_fmt for c in [model_a] + ([model_b] if two_models else []) if c in t1_df.columns}
+    score_cols = [c for c in [model_a] + ([model_b] if two_models else []) if c in t1_df.columns]
+    fmt: dict = {c: score_fmt for c in score_cols}
     fmt.update({c: delta_fmt for c in delta_cols})
 
-    styled_t1 = t1_df.style.map(_color_delta, subset=delta_cols).format(fmt, na_rep="—")
+    styled_t1 = (
+        t1_df.style
+        .map(_color_delta, subset=delta_cols)
+        .map(_heat_bg, subset=score_cols)
+        .format(fmt, na_rep="—")
+    )
     st.dataframe(styled_t1, use_container_width=True, hide_index=True)
+    st.markdown(
+        '<div style="display:flex;align-items:center;gap:10px;font-size:12px;color:#A6ABC4;'
+        'margin-top:8px"><span>Lower</span><span style="height:10px;width:180px;border-radius:5px;'
+        'background:linear-gradient(90deg,#1A1A24,#4169E1,#00CFFF)"></span>'
+        '<span>Higher · composite 0–100</span></div>',
+        unsafe_allow_html=True,
+    )
 
     # ── EN Baseline Gap metrics ────────────────────────────────────────────
     african_langs = [lang for lang in langs if lang != "en"]
