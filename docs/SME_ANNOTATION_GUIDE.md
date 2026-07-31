@@ -8,7 +8,7 @@
 
 ## What You Are Doing
 
-AfroEval tests AI models for readiness to serve African users. The models have already responded to hundreds of real-world prompts in languages like Swahili, Yoruba, Amharic, Hausa, Oromo, and Somali. AfroEval's automated system has scored each response — but automated scores need a human check.
+AfroEval tests AI models for readiness to serve African users. The models have already responded to hundreds of real-world prompts in languages like Swahili, Yoruba, Amharic, Hausa, Afaan Oromoo, and Somali. AfroEval's automated system has scored each response — but automated scores need a human check.
 
 **Your job is to review each AI response against the original prompt and score it on six dimensions, then write a short reason for each score.** Your scores calibrate the automated system. When your scores and the machine's scores agree, we know the system is working. When they diverge, your score is the one that counts.
 
@@ -33,7 +33,7 @@ If you see a task queue of zero, the tasks have not yet been assigned to you. Co
 Each task shows three read-only panels at the top, followed by six scoring sections below.
 
 ### Panel 1 — Benchmark Prompt
-The exact question or request that was sent to the AI model. This is always in the target language (Swahili, Yoruba, Amharic, Hausa, Oromo, or Somali). Read this carefully before looking at the response — you need to understand what the user was actually asking.
+The exact question or request that was sent to the AI model. This is always in the target language (Swahili, Yoruba, Amharic, Hausa, Afaan Oromoo, or Somali). Read this carefully before looking at the response — you need to understand what the user was actually asking.
 
 ### Panel 2 — Model Response
 The AI model's answer to the prompt. This is what you are evaluating.

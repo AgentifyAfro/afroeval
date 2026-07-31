@@ -116,7 +116,7 @@ LANGUAGE_NAMES = {
     "ig":    "Igbo",
     "am":    "Amharic",
     "ha":    "Hausa",
-    "om":    "Oromo",
+    "om":    "Afaan Oromoo",
     "zu":    "Zulu",
     "so":    "Somali",
     "sheng": "Sheng",
@@ -145,7 +145,7 @@ PACK_CATALOG = [
     {"id": "remittance_so_v1.0.0",         "label": "Remittance (Somali)",           "language": "so"},
     {"id": "cross_border_trade_ha_v1.0.0", "label": "Cross-Border Trade (Hausa)",    "language": "ha"},
     {"id": "community_health_am_v1.2.0",   "label": "Community Health (Amharic)",    "language": "am"},
-    {"id": "agriculture_om_v1.0.0",        "label": "Agriculture (Oromo)",           "language": "om"},
+    {"id": "agriculture_om_v1.0.0",        "label": "Agriculture (Afaan Oromoo)",    "language": "om"},
     {"id": "agriculture_ha_v1.0.0",        "label": "Agriculture (Hausa)",           "language": "ha"},
     {"id": "public_services_zu_v1.0.0",    "label": "Public Services (Zulu)",        "language": "zu"},
     {"id": "customer_service_yo_v1.0.0",   "label": "Customer Service (Yoruba)",     "language": "yo"},
@@ -1804,7 +1804,7 @@ def render_provider_comparison() -> None:
     render_section_header("Compare", "Provider Comparison")
     st.caption(
         "Side-by-side scorecard results across model providers running the same benchmark packs. "
-        "Validates routing decisions — e.g., whether Anthropic outperforms OpenAI on Oromo/Somali content."
+        "Validates routing decisions — e.g., whether Anthropic outperforms OpenAI on Afaan Oromoo/Somali content."
     )
 
     with st.spinner("Loading scorecards…"):
