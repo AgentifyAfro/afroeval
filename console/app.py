@@ -770,6 +770,17 @@ def _provider_short(provider: str) -> str:
     return PROVIDER_SHORT.get(provider, provider)
 
 
+def _content_filter_count(metrics_by_resp: dict[str, list[dict]]) -> int:
+    """Count metric rows blocked by the judge's content filter — the African-language
+    fairness signal (the judge sees the target-language response)."""
+    return sum(
+        1
+        for rows in metrics_by_resp.values()
+        for m in rows
+        if m.get("error") and m.get("error_cause") == "content_filter"
+    )
+
+
 def _render_comparison_insight(row_a: dict, row_b: dict, dims: list[str]) -> None:
     delta = row_b["composite_score"] - row_a["composite_score"]
     winner = row_b if delta >= 0 else row_a
@@ -1699,6 +1710,15 @@ def render_run_scorecard() -> None:
     if df.empty:
         st.info("No item data — ModelResponse rows may not have been persisted for this run.")
         return
+
+    _cf = _content_filter_count(metrics_by_resp)
+    if _cf:
+        render_callout(
+            f"<b>Content-filter note.</b> {_cf} judge call(s) in this run were blocked by the "
+            "content filter and excluded from scoring — a known false-positive risk on "
+            "African-language responses. See the item drill-down (rows marked <b>Excluded</b>).",
+            kind="warn",
+        )
 
     # Filters
     fc1, fc2, fc3 = st.columns(3)
