@@ -1935,9 +1935,10 @@ def render_language_breakdown() -> None:
     render_console_header()
     render_section_header("Coverage", "Language Comparison")
     st.caption(
-        "Per-language aggregate scores across evaluation runs. English (US) is the "
-        "high-resource baseline — the gap between EN and African language scores "
-        "quantifies the equity deficit each model needs to close."
+        "Per-language deployment-readiness composites, engine-weighted. Every language — "
+        "English (US) included — is scored on the same African-context rubric, so these are "
+        "not general-capability scores and don't compare to MMLU-style benchmarks. English "
+        "runs a US customer-service pack as a control condition, not a high-resource ceiling."
     )
 
     all_rows = load_provider_comparison()
@@ -1994,8 +1995,9 @@ def render_language_breakdown() -> None:
     render_section_header("Coverage", "Composite by language × model")
     st.caption(
         "Sequential tint on the score columns — darker = lower, cyan = higher; status colours "
-        "stay reserved for the Δ columns. Δ vs EN = language composite minus English (US) "
-        "composite for the same model; negative values indicate an equity deficit."
+        "stay reserved for the Δ columns. Δ vs EN = language composite minus the English (US) "
+        "control composite for the same model. Packs differ by domain, so read this as a "
+        "pack-to-pack difference, not a same-task equity measure."
     )
 
     en_comp_a = _get("en", run_id_a, "composite")
@@ -2097,44 +2099,13 @@ def render_language_breakdown() -> None:
         unsafe_allow_html=True,
     )
 
-    # ── EN Baseline Gap metrics ────────────────────────────────────────────
-    african_langs = [lang for lang in langs if lang != "en"]
-    if en_comp_a is not None and african_langs:
-        gaps_a = []
-        for lang in african_langs:
-            g = _get(lang, run_id_a, "composite")
-            if g is not None:
-                gaps_a.append(en_comp_a - g)
-        avg_gap_a = round(sum(gaps_a) / len(gaps_a), 1) if gaps_a else None
-
-        avg_gap_b = None
-        if two_models and en_comp_b is not None:
-            gaps_b = []
-            for lang in african_langs:
-                g = _get(lang, run_id_b, "composite")
-                if g is not None:
-                    gaps_b.append(en_comp_b - g)
-            avg_gap_b = round(sum(gaps_b) / len(gaps_b), 1) if gaps_b else None
-
-        render_section_divider()
-        st.subheader("EN Baseline Gap")
-        st.caption(
-            "Points by which English score exceeds the mean African-language score for the same model. "
-            "A larger gap signals greater language-equity risk."
-        )
-        gc1, gc2 = st.columns(2)
-        with gc1:
-            st.metric(model_a, f"{avg_gap_a:+.1f} pts" if avg_gap_a is not None else "—")
-        with gc2:
-            if two_models:
-                st.metric(model_b, f"{avg_gap_b:+.1f} pts" if avg_gap_b is not None else "—")
-
     # ── Table 2: Dimension × Language pivot ────────────────────────────────
     render_section_divider()
     st.subheader("Dimension × Language Comparison")
     st.caption(
         "Rows = evaluation dimensions. Columns = each language found in the selected runs. "
-        "Gap = language score minus English baseline (negative = equity deficit)."
+        "Gap = language score minus the English (US) control. Different packs and domains — "
+        "a pack-to-pack difference, not a same-task equity measure."
     )
 
     seen_pairs: set[tuple[str, str]] = set()
