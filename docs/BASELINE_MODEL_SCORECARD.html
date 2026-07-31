@@ -1,0 +1,184 @@
+<!--
+  ==============================================================================
+  African Language Readiness - Baseline Model Scorecard  (GENERIC baseline; NOT an AfroEval evaluation)
+  Published artifact (source of record): https://claude.ai/code/artifact/e5ebab61-7a58-442c-9c44-84de38147383
+  Edit here, then redeploy to the SAME artifact URL via the Artifact tool (url:). Favicon: bar-chart.
+  2026-07-31: committed as versioned source (reconstructed from the live artifact); "Oromo" -> "Afaan Oromoo".
+  ==============================================================================
+-->
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    margin: 0; color: #1a1a1a; background: #F9F6F0; line-height: 1.5; }
+  .banner { background: #1B4332; color: #f4efe1; font-size: 11px; padding: 8px 20px;
+    text-align: center; }
+  .page { max-width: 980px; margin: 0 auto; padding: 30px 22px; }
+  h1, h2, h3 { color: #1B4332; }
+  h1 { font-size: 30px; margin: 0 0 4px; text-wrap: balance; }
+  .sub { color: #555; font-size: 15px; margin-bottom: 8px; }
+  .disc { font-size: 12.5px; line-height: 1.55; color: #1B4332; background: #fbf6e6;
+    border: 1px solid #D4AF37; border-left: 6px solid #D4AF37; border-radius: 6px;
+    padding: 14px 16px; margin: 16px 0; font-weight: 500; }
+  .disc::before { content: "DISCLAIMER"; display: block; font-size: 10px;
+    letter-spacing: .12em; color: #D4AF37; font-weight: 800; margin-bottom: 6px; }
+  .disc-c { font-size: 13px; line-height: 1.55; color: #23331f; background: #fff;
+    border: 1px solid #dcd6c6; border-radius: 8px; padding: 16px 18px; margin: 16px 0; }
+  .disc-c p { margin: 8px 0; }
+  .disc-c b { color: #1B4332; }
+  .disc-c-title { font-size: 11px; letter-spacing: .12em; color: #D4AF37;
+    font-weight: 800; margin-bottom: 4px; }
+  .note { font-size: 12px; color: #555; background: #f2efe6; border-radius: 6px;
+    padding: 10px 12px; margin: 10px 0; }
+  table { border-collapse: collapse; width: 100.0%; margin: 12px 0; font-size: 14px;
+    background: #fff; }
+  .scroll { overflow-x: auto; }
+  th, td { border: 1px solid #e2ded2; padding: 7px 9px; text-align: left; vertical-align: top; }
+  th { background: #1B4332; color: #fff; }
+  td { font-variant-numeric: tabular-nums; }
+  .card { border: 1px solid #e4dfd2; border-radius: 10px; padding: 22px; margin: 18px 0;
+    background: #fff; box-shadow: 0 1px 3px rgba(27,67,50,.06); }
+  .cardgrid { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+  .cardgrid .radar { flex: 0 0 248px; }
+  .cardgrid .obs { flex: 1 1 320px; min-width: 260px; }
+  .obs ul { margin: 6px 0 0; padding-left: 18px; }
+  .obs li { margin: 5px 0; font-size: 14px; }
+  .bar { background: #ece7da; border-radius: 4px; height: 15px; overflow: hidden; }
+  .bar > span { display: block; height: 100.0%; background: #1B4332; }
+  .agg { font-size: 44px; font-weight: 800; color: #1B4332; line-height: 1; }
+  .ci { color: #6b6658; font-size: 12px; }
+  .cell { text-align: center; font-weight: 600; }
+  .muted { color: #6b6658; font-size: 13px; }
+  .legend { font-size: 12px; color: #6b6658; margin-top: 6px; }
+  .highlight { background: #fbf1cf; border-left: 5px solid #D4AF37; border-radius: 4px;
+    padding: 13px 15px; margin: 16px 0; font-weight: 700; color: #1B4332; font-size: 14px; }
+  .close { font-size: 14px; color: #1B4332; font-style: italic; margin-top: 14px; }
+  .foot { font-size: 11px; color: #8a8577; border-top: 1px solid #e2ded2; margin-top: 20px;
+    padding-top: 10px; font-family: ui-monospace, Menlo, Consolas, monospace; }
+  a { color: #1B4332; }
+  .pdf-footer { display: none; }
+  @media print {
+    body { background: #fff; }
+    .card, table { break-inside: avoid; }
+    .pdf-footer { display: block; position: fixed; bottom: 0; left: 0; right: 0;
+      font-size: 8px; color: #666; text-align: center; padding: 4px 10px;
+      border-top: 1px solid #ddd; background: #fff; }
+  }
+</style>
+<div class="banner">This Generic Baseline Scorecard is an independent reference document produced using publicly available multilingual benchmarks and standard model APIs. It does not draw from, represent, or approximate AfroEval&#x27;s evaluation system in any form.</div>
+<div class="page">
+<h1>African Language Readiness — Baseline Model Scorecard</h1>
+<div class="sub">Generic Performance Assessment | No Specialized African AI Infrastructure</div>
+<div class="muted">Version 1.0 &nbsp;·&nbsp; 2026-07-25</div>
+<div class="disc">This Generic Baseline Scorecard is an independent reference document produced using publicly available multilingual benchmarks and standard model APIs. It does not draw from, represent, or approximate AfroEval&#x27;s evaluation system in any form.<br><br>AfroEval&#x27;s evaluation architecture, SME-authorized benchmark corpus, proprietary test suite, scoring methodology, data pipelines, Human-in-the-Loop processes, and governance model are not referenced, replicated, or reflected in this report.<br><br>The scores presented here capture how frontier AI models respond to African languages under generic, non-specialized conditions. They are not indicators of performance under AfroEval&#x27;s certified evaluation framework, and should not be interpreted as such.</div>
+<table><tr><th>Model</th><th>Aggregate Score</th></tr><tr><td>Claude Sonnet 4.6 (Anthropic)</td><td><b>98.7%</b></td></tr><tr><td>GPT-4o (OpenAI)</td><td><b>98.3%</b></td></tr><tr><td>Gemini 3.6 Flash (Google)</td><td><b>87.0%</b></td></tr></table>
+<div class="muted">Scores only. No readiness labels, pass/fail badges, or deployment recommendations.</div>
+</div><div class="page"><h2>Executive Summary</h2>
+<div class="disc-c"><div class="disc-c-title">ABOUT THIS SCORECARD</div><p>This report measures how today&#x27;s leading AI models handle African languages using standard, publicly available tests — nothing more, nothing less.</p><p><b>What this scorecard does not use:</b><br>AfroEval&#x27;s proprietary architecture, its SME-authorized benchmark library, its scoring methodology, its data pipelines, its Human-in-the-Loop review processes, or its governance model. None of AfroEval&#x27;s intellectual property is present in this evaluation.</p><p><b>What the scores mean:</b><br>These numbers show how frontier models perform on African languages under generic conditions — the same conditions most organizations use today when they deploy AI without African-specialized evaluation infrastructure.</p><p><b>What the scores do not mean:</b><br>They are not a certified readiness assessment. They are not AfroEval scores. They are not a substitute for African-specific evaluation. That is precisely the gap AfroEval is built to close.</p></div>
+<p>Across 8 African languages and 7 performance dimensions, frontier models scored between 87.0% and 98.7% on generic multilingual tests. These scores reflect what current models can do on broadly-designed evaluations. They do not reflect how the same models perform when assessed against African-specific knowledge, cultural context, and community-level language use — which requires a different kind of measurement entirely.</p>
+<p class="muted">Scores tend to be highest for higher-resource languages (such as Swahili and Hausa) and show more variation for lower-resource languages (such as Somali and Afaan Oromoo). The Language-by-Language view below shows this gradient.</p>
+<h3>Generic Baseline Score vs. AfroEval Score</h3>
+<div class="scroll"><table>
+<tr><th></th><th>Generic Baseline</th><th>AfroEval Scorecard</th></tr>
+<tr><td><b>What is tested</b></td><td>Surface fluency, broad knowledge, generic comprehension</td><td>African-specific cultural accuracy, linguistic nuance, community-context validity, deployment readiness</td></tr>
+<tr><td><b>Test design</b></td><td>Standard multilingual benchmarks</td><td>Proprietary AfroEval test suite (HITL-informed, community-authored)</td></tr>
+<tr><td><b>Score tendency</b></td><td>Higher — rewards general capability</td><td>Stricter — reveals performance under African-specific measurement</td></tr>
+<tr><td><b>Verdict</b></td><td>None issued</td><td>Composable, traceable, defensible readiness assessment</td></tr>
+<tr><td><b>Who interprets</b></td><td>Stakeholder</td><td>AfroEval certified evaluation report</td></tr>
+</table></div>
+<div class="close">What these scores mean for African deployment decisions is a question this report leaves open. A certified AfroEval assessment provides the measurement framework purpose-built to answer it.</div></div><div class="page"><div class="card">
+<h2 style="margin-top:0">Claude Sonnet 4.6 (Anthropic)</h2>
+<div class="agg">98.7%</div>
+<div class="muted">Aggregate score (weighted across 7 dimensions)</div>
+<div class="note">This score reflects model performance on generic, non-specialized African language tests. It measures surface fluency, broad knowledge, and general comprehension — not African-specific cultural accuracy, community-level linguistic nuance, or deployment-context validity. Scores on generic tests tend to be higher than scores on African-specific evaluation frameworks.</div>
+<div class="cardgrid">
+  <div class="radar"><svg viewBox="0 0 280 280" width="248" height="248" role="img" aria-label="Radar chart of the 7 dimension scores"><polygon points="140.0,117.0 158.0,125.7 162.4,145.1 150.0,160.7 130.0,160.7 117.6,145.1 122.0,125.7" fill="none" stroke="#e6e2d8" stroke-width="1"/><polygon points="140.0,94.0 176.0,111.3 184.8,150.2 160.0,181.4 120.0,181.4 95.2,150.2 104.0,111.3" fill="none" stroke="#e6e2d8" stroke-width="1"/><polygon points="140.0,71.0 193.9,97.0 207.3,155.4 169.9,202.2 110.1,202.2 72.7,155.4 86.1,97.0" fill="none" stroke="#e6e2d8" stroke-width="1"/><polygon points="140.0,48.0 211.9,82.6 229.7,160.5 179.9,222.9 100.1,222.9 50.3,160.5 68.1,82.6" fill="none" stroke="#e6e2d8" stroke-width="1"/><line x1="140" y1="140" x2="140.0" y2="48.0" stroke="#ddd" stroke-width="1"/><line x1="140" y1="140" x2="211.9" y2="82.6" stroke="#ddd" stroke-width="1"/><line x1="140" y1="140" x2="229.7" y2="160.5" stroke="#ddd" stroke-width="1"/><line x1="140" y1="140" x2="179.9" y2="222.9" stroke="#ddd" stroke-width="1"/><line x1="140" y1="140" x2="100.1" y2="222.9" stroke="#ddd" stroke-width="1"/><line x1="140" y1="140" x2="50.3" y2="160.5" stroke="#ddd" stroke-width="1"/><line x1="140" y1="140" x2="68.1" y2="82.6" stroke="#ddd" stroke-width="1"/><polygon points="140.0,51.1 211.9,82.6 229.7,160.5 179.9,222.9 100.1,222.9 53.0,159.9 70.9,84.9" fill="#1B4332" fill-opacity="0.22" stroke="#1B4332" stroke-width="2"/><text x="140.0" y="32.0" font-size="10" fill="#555" text-anchor="middle" dominant-baseline="middle">Comp</text><text x="224.4" y="72.7" font-size="10" fill="#555" text-anchor="start" dominant-baseline="middle">Cultural</text><text x="245.3" y="164.0" font-size="10" fill="#555" text-anchor="start" dominant-baseline="middle">Knowledge</text><text x="186.9" y="237.3" font-size="10" fill="#555" text-anchor="start" dominant-baseline="middle">News</text><text x="93.1" y="237.3" font-size="10" fill="#555" text-anchor="end" dominant-baseline="middle">Medical</text><text x="34.7" y="164.0" font-size="10" fill="#555" text-anchor="end" dominant-baseline="middle">Code</text><text x="55.6" y="72.7" font-size="10" fill="#555" text-anchor="end" dominant-baseline="middle">Bias</text></svg></div>
+  <div class="obs"><b>Key observations</b><ul><li>Performed strongest on Cultural Reasoning (100.0%).</li><li>Showed lower scores on Bias / Disparity (96.1%).</li><li>Notable gap: highest in Hausa (99.9%), lowest in Igbo (96.8%); mean English-vs-African disparity ratio 0.96.</li></ul></div>
+</div>
+<h3>Dimension breakdown</h3>
+<div class="scroll"><table><tr><td>Comprehension</td><td style="width:50%"><div class="bar"><span style="width:96.7%"></span></div></td><td>96.7%<div class="ci">95% CI 91.7%–98.7% · n=120</div></td></tr><tr><td>Cultural Reasoning</td><td style="width:50%"><div class="bar"><span style="width:100.0%"></span></div></td><td>100.0%<div class="ci">95% CI 91.2%–100.0% · n=40</div></td></tr><tr><td>Knowledge &amp; Reasoning</td><td style="width:50%"><div class="bar"><span style="width:100.0%"></span></div></td><td>100.0%<div class="ci">95% CI 91.2%–100.0% · n=40</div></td></tr><tr><td>News Classification</td><td style="width:50%"><div class="bar"><span style="width:100.0%"></span></div></td><td>100.0%</td></tr><tr><td>Medical / Health QA</td><td style="width:50%"><div class="bar"><span style="width:100.0%"></span></div></td><td>100.0%<div class="ci">95% CI 91.2%–100.0% · n=40</div></td></tr><tr><td>Code Switching</td><td style="width:50%"><div class="bar"><span style="width:97.0%"></span></div></td><td>97.0%</td></tr><tr><td>Bias / Disparity</td><td style="width:50%"><div class="bar"><span style="width:96.1%"></span></div></td><td>96.1%</td></tr></table></div>
+<h3>Language-by-language</h3>
+<div class="scroll"><table><tr><th>Language</th><th>Weighted score</th><th>Disparity ratio</th></tr><tr><td>Swahili</td><td class="cell" style="background:#08519c;color:#fff">98.2%</td><td>0.98</td></tr><tr><td>Hausa</td><td class="cell" style="background:#08519c;color:#fff">99.9%</td><td>0.98</td></tr><tr><td>Amharic</td><td class="cell" style="background:#08519c;color:#fff">97.9%</td><td>1.02</td></tr><tr><td>Yoruba</td><td class="cell" style="background:#08519c;color:#fff">97.6%</td><td>0.93</td></tr><tr><td>Zulu</td><td class="cell" style="background:#08519c;color:#fff">99.7%</td><td>0.93</td></tr><tr><td>Igbo</td><td class="cell" style="background:#08519c;color:#fff">96.8%</td><td>0.93</td></tr><tr><td>Somali</td><td class="cell" style="background:#08519c;color:#fff">99.4%</td><td>0.96</td></tr><tr><td>Afaan Oromoo</td><td class="cell" style="background:#08519c;color:#fff">99.9%</td><td>0.98</td></tr></table></div>
+<div class="legend">Blue heatmap per Rule 5 — darker blue = stronger generic performance;
+color does not indicate deployment readiness. ⚑ = a medically-unsafe option was chosen
+on at least one health question in that language.</div>
+<div class="disc-c"><div class="disc-c-title">ABOUT THIS SCORECARD</div><p>This report measures how today&#x27;s leading AI models handle African languages using standard, publicly available tests — nothing more, nothing less.</p><p><b>What this scorecard does not use:</b><br>AfroEval&#x27;s proprietary architecture, its SME-authorized benchmark library, its scoring methodology, its data pipelines, its Human-in-the-Loop review processes, or its governance model. None of AfroEval&#x27;s intellectual property is present in this evaluation.</p><p><b>What the scores mean:</b><br>These numbers show how frontier models perform on African languages under generic conditions — the same conditions most organizations use today when they deploy AI without African-specialized evaluation infrastructure.</p></div>
+</div></div><div class="page"><div class="card">
+<h2 style="margin-top:0">GPT-4o (OpenAI)</h2>
+<div class="agg">98.3%</div>
+<div class="muted">Aggregate score (weighted across 7 dimensions)</div>
+<div class="note">This score reflects model performance on generic, non-specialized African language tests. It measures surface fluency, broad knowledge, and general comprehension — not African-specific cultural accuracy, community-level linguistic nuance, or deployment-context validity. Scores on generic tests tend to be higher than scores on African-specific evaluation frameworks.</div>
+<div class="cardgrid">
+  <div class="radar"><svg viewBox="0 0 280 280" width="248" height="248" role="img" aria-label="Radar chart of the 7 dimension scores"><polygon points="140.0,117.0 158.0,125.7 162.4,145.1 150.0,160.7 130.0,160.7 117.6,145.1 122.0,125.7" fill="none" stroke="#e6e2d8" stroke-width="1"/><polygon points="140.0,94.0 176.0,111.3 184.8,150.2 160.0,181.4 120.0,181.4 95.2,150.2 104.0,111.3" fill="none" stroke="#e6e2d8" stroke-width="1"/><polygon points="140.0,71.0 193.9,97.0 207.3,155.4 169.9,202.2 110.1,202.2 72.7,155.4 86.1,97.0" fill="none" stroke="#e6e2d8" stroke-width="1"/><polygon points="140.0,48.0 211.9,82.6 229.7,160.5 179.9,222.9 100.1,222.9 50.3,160.5 68.1,82.6" fill="none" stroke="#e6e2d8" stroke-width="1"/><line x1="140" y1="140" x2="140.0" y2="48.0" stroke="#ddd" stroke-width="1"/><line x1="140" y1="140" x2="211.9" y2="82.6" stroke="#ddd" stroke-width="1"/><line x1="140" y1="140" x2="229.7" y2="160.5" stroke="#ddd" stroke-width="1"/><line x1="140" y1="140" x2="179.9" y2="222.9" stroke="#ddd" stroke-width="1"/><line x1="140" y1="140" x2="100.1" y2="222.9" stroke="#ddd" stroke-width="1"/><line x1="140" y1="140" x2="50.3" y2="160.5" stroke="#ddd" stroke-width="1"/><line x1="140" y1="140" x2="68.1" y2="82.6" stroke="#ddd" stroke-width="1"/><polygon points="140.0,50.3 211.9,82.6 229.7,160.5 179.9,222.9 100.1,222.9 57.9,158.7 71.5,85.3" fill="#1B4332" fill-opacity="0.22" stroke="#1B4332" stroke-width="2"/><text x="140.0" y="32.0" font-size="10" fill="#555" text-anchor="middle" dominant-baseline="middle">Comp</text><text x="224.4" y="72.7" font-size="10" fill="#555" text-anchor="start" dominant-baseline="middle">Cultural</text><text x="245.3" y="164.0" font-size="10" fill="#555" text-anchor="start" dominant-baseline="middle">Knowledge</text><text x="186.9" y="237.3" font-size="10" fill="#555" text-anchor="start" dominant-baseline="middle">News</text><text x="93.1" y="237.3" font-size="10" fill="#555" text-anchor="end" dominant-baseline="middle">Medical</text><text x="34.7" y="164.0" font-size="10" fill="#555" text-anchor="end" dominant-baseline="middle">Code</text><text x="55.6" y="72.7" font-size="10" fill="#555" text-anchor="end" dominant-baseline="middle">Bias</text></svg></div>
+  <div class="obs"><b>Key observations</b><ul><li>Performed strongest on Cultural Reasoning (100.0%).</li><li>Showed lower scores on Code Switching (91.5%).</li><li>Notable gap: highest in Swahili (100.0%), lowest in Afaan Oromoo (96.1%); mean English-vs-African disparity ratio 0.95.</li></ul></div>
+</div>
+<h3>Dimension breakdown</h3>
+<div class="scroll"><table><tr><td>Comprehension</td><td style="width:50%"><div class="bar"><span style="width:97.5%"></span></div></td><td>97.5%<div class="ci">95% CI 92.9%–99.1% · n=120</div></td></tr><tr><td>Cultural Reasoning</td><td style="width:50%"><div class="bar"><span style="width:100.0%"></span></div></td><td>100.0%<div class="ci">95% CI 91.2%–100.0% · n=40</div></td></tr><tr><td>Knowledge &amp; Reasoning</td><td style="width:50%"><div class="bar"><span style="width:100.0%"></span></div></td><td>100.0%<div class="ci">95% CI 91.2%–100.0% · n=40</div></td></tr><tr><td>News Classification</td><td style="width:50%"><div class="bar"><span style="width:100.0%"></span></div></td><td>100.0%</td></tr><tr><td>Medical / Health QA</td><td style="width:50%"><div class="bar"><span style="width:100.0%"></span></div></td><td>100.0%<div class="ci">95% CI 91.2%–100.0% · n=40</div></td></tr><tr><td>Code Switching</td><td style="width:50%"><div class="bar"><span style="width:91.5%"></span></div></td><td>91.5%</td></tr><tr><td>Bias / Disparity</td><td style="width:50%"><div class="bar"><span style="width:95.3%"></span></div></td><td>95.3%</td></tr></table></div>
+<h3>Language-by-language</h3>
+<div class="scroll"><table><tr><th>Language</th><th>Weighted score</th><th>Disparity ratio</th></tr><tr><td>Swahili</td><td class="cell" style="background:#08519c;color:#fff">100.0%</td><td>1.00</td></tr><tr><td>Hausa</td><td class="cell" style="background:#08519c;color:#fff">99.9%</td><td>0.98</td></tr><tr><td>Amharic</td><td class="cell" style="background:#08519c;color:#fff">97.8%</td><td>0.89</td></tr><tr><td>Yoruba</td><td class="cell" style="background:#08519c;color:#fff">97.4%</td><td>0.89</td></tr><tr><td>Zulu</td><td class="cell" style="background:#08519c;color:#fff">99.9%</td><td>0.98</td></tr><tr><td>Igbo</td><td class="cell" style="background:#08519c;color:#fff">97.3%</td><td>0.96</td></tr><tr><td>Somali</td><td class="cell" style="background:#08519c;color:#fff">97.8%</td><td>0.98</td></tr><tr><td>Afaan Oromoo</td><td class="cell" style="background:#08519c;color:#fff">96.1%</td><td>0.96</td></tr></table></div>
+<div class="legend">Blue heatmap per Rule 5 — darker blue = stronger generic performance;
+color does not indicate deployment readiness. ⚑ = a medically-unsafe option was chosen
+on at least one health question in that language.</div>
+<div class="disc-c"><div class="disc-c-title">ABOUT THIS SCORECARD</div><p>This report measures how today&#x27;s leading AI models handle African languages using standard, publicly available tests — nothing more, nothing less.</p><p><b>What this scorecard does not use:</b><br>AfroEval&#x27;s proprietary architecture, its SME-authorized benchmark library, its scoring methodology, its data pipelines, its Human-in-the-Loop review processes, or its governance model. None of AfroEval&#x27;s intellectual property is present in this evaluation.</p><p><b>What the scores mean:</b><br>These numbers show how frontier models perform on African languages under generic conditions — the same conditions most organizations use today when they deploy AI without African-specialized evaluation infrastructure.</p></div>
+</div></div><div class="page"><div class="card">
+<h2 style="margin-top:0">Gemini 3.6 Flash (Google)</h2>
+<div class="agg">87.0%</div>
+<div class="muted">Aggregate score (weighted across 7 dimensions)</div>
+<div class="note">This score reflects model performance on generic, non-specialized African language tests. It measures surface fluency, broad knowledge, and general comprehension — not African-specific cultural accuracy, community-level linguistic nuance, or deployment-context validity. Scores on generic tests tend to be higher than scores on African-specific evaluation frameworks.</div>
+<div class="cardgrid">
+  <div class="radar"><svg viewBox="0 0 280 280" width="248" height="248" role="img" aria-label="Radar chart of the 7 dimension scores"><polygon points="140.0,117.0 158.0,125.7 162.4,145.1 150.0,160.7 130.0,160.7 117.6,145.1 122.0,125.7" fill="none" stroke="#e6e2d8" stroke-width="1"/><polygon points="140.0,94.0 176.0,111.3 184.8,150.2 160.0,181.4 120.0,181.4 95.2,150.2 104.0,111.3" fill="none" stroke="#e6e2d8" stroke-width="1"/><polygon points="140.0,71.0 193.9,97.0 207.3,155.4 169.9,202.2 110.1,202.2 72.7,155.4 86.1,97.0" fill="none" stroke="#e6e2d8" stroke-width="1"/><polygon points="140.0,48.0 211.9,82.6 229.7,160.5 179.9,222.9 100.1,222.9 50.3,160.5 68.1,82.6" fill="none" stroke="#e6e2d8" stroke-width="1"/><line x1="140" y1="140" x2="140.0" y2="48.0" stroke="#ddd" stroke-width="1"/><line x1="140" y1="140" x2="211.9" y2="82.6" stroke="#ddd" stroke-width="1"/><line x1="140" y1="140" x2="229.7" y2="160.5" stroke="#ddd" stroke-width="1"/><line x1="140" y1="140" x2="179.9" y2="222.9" stroke="#ddd" stroke-width="1"/><line x1="140" y1="140" x2="100.1" y2="222.9" stroke="#ddd" stroke-width="1"/><line x1="140" y1="140" x2="50.3" y2="160.5" stroke="#ddd" stroke-width="1"/><line x1="140" y1="140" x2="68.1" y2="82.6" stroke="#ddd" stroke-width="1"/><polygon points="140.0,79.4 211.9,82.6 229.7,160.5 179.9,222.9 100.1,222.9 69.6,156.1 101.1,109.0" fill="#1B4332" fill-opacity="0.22" stroke="#1B4332" stroke-width="2"/><text x="140.0" y="32.0" font-size="10" fill="#555" text-anchor="middle" dominant-baseline="middle">Comp</text><text x="224.4" y="72.7" font-size="10" fill="#555" text-anchor="start" dominant-baseline="middle">Cultural</text><text x="245.3" y="164.0" font-size="10" fill="#555" text-anchor="start" dominant-baseline="middle">Knowledge</text><text x="186.9" y="237.3" font-size="10" fill="#555" text-anchor="start" dominant-baseline="middle">News</text><text x="93.1" y="237.3" font-size="10" fill="#555" text-anchor="end" dominant-baseline="middle">Medical</text><text x="34.7" y="164.0" font-size="10" fill="#555" text-anchor="end" dominant-baseline="middle">Code</text><text x="55.6" y="72.7" font-size="10" fill="#555" text-anchor="end" dominant-baseline="middle">Bias</text></svg></div>
+  <div class="obs"><b>Key observations</b><ul><li>Performed strongest on Cultural Reasoning (100.0%).</li><li>Showed lower scores on Bias / Disparity (54.1%).</li><li>Notable gap: highest in Hausa (90.6%), lowest in Yoruba (80.4%); mean English-vs-African disparity ratio 0.54.</li></ul></div>
+</div>
+<h3>Dimension breakdown</h3>
+<div class="scroll"><table><tr><td>Comprehension</td><td style="width:50%"><div class="bar"><span style="width:65.8%"></span></div></td><td>65.8%<div class="ci">95% CI 57.0%–73.7% · n=120</div></td></tr><tr><td>Cultural Reasoning</td><td style="width:50%"><div class="bar"><span style="width:100.0%"></span></div></td><td>100.0%<div class="ci">95% CI 91.2%–100.0% · n=40</div></td></tr><tr><td>Knowledge &amp; Reasoning</td><td style="width:50%"><div class="bar"><span style="width:100.0%"></span></div></td><td>100.0%<div class="ci">95% CI 91.2%–100.0% · n=40</div></td></tr><tr><td>News Classification</td><td style="width:50%"><div class="bar"><span style="width:100.0%"></span></div></td><td>100.0%</td></tr><tr><td>Medical / Health QA</td><td style="width:50%"><div class="bar"><span style="width:100.0%"></span></div></td><td>100.0%<div class="ci">95% CI 91.2%–100.0% · n=40</div></td></tr><tr><td>Code Switching</td><td style="width:50%"><div class="bar"><span style="width:78.5%"></span></div></td><td>78.5%</td></tr><tr><td>Bias / Disparity</td><td style="width:50%"><div class="bar"><span style="width:54.1%"></span></div></td><td>54.1%</td></tr></table></div>
+<h3>Language-by-language</h3>
+<div class="scroll"><table><tr><th>Language</th><th>Weighted score</th><th>Disparity ratio</th></tr><tr><td>Swahili</td><td class="cell" style="background:#08519c;color:#fff">88.6%</td><td>0.70</td></tr><tr><td>Hausa</td><td class="cell" style="background:#08519c;color:#fff">90.6%</td><td>0.52</td></tr><tr><td>Amharic</td><td class="cell" style="background:#08519c;color:#fff">87.1%</td><td>0.55</td></tr><tr><td>Yoruba</td><td class="cell" style="background:#08519c;color:#fff">80.4%</td><td>0.31</td></tr><tr><td>Zulu</td><td class="cell" style="background:#08519c;color:#fff">86.3%</td><td>0.50</td></tr><tr><td>Igbo</td><td class="cell" style="background:#08519c;color:#fff">90.2%</td><td>0.69</td></tr><tr><td>Somali</td><td class="cell" style="background:#08519c;color:#fff">88.5%</td><td>0.58</td></tr><tr><td>Afaan Oromoo</td><td class="cell" style="background:#08519c;color:#fff">84.5%</td><td>0.47</td></tr></table></div>
+<div class="legend">Blue heatmap per Rule 5 — darker blue = stronger generic performance;
+color does not indicate deployment readiness. ⚑ = a medically-unsafe option was chosen
+on at least one health question in that language.</div>
+<div class="disc-c"><div class="disc-c-title">ABOUT THIS SCORECARD</div><p>This report measures how today&#x27;s leading AI models handle African languages using standard, publicly available tests — nothing more, nothing less.</p><p><b>What this scorecard does not use:</b><br>AfroEval&#x27;s proprietary architecture, its SME-authorized benchmark library, its scoring methodology, its data pipelines, its Human-in-the-Loop review processes, or its governance model. None of AfroEval&#x27;s intellectual property is present in this evaluation.</p><p><b>What the scores mean:</b><br>These numbers show how frontier models perform on African languages under generic conditions — the same conditions most organizations use today when they deploy AI without African-specialized evaluation infrastructure.</p></div>
+</div></div><div class="page"><h2>Language-by-Language View</h2>
+<div class="muted">Languages ordered by resource level (higher → lower).</div>
+<div class="scroll"><table><tr><th>Language</th><th>Claude Sonnet 4.6 (Anthropic)</th><th>GPT-4o (OpenAI)</th><th>Gemini 3.6 Flash (Google)</th></tr><tr><td><b>Swahili</b></td><td class="cell" style="background:#08519c;color:#fff">98.2%</td><td class="cell" style="background:#08519c;color:#fff">100.0%</td><td class="cell" style="background:#08519c;color:#fff">88.6%</td></tr><tr><td><b>Hausa</b></td><td class="cell" style="background:#08519c;color:#fff">99.9%</td><td class="cell" style="background:#08519c;color:#fff">99.9%</td><td class="cell" style="background:#08519c;color:#fff">90.6%</td></tr><tr><td><b>Amharic</b></td><td class="cell" style="background:#08519c;color:#fff">97.9%</td><td class="cell" style="background:#08519c;color:#fff">97.8%</td><td class="cell" style="background:#08519c;color:#fff">87.1%</td></tr><tr><td><b>Yoruba</b></td><td class="cell" style="background:#08519c;color:#fff">97.6%</td><td class="cell" style="background:#08519c;color:#fff">97.4%</td><td class="cell" style="background:#08519c;color:#fff">80.4%</td></tr><tr><td><b>Zulu</b></td><td class="cell" style="background:#08519c;color:#fff">99.7%</td><td class="cell" style="background:#08519c;color:#fff">99.9%</td><td class="cell" style="background:#08519c;color:#fff">86.3%</td></tr><tr><td><b>Igbo</b></td><td class="cell" style="background:#08519c;color:#fff">96.8%</td><td class="cell" style="background:#08519c;color:#fff">97.3%</td><td class="cell" style="background:#08519c;color:#fff">90.2%</td></tr><tr><td><b>Somali</b></td><td class="cell" style="background:#08519c;color:#fff">99.4%</td><td class="cell" style="background:#08519c;color:#fff">97.8%</td><td class="cell" style="background:#08519c;color:#fff">88.5%</td></tr><tr><td><b>Afaan Oromoo</b></td><td class="cell" style="background:#08519c;color:#fff">99.9%</td><td class="cell" style="background:#08519c;color:#fff">96.1%</td><td class="cell" style="background:#08519c;color:#fff">84.5%</td></tr></table></div>
+<div class="legend">Darker blue = stronger generic test performance.
+Color does not indicate deployment readiness.</div></div><div class="page"><h2>Public Benchmark Reference</h2>
+<div class="muted">Third-party published data — not AfroEval evaluations.</div>
+<div class="scroll"><table>
+<tr><th>Model</th><th>Provider</th><th>Overall</th><th>AfriMCQA</th><th>AfriMMLU</th><th>MasakhaNEWS</th><th>AfriMedQA</th></tr>
+<tr><td>GPT-5.2</td><td>OpenAI</td><td>72.03</td><td>75.50</td><td>67.38</td><td>75.27</td><td>69.97</td></tr><tr><td>Gemini 2.5 Flash</td><td>Google</td><td>71.79</td><td>81.05</td><td>60.50</td><td>71.20</td><td>74.42</td></tr><tr><td>Claude Haiku 4.5</td><td>Anthropic</td><td>62.10</td><td>63.46</td><td>54.75</td><td>67.72</td><td>62.49</td></tr></table></div>
+<div class="muted">Source: DataLens Africa LLM Leaderboard — <a href="https://datalens.africa/llm-leaderboard">https://datalens.africa/llm-leaderboard</a> (accessed 2026-05-23). IrokoBench (arxiv.org/abs/2406.03368) — AfriXNLI, AfriMGSM, AfriMMLU across 17 African languages</div>
+<div class="note">These published scores are provided for reference and triangulation only.
+They were produced by independent researchers using their own methodologies.
+AfroEval does not endorse or validate these scores.</div>
+<h3>About these benchmarks</h3>
+<p>These are the African-language NLP benchmarks the field uses to measure how well
+AI models handle African languages — most from the African NLP research community
+(notably Masakhane) and related academic efforts. This scorecard authors its own
+original items inspired by their task formats; it does not use the datasets themselves.</p>
+<div class="scroll"><table>
+<tr><th>Benchmark</th><th>Task type</th><th>What it measures</th><th>Baseline Model Scorecard it maps to</th></tr>
+<tr><td>AfriMCQA</td><td>Multiple-choice, cultural knowledge</td><td>Whether the model knows African cultural context — customs, institutions, geography, traditions</td><td>Dimension 2 — Cultural Reasoning</td></tr>
+<tr><td>AfriMMLU</td><td>Multiple-choice, general knowledge</td><td>African-language version of the MMLU exam (broad academic / factual knowledge); part of IrokoBench</td><td>Dimension 3 — Knowledge &amp; Reasoning</td></tr>
+<tr><td>MasakhaNEWS</td><td>Text classification</td><td>Sorting African-language news headlines into topics (business, health, politics, sports, etc.)</td><td>Dimension 4 — News Classification</td></tr>
+<tr><td>AfriMedQA</td><td>Medical question-answering</td><td>Answering basic health / medical questions accurately and safely in African contexts</td><td>Dimension 5 — Medical / Health QA</td></tr>
+</table></div>
+<div class="highlight">They're the academic/community &ldquo;standardized tests&rdquo; for African-language AI;
+our scorecard borrows their task formats to author original items, and cites their
+published results separately as an outside reference point.</div></div><div class="page"><h2>Methodology Note</h2>
+<p><b>What was tested:</b> 7 standard, publicly recognized dimensions —
+comprehension, cultural reasoning, knowledge &amp; reasoning, news
+classification, medical/health QA, code-switching, and bias/disparity — all
+zero-shot with no African-specific tuning. Items are original, authored by
+AgentifyAfro and inspired by the task formats of public benchmarks; they are not
+drawn from or affiliated with those benchmarks.</p>
+<div class="disc">This Generic Baseline Scorecard is produced solely using publicly available multilingual benchmarks and standard commercial model APIs. No component of AfroEval&#x27;s intellectual property is incorporated herein, including but not limited to: its proprietary evaluation architecture, SME-authorized benchmark corpus, test suite design, scoring and weighting methodology, data ingestion and processing pipelines, Human-in-the-Loop (HITL) quality processes, and AI governance model.<br><br>The scores and observations in this report reflect frontier model behavior on African languages as encountered under generic, non-specialized evaluation conditions only. They do not represent, approximate, or substitute for performance measurements produced under AfroEval&#x27;s certified evaluation framework. No claim is made regarding African-language deployment readiness.<br><br>AfroEval Scorecard™ and its evaluation methodology are proprietary to AgentifyAfro.</div>
+<p><b>Why generic tests produce higher scores:</b> generic multilingual tests
+reward broad capability and surface fluency, not African-specific accuracy,
+cultural context, or community-level language use. Scores are therefore
+structurally biased upward relative to an African-specialized evaluation.</p>
+<p><b>Why the distinction matters:</b> a high generic score does not establish
+that a model is fit for African-language deployment. That determination requires
+a measurement framework built for the context.</p>
+<p><b>Judging:</b> open-ended dimensions are scored by a neutral third-party
+model that is never one of the models being scored, at temperature 0. See
+docs/methodology.md for the full disclosure.</p>
+<p class="close">Contact AfroEval for a certified readiness assessment.</p></div><div class="page"><div class="foot"><b>Reproducibility</b><br>prompt_set_sha256[:32] = 65f245a51a6f2aefd5c0befa2a165ffe<br>generated_utc = 2026-07-24T20:21:39.754492Z<br>judge = gpt-4.1-mini (Azure) / gpt-4.1-mini @ temperature 0.0<br>model[anthropic] = claude-sonnet-4-6 @ temperature 0.0<br>model[openai] = gpt-4o @ temperature 0.0<br>model[gemini] = gemini-3.6-flash @ temperature 0.0<br><br><span style="font-style:italic">prompt_set_sha256 is a fingerprint of the exact prompt set used — it changes if any prompt changes. Together these fields make every score traceable and reproducible.</span></div></div><div class="pdf-footer">This Generic Baseline Scorecard is an independent reference document produced using publicly available multilingual benchmarks and standard model APIs. It does not draw from, represent, or approximate AfroEval&#x27;s evaluation system in any form.</div>

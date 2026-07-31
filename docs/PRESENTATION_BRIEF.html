@@ -1,0 +1,913 @@
+<!--
+  ==============================================================================
+  AfroEval Scorecard(TM) - Presentation Brief   ·   CONFIDENTIAL - AgentifyAfro.ai
+  Published artifact (source of record): https://claude.ai/code/artifact/3abda659-25e4-476d-b938-5a85cbd90238
+  Edit here, then redeploy to the SAME artifact URL via the Artifact tool (url:). Favicon: globe.
+  2026-07-31: committed as versioned source (reconstructed from the live artifact); "Oromo" -> "Afaan Oromoo".
+  ==============================================================================
+-->
+<title>AfroEval Scorecard — Presentation Brief</title>
+<style>
+  :root {
+    --forest:    #1D4A2E;
+    --amber:     #C47F17;
+    --sage:      #4A7C59;
+    --paper:     #F6F7F4;
+    --mist:      #E8EDE9;
+    --ink:       #1A2B1F;
+    --warm-dark: #2C3B30;
+    --body-text: #2E3D32;
+    --muted:     #5E7266;
+    --card-bg:   #FFFFFF;
+    --border:    #D9E2DA;
+
+    --f-display: Georgia, 'Times New Roman', serif;
+    --f-body:    -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    --f-mono:    ui-monospace, 'Cascadia Code', 'Menlo', monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--paper);
+    color: var(--body-text);
+    font-family: var(--f-body);
+    font-size: 1rem;
+    line-height: 1.7;
+    margin: 0;
+    padding: 0;
+  }
+
+  .page {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 3.5rem 2rem 6rem;
+  }
+
+  /* ── Header ── */
+  .header {
+    border-left: 4px solid var(--amber);
+    padding-left: 1.5rem;
+    margin-bottom: 3.5rem;
+  }
+
+  .product-eyebrow {
+    display: block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--sage);
+    margin-bottom: 0.6rem;
+  }
+
+  .product-name {
+    font-family: var(--f-display);
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 400;
+    color: var(--forest);
+    line-height: 1.1;
+    text-wrap: balance;
+    margin: 0 0 0.75rem;
+    letter-spacing: -0.01em;
+  }
+
+  .product-tagline {
+    font-family: var(--f-display);
+    font-size: 1.2rem;
+    font-style: italic;
+    color: var(--muted);
+    margin: 0;
+    line-height: 1.45;
+    max-width: 55ch;
+  }
+
+  .header-meta {
+    display: flex;
+    gap: 2rem;
+    margin-top: 1.25rem;
+    font-size: 0.78rem;
+    color: var(--muted);
+    flex-wrap: wrap;
+  }
+
+  /* ── Section anatomy ── */
+  .section {
+    margin-bottom: 2.75rem;
+  }
+
+  .eyebrow {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--amber);
+    margin-bottom: 0.6rem;
+  }
+
+  .section-title {
+    font-family: var(--f-display);
+    font-size: 1.55rem;
+    color: var(--forest);
+    font-weight: 400;
+    line-height: 1.25;
+    text-wrap: balance;
+    margin: 0 0 0.9rem;
+  }
+
+  p {
+    margin: 0 0 0.9rem;
+    max-width: 65ch;
+  }
+
+  p:last-child { margin-bottom: 0; }
+
+  hr.divider {
+    border: none;
+    border-top: 1px solid var(--mist);
+    margin: 2.5rem 0;
+  }
+
+  /* ── Highlight callout ── */
+  .callout {
+    background: var(--mist);
+    border-left: 3px solid var(--forest);
+    padding: 1rem 1.25rem;
+    margin: 1.25rem 0;
+    border-radius: 0 2px 2px 0;
+  }
+
+  .callout p {
+    margin: 0;
+    font-family: var(--f-display);
+    font-style: italic;
+    color: var(--forest);
+    font-size: 1.1rem;
+    max-width: none;
+  }
+
+  /* ── Six Dimensions ── */
+  .dimensions-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.875rem;
+    margin-top: 1.25rem;
+  }
+
+  .dim-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    padding: 1.1rem 1.1rem 0.9rem;
+    border-radius: 3px;
+  }
+
+  .dim-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-bottom: 0.45rem;
+  }
+
+  .dim-name {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--ink);
+    line-height: 1.3;
+  }
+
+  .dim-pct {
+    font-family: var(--f-mono);
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--amber);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .weight-track {
+    height: 3px;
+    background: var(--mist);
+    border-radius: 2px;
+    margin-bottom: 0.65rem;
+    overflow: hidden;
+  }
+
+  .weight-fill {
+    height: 100%;
+    background: var(--forest);
+    border-radius: 2px;
+    transition: width 0s;
+  }
+
+  .dim-desc {
+    font-size: 0.8rem;
+    color: var(--muted);
+    line-height: 1.5;
+    margin: 0;
+    max-width: none;
+  }
+
+  .dim-langs {
+    margin-top: 0.45rem;
+    font-size: 0.72rem;
+    color: var(--sage);
+    font-weight: 500;
+  }
+
+  /* ── Verdict list ── */
+  .verdict-list {
+    list-style: none;
+    padding: 0;
+    margin: 1.1rem 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .verdict-item {
+    display: grid;
+    grid-template-columns: 10px 1fr auto;
+    gap: 0.85rem;
+    align-items: start;
+    padding: 0.8rem 1rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+  }
+
+  .v-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-top: 0.45rem;
+    flex-shrink: 0;
+  }
+
+  .v-body { display: flex; flex-direction: column; gap: 0.2rem; }
+
+  .v-name {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--ink);
+    line-height: 1.3;
+  }
+
+  .v-desc {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin: 0;
+    max-width: none;
+  }
+
+  .v-range {
+    font-family: var(--f-mono);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+    white-space: nowrap;
+    padding-top: 0.3rem;
+  }
+
+  .dot-ready  { background: #2D7A4F; }
+  .dot-cond   { background: #C47F17; }
+  .dot-notr   { background: #C4521A; }
+  .dot-highr  { background: #B81C1C; }
+
+  /* ── Tables ── */
+  .table-wrap {
+    overflow-x: auto;
+    margin: 1rem 0;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  thead th {
+    text-align: left;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0.55rem 0.875rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--paper);
+    white-space: nowrap;
+  }
+
+  tbody td {
+    padding: 0.6rem 0.875rem;
+    border-bottom: 1px solid var(--mist);
+    color: var(--body-text);
+    vertical-align: top;
+    line-height: 1.45;
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+
+  td.missing {
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  td.check { color: #2D7A4F; font-weight: 600; font-size: 0.9rem; }
+
+  /* ── Differentiator list ── */
+  .diff-list {
+    list-style: none;
+    padding: 0;
+    margin: 1.1rem 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .diff-item {
+    display: grid;
+    grid-template-columns: 2.5rem 1fr;
+    gap: 0.75rem;
+    align-items: start;
+  }
+
+  .diff-num {
+    font-family: var(--f-display);
+    font-size: 2rem;
+    font-weight: 400;
+    color: var(--border);
+    line-height: 1;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    padding-top: 0.05rem;
+  }
+
+  .diff-inner { display: flex; flex-direction: column; gap: 0.2rem; }
+
+  .diff-title {
+    font-weight: 600;
+    font-size: 0.9375rem;
+    color: var(--forest);
+    margin: 0;
+    line-height: 1.3;
+  }
+
+  .diff-body {
+    font-size: 0.82rem;
+    color: var(--muted);
+    margin: 0;
+    max-width: 57ch;
+    line-height: 1.55;
+  }
+
+  /* ── Stack section ── */
+  .stack-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1rem;
+  }
+
+  .stack-row {
+    display: grid;
+    grid-template-columns: 9rem 1fr;
+    gap: 0.5rem;
+    align-items: start;
+    font-size: 0.82rem;
+  }
+
+  .stack-key {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding-top: 0.15rem;
+    line-height: 1.4;
+  }
+
+  .pill-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+
+  .pill {
+    display: inline-block;
+    padding: 0.175rem 0.55rem;
+    background: var(--mist);
+    color: var(--warm-dark);
+    font-size: 0.75rem;
+    font-weight: 500;
+    border-radius: 2px;
+    font-family: var(--f-body);
+    white-space: nowrap;
+  }
+
+  /* ── Closing ── */
+  .closing {
+    border-top: 3px solid var(--forest);
+    padding-top: 2rem;
+    margin-top: 3rem;
+  }
+
+  .closing-quote {
+    font-family: var(--f-display);
+    font-size: clamp(1.2rem, 3vw, 1.55rem);
+    font-style: italic;
+    color: var(--forest);
+    line-height: 1.4;
+    text-wrap: balance;
+    margin: 0 0 0.9rem;
+    max-width: 52ch;
+  }
+
+  .closing-sub {
+    font-size: 0.875rem;
+    color: var(--muted);
+    margin: 0;
+    max-width: 55ch;
+    line-height: 1.6;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 580px) {
+    .dimensions-grid { grid-template-columns: 1fr; }
+    .verdict-item { grid-template-columns: 10px 1fr; }
+    .v-range { grid-column: 2; padding-top: 0; }
+    .stack-row { grid-template-columns: 1fr; }
+    .stack-key { padding-bottom: 0.2rem; }
+    .diff-item { grid-template-columns: 2rem 1fr; }
+    .diff-num { font-size: 1.5rem; }
+  }
+
+  /* ── Focus ── */
+  :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+  }
+</style>
+
+<div class="page">
+
+  <!-- ── Header ── -->
+  <header class="header">
+    <span class="product-eyebrow">AgentifyAfro · AI Quality Operations</span>
+    <h1 class="product-name">AfroEval Scorecard™</h1>
+    <p class="product-tagline">The first AI deployment readiness evaluation designed for African language markets.</p>
+    <div class="header-meta">
+      <span>Presentation Brief</span>
+      <span>July 2026</span>
+      <span>Confidential — AgentifyAfro.ai</span>
+    </div>
+  </header>
+
+  <!-- ── 1. The Problem ── -->
+  <section class="section" aria-labelledby="problem-title">
+    <span class="eyebrow">The Problem</span>
+    <h2 class="section-title" id="problem-title">AI is being deployed in Africa without Africa-specific evaluation</h2>
+    <p>Every major AI benchmark — MMLU, HellaSwag, BIG-Bench, XTREME — shares the same blind spot: they evaluate models in English, in Western cultural contexts, for Western deployment scenarios. Every one of them.</p>
+    <p>Meanwhile, AI is being deployed today across African markets in mobile banking, community health, agriculture, and government services — serving hundreds of millions of users who speak <strong>Swahili, Yoruba, Amharic, Hausa, Afaan Oromoo, Somali, Zulu, Sheng,</strong> and <strong>English</strong>, who communicate in code-switched registers including <strong>Sheng, Nigerian Pidgin, Kinyarwanda-French,</strong> and <strong>Darija (Moroccan Arabic-French)</strong>, and who live in informal economies and low-literacy contexts no existing benchmark was designed to test.</p>
+    <p>The result: AI systems earn passing scores on benchmarks that never tested them for African users. The risks are immediate and measurable:</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Failure mode</th>
+            <th>Consequence</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Model responds in English to a Swahili prompt</td><td>User loses trust; task fails silently</td></tr>
+          <tr><td>Model fabricates mobile money operators or central bank regulations</td><td>Direct financial harm to the user</td></tr>
+          <tr><td>Model performs worse for rural or low-literacy users</td><td>Discriminatory service; regulatory risk</td></tr>
+          <tr><td>Model violates cultural or religious norms in a health context</td><td>Destroys trust; causes real-world harm</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>No existing product measures any of these. AfroEval does.</p>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ── 2. What AfroEval Is ── -->
+  <section class="section" aria-labelledby="what-title">
+    <span class="eyebrow">The Solution</span>
+    <h2 class="section-title" id="what-title">What AfroEval Scorecard is</h2>
+    <p>AfroEval Scorecard™ is an AI quality evaluation system designed specifically for African deployment contexts. It produces a single, governance-grade composite score (0–100) that tells an organisation whether an AI system is ready to serve African users — and exactly where it falls short if it is not.</p>
+    <div class="callout">
+      <p>Every score is defensible to a board, a regulator, or a procurement committee. Every failing item has a specific prompt, a specific model response, and a specific reason.</p>
+    </div>
+    <p>AfroEval evaluates models across six dimensions, each with SME-validated benchmarks, automated LLM-judge scoring, and Fairlearn-backed cohort disparity measurement. Scores decompose to individual test items so nothing hides behind an average.</p>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ── 3. Six Dimensions ── -->
+  <section class="section" aria-labelledby="dims-title">
+    <span class="eyebrow">How It Works</span>
+    <h2 class="section-title" id="dims-title">The six evaluation dimensions</h2>
+    <p>Each dimension is independently scored and weighted. The composite is renormalized over only the dimensions that were evaluated — a pack without cohort data does not inflate or deflate the score.</p>
+
+    <div class="dimensions-grid">
+
+      <div class="dim-card">
+        <div class="dim-header">
+          <span class="dim-name">Language Performance</span>
+          <span class="dim-pct">25%</span>
+        </div>
+        <div class="weight-track"><div class="weight-fill" style="width:100%"></div></div>
+        <p class="dim-desc">Accuracy and fluency in the target African language. A model that responds in English to a Swahili prompt has failed its user — regardless of answer quality.</p>
+        <div class="dim-langs">Swahili · Yoruba · Amharic · Hausa · Zulu · Afaan Oromoo · Somali · Sheng · English</div>
+      </div>
+
+      <div class="dim-card">
+        <div class="dim-header">
+          <span class="dim-name">Cultural Appropriateness</span>
+          <span class="dim-pct">20%</span>
+        </div>
+        <div class="weight-track"><div class="weight-fill" style="width:80%"></div></div>
+        <p class="dim-desc">Alignment with local norms, social register, and deployment context. Scored on the AfroEval Cultural Rubric — a 1–5 scale calibrated by African SME validators across four domains.</p>
+        <div class="dim-langs">Mobile money · Health · Agriculture · Customer service</div>
+      </div>
+
+      <div class="dim-card">
+        <div class="dim-header">
+          <span class="dim-name">Hallucination Risk</span>
+          <span class="dim-pct">20%</span>
+        </div>
+        <div class="weight-track"><div class="weight-fill" style="width:80%"></div></div>
+        <p class="dim-desc">African-specific fact verification. Tests whether the model fabricates mobile money operators, central banks, geographic facts, health protocols, or agricultural data specific to the continent.</p>
+        <div class="dim-langs">M-Pesa · TeleBirr · MTN MoMo · African central banks · NCDC · KEMRI</div>
+      </div>
+
+      <div class="dim-card">
+        <div class="dim-header">
+          <span class="dim-name">Bias &amp; Fairness</span>
+          <span class="dim-pct">15%</span>
+        </div>
+        <div class="weight-track"><div class="weight-fill" style="width:60%"></div></div>
+        <p class="dim-desc">Disparate impact ratio across five cohorts using Fairlearn MetricFrame. If the worst cohort scores below 80% of the best cohort, the dimension fails and a remediation flag is raised.</p>
+        <div class="dim-langs">Formal economy · Informal economy · Rural · Low-literacy · Feature-phone users</div>
+      </div>
+
+      <div class="dim-card">
+        <div class="dim-header">
+          <span class="dim-name">Code-Switching Quality</span>
+          <span class="dim-pct">10%</span>
+        </div>
+        <div class="weight-track"><div class="weight-fill" style="width:40%"></div></div>
+        <p class="dim-desc">Register match, switch naturalness, and language preservation — evaluated on every item in a run, not just tagged items. African users mix languages naturally; the evaluator is designed to reflect that.</p>
+        <div class="dim-langs">Sheng · Nigerian Pidgin · Kinyarwanda-French · Darija</div>
+      </div>
+
+      <div class="dim-card">
+        <div class="dim-header">
+          <span class="dim-name">Safety &amp; Robustness</span>
+          <span class="dim-pct">10%</span>
+        </div>
+        <div class="weight-track"><div class="weight-fill" style="width:40%"></div></div>
+        <p class="dim-desc">Harmful content detection, refusal calibration, and adversarial robustness — evaluated in African deployment contexts, not generic Western safety scenarios.</p>
+        <div class="dim-langs">Context-sensitive harm · Refusal calibration · Adversarial edge cases</div>
+      </div>
+
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ── 4. Verdict System ── -->
+  <section class="section" aria-labelledby="verdict-title">
+    <span class="eyebrow">The Output</span>
+    <h2 class="section-title" id="verdict-title">The verdict system</h2>
+    <p>AfroEval produces a single composite score and a deployment verdict. A safety veto applies independently: if Safety &amp; Robustness scores below 30, the verdict is forced to High-Risk regardless of the composite.</p>
+
+    <ul class="verdict-list" role="list">
+      <li class="verdict-item">
+        <span class="v-dot dot-ready" aria-hidden="true"></span>
+        <div class="v-body">
+          <span class="v-name">Deployment-Ready</span>
+          <p class="v-desc">Suitable for production deployment in African markets. All dimensions at or above their pass thresholds.</p>
+        </div>
+        <span class="v-range">80–100</span>
+      </li>
+      <li class="verdict-item">
+        <span class="v-dot dot-cond" aria-hidden="true"></span>
+        <div class="v-body">
+          <span class="v-name">Conditional</span>
+          <p class="v-desc">Suitable for deployment with identified remediation. Scorecard includes a prioritised Remediation Roadmap.</p>
+        </div>
+        <span class="v-range">60–79</span>
+      </li>
+      <li class="verdict-item">
+        <span class="v-dot dot-notr" aria-hidden="true"></span>
+        <div class="v-body">
+          <span class="v-name">Not-Ready</span>
+          <p class="v-desc">Significant gaps present. Deployment is not recommended until dimension-level issues are resolved.</p>
+        </div>
+        <span class="v-range">40–59</span>
+      </li>
+      <li class="verdict-item">
+        <span class="v-dot dot-highr" aria-hidden="true"></span>
+        <div class="v-body">
+          <span class="v-name">High-Risk</span>
+          <p class="v-desc">Fundamental failures. Deployment in this state poses measurable harm risk to African users.</p>
+        </div>
+        <span class="v-range">0–39</span>
+      </li>
+    </ul>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ── 5. Benchmark Library ── -->
+  <section class="section" aria-labelledby="bench-title">
+    <span class="eyebrow">The Proprietary Moat</span>
+    <h2 class="section-title" id="bench-title">SME-validated benchmark library</h2>
+    <p>Every benchmark item is authored by an African SME — a native or near-native speaker with domain expertise — and validated through a two-validator review process with inter-rater reliability measurement. Items must have a verifiable provenance (an observed real deployment scenario), a prompt written as a real user would write it, and an expected-behavior specification, not a sample answer.</p>
+    <p>The methodology is publishable — transparency builds trust and establishes AfroEval as the standard. The calibrated, adjudicated benchmark data is what makes the score credible. That data stays proprietary.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Pack</th>
+            <th>Language</th>
+            <th>Domain</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Mobile Money</td><td>Swahili</td><td>Financial services</td></tr>
+          <tr><td>Remittance</td><td>Somali</td><td>Financial services</td></tr>
+          <tr><td>Cross-Border Trade</td><td>Hausa</td><td>Commerce</td></tr>
+          <tr><td>Community Health</td><td>Amharic</td><td>Healthcare</td></tr>
+          <tr><td>Agriculture</td><td>Afaan Oromoo</td><td>Agriculture</td></tr>
+          <tr><td>Agriculture</td><td>Hausa</td><td>Agriculture</td></tr>
+          <tr><td>Public Services</td><td>Zulu</td><td>Government</td></tr>
+          <tr><td>Customer Service</td><td>Yoruba</td><td>Service delivery</td></tr>
+          <tr><td>Urban Digital</td><td>Sheng</td><td>Multi-domain</td></tr>
+          <tr><td>Code-Switching</td><td>Mixed</td><td>Language quality</td></tr>
+          <tr><td>Safety</td><td>Mixed</td><td>Harm prevention</td></tr>
+          <tr><td>Customer Service</td><td>English</td><td>Baseline comparison</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ── 6. Competitive Landscape ── -->
+  <section class="section" aria-labelledby="comp-title">
+    <span class="eyebrow">Market Context</span>
+    <h2 class="section-title" id="comp-title">Does anything similar exist?</h2>
+    <p>No direct competitor exists. The landscape contains general benchmarks, multilingual NLP research, and bias frameworks — none of them are evaluation <em>products</em> designed for African deployment readiness.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Product / category</th>
+            <th>What it covers</th>
+            <th>What it misses</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>MMLU, HellaSwag, BIG-Bench</td>
+            <td>English academic knowledge benchmarks</td>
+            <td class="missing">Everything African</td>
+          </tr>
+          <tr>
+            <td>XTREME, XGLUE, FLORES</td>
+            <td>Multilingual NLP tasks (some African languages)</td>
+            <td class="missing">No cultural rubric, no hallucination probes, no cohort fairness, no verdict</td>
+          </tr>
+          <tr>
+            <td>Anthropic / OpenAI safety evals</td>
+            <td>General safety and harmlessness evaluation</td>
+            <td class="missing">Not Africa-specific; no language or cultural dimensions</td>
+          </tr>
+          <tr>
+            <td>Fairlearn, AI Fairness 360</td>
+            <td>Bias measurement frameworks</td>
+            <td class="missing">Frameworks only — require your own benchmark data; not a product</td>
+          </tr>
+          <tr>
+            <td>General LLM leaderboards</td>
+            <td>English benchmarks, broad coverage</td>
+            <td class="missing">No African languages; no deployment readiness verdict</td>
+          </tr>
+          <tr>
+            <td>Masakhane NLP</td>
+            <td>African NLP research, datasets</td>
+            <td class="missing">Academic research, not a commercial evaluation product</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="margin-top:1rem;">No existing product tests African language fluency as a deployment gate, runs African-specific hallucination probes, evaluates cultural appropriateness with African SME-calibrated rubrics, or measures performance disparity across informal economy and rural cohorts.</p>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ── 7. Differentiators ── -->
+  <section class="section" aria-labelledby="diff-title">
+    <span class="eyebrow">Differentiation</span>
+    <h2 class="section-title" id="diff-title">What makes AfroEval different</h2>
+
+    <ul class="diff-list" role="list">
+      <li class="diff-item">
+        <span class="diff-num" aria-hidden="true">1</span>
+        <div class="diff-inner">
+          <p class="diff-title">Built for Africa, not adapted for Africa</p>
+          <p class="diff-body">Every dimension, benchmark item, and cohort definition was designed from scratch for African deployment contexts. This is not a Western benchmark with African language strings swapped in.</p>
+        </div>
+      </li>
+      <li class="diff-item">
+        <span class="diff-num" aria-hidden="true">2</span>
+        <div class="diff-inner">
+          <p class="diff-title">The benchmark library is the moat</p>
+          <p class="diff-body">The methodology can be published — transparency builds trust. The SME-validated, adjudicated, provenance-verified data cannot be replicated cheaply or quickly. That is what makes the score defensible in a procurement room.</p>
+        </div>
+      </li>
+      <li class="diff-item">
+        <span class="diff-num" aria-hidden="true">3</span>
+        <div class="diff-inner">
+          <p class="diff-title">Governance-grade output</p>
+          <p class="diff-body">Every verdict decomposes to specific failing test cases: actual prompts, actual model responses, actual failure reasons. A board member or regulator can audit the result. No black-box number.</p>
+        </div>
+      </li>
+      <li class="diff-item">
+        <span class="diff-num" aria-hidden="true">4</span>
+        <div class="diff-inner">
+          <p class="diff-title">Africa-specific hallucination detection</p>
+          <p class="diff-body">A model may cite US institutions flawlessly while fabricating African mobile money operators, central bank regulations, and geographic facts. No other product catches this. AfroEval runs a dedicated African hallucination probe set on every evaluation.</p>
+        </div>
+      </li>
+      <li class="diff-item">
+        <span class="diff-num" aria-hidden="true">5</span>
+        <div class="diff-inner">
+          <p class="diff-title">Code-switching coverage on every item</p>
+          <p class="diff-body">Urban African users code-switch naturally — Sheng, Nigerian Pidgin, Kinyarwanda-French, Darija. AfroEval measures register match and language preservation on all items, not just tagged ones, because staying correctly in one language is as meaningful a signal as switching between two.</p>
+        </div>
+      </li>
+      <li class="diff-item">
+        <span class="diff-num" aria-hidden="true">6</span>
+        <div class="diff-inner">
+          <p class="diff-title">Cohort fairness for the informal economy</p>
+          <p class="diff-body">Existing fairness frameworks use Western demographic categories. None measure AI performance disparity across informal-economy workers, rural users, low-literacy users, and feature-phone users. AfroEval is the only product that does.</p>
+        </div>
+      </li>
+      <li class="diff-item">
+        <span class="diff-num" aria-hidden="true">7</span>
+        <div class="diff-inner">
+          <p class="diff-title">SME-in-the-loop validation</p>
+          <p class="diff-body">Automated scores are calibrated against expert African SME judgment. Items are authored and validated by people with direct knowledge of the deployment context — not crowdsourced annotation. Inter-rater reliability is measured; disagreements go to adjudication.</p>
+        </div>
+      </li>
+    </ul>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ── 8. Problem → Solution Mapping ── -->
+  <section class="section" aria-labelledby="map-title">
+    <span class="eyebrow">Problem → Solution</span>
+    <h2 class="section-title" id="map-title">How each problem is addressed</h2>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Problem</th>
+            <th>AfroEval response</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Models respond in English to African-language prompts</td>
+            <td>Language Performance (25%) — flags English-response failures; measures fluency and accuracy in 9 anchor languages</td>
+          </tr>
+          <tr>
+            <td>Models violate local cultural norms</td>
+            <td>Cultural Appropriateness (20%) — SME-calibrated 1–5 rubric across four African deployment domains</td>
+          </tr>
+          <tr>
+            <td>Models fabricate Africa-specific facts</td>
+            <td>Hallucination Risk (20%) — dedicated probe set covering mobile money, regulatory bodies, geography, health, agriculture</td>
+          </tr>
+          <tr>
+            <td>Models perform worse for informal or rural users</td>
+            <td>Bias &amp; Fairness (15%) — Fairlearn disparate impact ratio across 5 cohorts; remediation flag if worst &lt; 80% of best</td>
+          </tr>
+          <tr>
+            <td>Models fail code-switched inputs</td>
+            <td>Code-Switching Quality (10%) — register match, switch naturalness, language preservation on every item in a run</td>
+          </tr>
+          <tr>
+            <td>Models produce harmful outputs in African contexts</td>
+            <td>Safety &amp; Robustness (10%) — Africa-context harm detection, refusal calibration, adversarial probes; veto override below 30</td>
+          </tr>
+          <tr>
+            <td>No single deployment-readiness verdict</td>
+            <td>Composite AfroEval Score (0–100) with Deployment-Ready / Conditional / Not-Ready / High-Risk verdict</td>
+          </tr>
+          <tr>
+            <td>No actionable remediation guidance</td>
+            <td>Remediation Roadmap — dimensions ranked by priority (weight × gap from threshold) with specific recommendations</td>
+          </tr>
+          <tr>
+            <td>No cross-provider comparison</td>
+            <td>Side-by-side scorecard view across Azure OpenAI, Anthropic, OpenAI, and Google Gemini on the same benchmark pack</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- ── 9. Technical Stack ── -->
+  <section class="section" aria-labelledby="stack-title">
+    <span class="eyebrow">Under the Hood</span>
+    <h2 class="section-title" id="stack-title">Technical stack</h2>
+
+    <div class="stack-grid">
+      <div class="stack-row">
+        <span class="stack-key">Evaluation engine</span>
+        <div class="pill-group">
+          <span class="pill">Python</span>
+          <span class="pill">FastAPI</span>
+          <span class="pill">Supabase (PostgreSQL)</span>
+        </div>
+      </div>
+      <div class="stack-row">
+        <span class="stack-key">Scoring</span>
+        <div class="pill-group">
+          <span class="pill">Fairlearn — bias/fairness</span>
+          <span class="pill">DeepEval — semantic similarity</span>
+          <span class="pill">LLM-judge evaluators</span>
+        </div>
+      </div>
+      <div class="stack-row">
+        <span class="stack-key">Benchmark library</span>
+        <div class="pill-group">
+          <span class="pill">JSONL packs</span>
+          <span class="pill">SME-validated</span>
+          <span class="pill">Versioned</span>
+        </div>
+      </div>
+      <div class="stack-row">
+        <span class="stack-key">Console</span>
+        <div class="pill-group">
+          <span class="pill">Streamlit</span>
+          <span class="pill">Run scorecards</span>
+          <span class="pill">Compare providers</span>
+          <span class="pill">Item drill-down</span>
+          <span class="pill">PDF export</span>
+        </div>
+      </div>
+      <div class="stack-row">
+        <span class="stack-key">Model connectors</span>
+        <div class="pill-group">
+          <span class="pill">Azure OpenAI</span>
+          <span class="pill">Anthropic Claude</span>
+          <span class="pill">OpenAI</span>
+          <span class="pill">Google Gemini</span>
+        </div>
+      </div>
+      <div class="stack-row">
+        <span class="stack-key">HITL pipeline</span>
+        <div class="pill-group">
+          <span class="pill">Label Studio — SME authoring &amp; validation</span>
+        </div>
+      </div>
+      <div class="stack-row">
+        <span class="stack-key">Deployment</span>
+        <div class="pill-group">
+          <span class="pill">Streamlit Cloud (console)</span>
+          <span class="pill">Supabase (database)</span>
+          <span class="pill">Vercel</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Closing ── -->
+  <div class="closing">
+    <p class="closing-quote">"Is this model ready for our African users — in their language, in their cultural context, across all the communities we serve?"</p>
+    <p class="closing-sub">That is the question every responsible AI deployer needs to answer before going live. AfroEval is the only evaluation system that answers it with evidence. The world's first AI deployment readiness standard, built for Africa.</p>
+  </div>
+
+</div>
