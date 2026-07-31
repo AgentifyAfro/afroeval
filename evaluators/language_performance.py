@@ -372,22 +372,31 @@ class MultilingualSimilarityEvaluator(BaseEvaluator):
         except Exception as exc:
             exc_str = str(exc)
             is_auth_error = "401" in exc_str or "unauthorized" in exc_str.lower()
-            if is_auth_error:
-                _logger.warning(
-                    "MultilingualSimilarityEvaluator: 401 auth error from HuggingFace — "
-                    "check HF_TOKEN in .env (remove it or set a valid token from "
-                    "huggingface.co/settings/tokens). Skipping metric row."
-                )
+            is_missing_dep = (
+                isinstance(exc, (ModuleNotFoundError, ImportError))
+                or "no module named" in exc_str.lower()
+            )
+            if is_auth_error or is_missing_dep:
+                # Infra/config unavailability — a bad/expired HF token, or sentence-transformers
+                # not installed on this deployment. The metric CANNOT run, so this is not a
+                # genuine 0.0 score: mark it not-applicable so the dispatcher skips persistence
+                # (no dead FAIL row in the results) and it renormalises out of the composite.
+                if is_auth_error:
+                    reason = "Auth error (401) — HF_TOKEN invalid or expired. No score recorded."
+                else:
+                    reason = f"Multilingual similarity unavailable: {exc}"
+                _logger.warning("MultilingualSimilarityEvaluator unavailable: %s — skipping metric row.", exc)
                 return MetricOutput(
                     dimension=self.dimension,
                     metric_name=self.metric_name,
                     score=0.0,
                     passed=False,
-                    reason="Auth error (401) — HF_TOKEN invalid or expired. No score recorded.",
+                    reason=reason,
                     applicable=False,
                     error=True,
                 )
-            # Non-auth errors: keep the row, flag as error, score=0.0
+            # Other (transient) failures — e.g. a connection timeout — keep the row visible so
+            # the failure is noticed; flag as error, score=0.0.
             return MetricOutput(
                 dimension=self.dimension,
                 metric_name=self.metric_name,

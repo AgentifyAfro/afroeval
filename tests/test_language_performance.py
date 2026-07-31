@@ -24,7 +24,9 @@ def test_multilingual_similarity_401_returns_not_applicable():
 
 
 def test_multilingual_similarity_non_auth_error_stays_applicable():
-    """Non-auth errors (network, missing package) keep the row but flag as error."""
+    """Transient errors (e.g. a network timeout) keep the row visible but flag it as an error,
+    so the failure is noticed. (Permanent infra failures — auth, missing dep — are skipped;
+    see the tests around this one.)"""
     ev = MultilingualSimilarityEvaluator()
     with patch(
         "evaluators.language_performance._get_multilingual_model",
@@ -36,6 +38,20 @@ def test_multilingual_similarity_non_auth_error_stays_applicable():
             expected_behavior="e",
         )
     assert result.applicable is True
+    assert result.error is True
+    assert result.score == 0.0
+
+
+def test_multilingual_similarity_missing_dependency_not_applicable():
+    """sentence-transformers not installed -> the metric cannot run, so it must be skipped
+    (applicable=False), not persisted as a dead 0.0 FAIL row in the Metric Results."""
+    ev = MultilingualSimilarityEvaluator()
+    with patch(
+        "evaluators.language_performance._get_multilingual_model",
+        side_effect=ModuleNotFoundError("No module named 'sentence_transformers'"),
+    ):
+        result = ev.evaluate(prompt="p", model_response="r", expected_behavior="e")
+    assert result.applicable is False
     assert result.error is True
     assert result.score == 0.0
 
