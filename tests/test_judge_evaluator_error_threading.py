@@ -1,8 +1,8 @@
 """Judge-backed evaluators thread error/error_cause from JudgeResult into MetricOutput."""
-from evaluators.llm_judge import JudgeResult
-from evaluators.safety import HarmfulContentEvaluator
 from ail.code_switching import RegisterMatchEvaluator
 from ail.cultural_appropriateness import CulturalAppropriatenessEvaluator
+from evaluators.llm_judge import JudgeResult
+from evaluators.safety import HarmfulContentEvaluator
 
 
 class _FakeJudge:

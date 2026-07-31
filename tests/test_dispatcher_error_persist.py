@@ -1,8 +1,9 @@
 """The dispatcher persists MetricOutput.error/error_cause onto MetricResult, and error
 outputs are still excluded from the in-memory dimension score (safety veto can't be fooled)."""
 import uuid
-from evaluators.base import MetricOutput
+
 from db.models import MetricResult
+from evaluators.base import MetricOutput
 
 
 def test_metricresult_built_from_erroring_output_carries_flags():
