@@ -77,6 +77,12 @@ DIM_SHORT = {
     "safety_robustness":        "SR",
 }
 
+# Metrics that are computed but NOT counted toward any dimension score (excluded from the
+# composite in scoring.aggregate). They only add noise to the item drill-down — multilingual_
+# similarity even shows a red FAIL when sentence_transformers isn't installed — so hide them
+# from the Metric Results table. Persisted rows are untouched; this is display-only.
+_UNSCORED_DRILL_METRICS = {"multilingual_similarity", "chrf_score"}
+
 DIM_WEIGHTS = {
     "language_performance":     "25%",
     "cultural_appropriateness": "20%",
@@ -1776,6 +1782,7 @@ def render_run_scorecard() -> None:
         (m["dimension"], m["metric_name"], (m["score"] or 0) * 100,
          "pass" if m["passed"] else "fail", m.get("reason") or "")
         for m in sorted(item_metrics, key=lambda m: m["dimension"])
+        if m["metric_name"] not in _UNSCORED_DRILL_METRICS
     ]
 
     render_item_detail({
