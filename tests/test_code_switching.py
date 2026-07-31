@@ -13,6 +13,7 @@ from ail.code_switching import (
     RegisterMatchEvaluator,
     SwitchNaturalnessEvaluator,
 )
+from evaluators.llm_judge import JudgeResult
 
 ALL_EVALUATOR_CLASSES = [RegisterMatchEvaluator, SwitchNaturalnessEvaluator, LanguagePreservationEvaluator]
 EXPECTED_METRIC_NAMES = {
@@ -24,7 +25,7 @@ EXPECTED_METRIC_NAMES = {
 
 def _fake_judge(score: float, reason: str = "test reason") -> MagicMock:
     judge = MagicMock()
-    judge.score.return_value = (score, reason)
+    judge.score.return_value = JudgeResult(score, reason)
     return judge
 
 

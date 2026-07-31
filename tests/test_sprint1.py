@@ -40,27 +40,29 @@ class TestLLMJudge:
 
     def test_score_returns_float_and_reason(self):
         judge = self._make_judge(0.85, "Good semantic match")
-        score, reason = judge.score("some criterion")
-        assert score == pytest.approx(0.85)
-        assert "Good semantic match" in reason
+        result = judge.score("some criterion")
+        assert result.score == pytest.approx(0.85)
+        assert "Good semantic match" in result.reason
 
     def test_score_clamps_above_1(self):
         judge = self._make_judge(1.5, "Too high")
-        score, _ = judge.score("criterion")
-        assert score == 1.0
+        result = judge.score("criterion")
+        assert result.score == 1.0
 
     def test_score_clamps_below_0(self):
         judge = self._make_judge(-0.3, "Negative")
-        score, _ = judge.score("criterion")
-        assert score == 0.0
+        result = judge.score("criterion")
+        assert result.score == 0.0
 
     def test_score_returns_fallback_on_api_error(self):
         mock_client = MagicMock()
         mock_client.chat.completions.create.side_effect = Exception("API down")
         judge = LLMJudge(client=mock_client, model="mock")
-        score, reason = judge.score("criterion", fallback=0.5)
-        assert score == 0.5
-        assert "Judge unavailable" in reason
+        result = judge.score("criterion", fallback=0.5)
+        assert result.score == 0.5
+        assert "Judge unavailable" in result.reason
+        assert result.error is True
+        assert result.error_cause == "unavailable"
 
     def test_score_returns_fallback_on_bad_json(self):
         mock_client = MagicMock()
@@ -68,8 +70,11 @@ class TestLLMJudge:
             choices=[MagicMock(message=MagicMock(content="not json at all"))]
         )
         judge = LLMJudge(client=mock_client, model="mock")
-        score, reason = judge.score("criterion", fallback=0.42)
-        assert score == pytest.approx(0.42)
+        with patch("evaluators.llm_judge.time.sleep"):
+            result = judge.score("criterion", fallback=0.42)
+        assert result.score == pytest.approx(0.42)
+        assert result.error is True
+        assert result.error_cause == "parse_error"
 
 
 # ── SemanticSimilarityEvaluator ───────────────────────────────────────────────

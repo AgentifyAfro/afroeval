@@ -76,14 +76,16 @@ class RegisterMatchEvaluator(BaseEvaluator):
             f"Reference (expected behavior, for context only): {expected_behavior}\n\n"
             'Respond with: {"score": <float 0.0-1.0>, "reason": "<one sentence>"}'
         )
-        score, reason = self._judge.score(criterion, fallback=0.5)
+        r = self._judge.score(criterion, fallback=0.5)
 
         return MetricOutput(
             dimension=self.dimension,
             metric_name=self.metric_name,
-            score=score,
-            passed=score >= 0.6,
-            reason=reason,
+            score=r.score,
+            passed=r.score >= 0.6,
+            reason=r.reason,
+            error=r.error,
+            error_cause=r.error_cause,
         )
 
 
@@ -137,14 +139,16 @@ class SwitchNaturalnessEvaluator(BaseEvaluator):
             f"Reference (expected behavior, for context only): {expected_behavior}\n\n"
             'Respond with: {"score": <float 0.0-1.0>, "reason": "<one sentence>"}'
         )
-        score, reason = self._judge.score(criterion, fallback=0.5)
+        r = self._judge.score(criterion, fallback=0.5)
 
         return MetricOutput(
             dimension=self.dimension,
             metric_name=self.metric_name,
-            score=score,
-            passed=score >= 0.6,
-            reason=reason,
+            score=r.score,
+            passed=r.score >= 0.6,
+            reason=r.reason,
+            error=r.error,
+            error_cause=r.error_cause,
         )
 
 
@@ -199,12 +203,14 @@ class LanguagePreservationEvaluator(BaseEvaluator):
             f"Reference (expected behavior, for context only): {expected_behavior}\n\n"
             'Respond with: {"score": <float 0.0-1.0>, "reason": "<one sentence>"}'
         )
-        score, reason = self._judge.score(criterion, fallback=0.5)
+        r = self._judge.score(criterion, fallback=0.5)
 
         return MetricOutput(
             dimension=self.dimension,
             metric_name=self.metric_name,
-            score=score,
-            passed=score >= 0.6,
-            reason=reason,
+            score=r.score,
+            passed=r.score >= 0.6,
+            reason=r.reason,
+            error=r.error,
+            error_cause=r.error_cause,
         )

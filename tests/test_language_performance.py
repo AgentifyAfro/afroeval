@@ -7,7 +7,9 @@ from evaluators.language_performance import MultilingualSimilarityEvaluator
 
 
 def test_multilingual_similarity_401_returns_not_applicable():
-    """A 401 auth error from HuggingFace Hub must NOT be stored as a real 0.0 score."""
+    """A 401 auth error from HuggingFace Hub must NOT be stored as a real 0.0 score —
+    it is persisted-and-excluded (error=True, error_cause="unavailable"), not a genuine
+    measurement."""
     ev = MultilingualSimilarityEvaluator()
     with patch(
         "evaluators.language_performance._get_multilingual_model",
@@ -18,8 +20,9 @@ def test_multilingual_similarity_401_returns_not_applicable():
             model_response="r",
             expected_behavior="e",
         )
-    assert result.applicable is False
+    assert result.applicable is True
     assert result.error is True
+    assert result.error_cause == "unavailable"
     assert "401" in result.reason or "auth" in result.reason.lower()
 
 
@@ -43,16 +46,18 @@ def test_multilingual_similarity_non_auth_error_stays_applicable():
 
 
 def test_multilingual_similarity_missing_dependency_not_applicable():
-    """sentence-transformers not installed -> the metric cannot run, so it must be skipped
-    (applicable=False), not persisted as a dead 0.0 FAIL row in the Metric Results."""
+    """sentence-transformers not installed -> the metric cannot run, so it is persisted
+    with error=True, error_cause="unavailable" (excluded from scoring, but visible/auditable
+    rather than silently dropped via applicable=False)."""
     ev = MultilingualSimilarityEvaluator()
     with patch(
         "evaluators.language_performance._get_multilingual_model",
         side_effect=ModuleNotFoundError("No module named 'sentence_transformers'"),
     ):
         result = ev.evaluate(prompt="p", model_response="r", expected_behavior="e")
-    assert result.applicable is False
+    assert result.applicable is True
     assert result.error is True
+    assert result.error_cause == "unavailable"
     assert result.score == 0.0
 
 

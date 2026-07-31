@@ -107,4 +107,5 @@ class FaithfulnessEvaluator(BaseEvaluator):
             passed=score >= 0.7,
             reason=reason,
             error=error,
+            error_cause="unavailable" if error else None,
         )

@@ -11,8 +11,16 @@ import json
 import logging
 import random
 import time
+from dataclasses import dataclass
 
-from openai import AzureOpenAI, BadRequestError, OpenAI, RateLimitError
+from openai import (
+    APIConnectionError,
+    APITimeoutError,
+    AzureOpenAI,
+    BadRequestError,
+    OpenAI,
+    RateLimitError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -26,13 +34,22 @@ _SYSTEM_PROMPT = (
 )
 
 
+@dataclass
+class JudgeResult:
+    """Result of one judge call. error=True marks an infra failure, not a measurement."""
+    score: float
+    reason: str
+    error: bool = False
+    error_cause: str | None = None   # rate_limit | content_filter | parse_error | timeout | unavailable
+
+
 class LLMJudge:
     """
     Calls an LLM to score a model response against a rubric criterion.
 
     Usage:
         judge = LLMJudge.from_azure(api_key, endpoint, deployment, api_version)
-        score, reason = judge.score(criterion_prompt)
+        result = judge.score(criterion_prompt)
     """
 
     def __init__(self, client: AzureOpenAI | OpenAI, model: str):
@@ -58,16 +75,21 @@ class LLMJudge:
     def from_openai(cls, api_key: str, model: str = "gpt-4o") -> "LLMJudge":
         return cls(OpenAI(api_key=api_key), model)
 
-    def score(self, criterion: str, fallback: float = 0.5) -> tuple[float, str]:
-        """
-        Ask the judge to evaluate based on a criterion prompt.
+    def score(self, criterion: str, fallback: float = 0.5) -> JudgeResult:
+        """Ask the judge to evaluate against a criterion prompt.
 
-        The criterion prompt must instruct the model to return:
-            {"score": <float 0.0–1.0>, "reason": "<string>"}
-
-        Returns (score, reason). On any error returns (fallback, error_message).
+        The criterion must instruct the model to return {"score": <0.0-1.0>, "reason": "<str>"}.
+        On success returns JudgeResult(score, reason). On failure returns a JudgeResult whose
+        score is `fallback` (cosmetic — the dispatcher excludes error rows from scoring) with
+        error=True and a categorized error_cause. Retries rate-limit / timeout / connection /
+        parse errors with exponential backoff; content-filter 400s are non-retryable.
         """
         for attempt in range(_MAX_RETRIES + 1):
+            last = attempt == _MAX_RETRIES
+
+            # 1) The API call itself. Kept separate from response parsing below so a
+            # client-side exception (rate limit, timeout, content filter, or anything
+            # unexpected) is never miscategorized as a malformed-response parse error.
             try:
                 completion = self._client.chat.completions.create(
                     model=self._model,
@@ -79,30 +101,53 @@ class LLMJudge:
                     temperature=0.0,
                     max_tokens=256,
                 )
-                raw = completion.choices[0].message.content or "{}"
-                data = json.loads(raw)
-                score = float(data.get("score", fallback))
-                reason = str(data.get("reason", "No reason provided."))
-                return max(0.0, min(1.0, score)), reason
-
             except RateLimitError as exc:
-                if attempt == _MAX_RETRIES:
+                if last:
                     logger.warning("LLMJudge rate limit — exhausted retries: %s", exc)
-                    return fallback, f"Rate limit after {_MAX_RETRIES} retries: {exc}"
-                delay = _BASE_DELAY_S * (2 ** attempt) + random.uniform(0, 0.5)
-                logger.info(
-                    "LLMJudge rate limited — retry %d/%d in %.1fs",
-                    attempt + 1, _MAX_RETRIES, delay,
-                )
-                time.sleep(delay)
+                    return JudgeResult(fallback, f"Rate limit after {_MAX_RETRIES} retries: {exc}",
+                                       error=True, error_cause="rate_limit")
+                self._backoff(attempt)
+                continue
+
+            except (APITimeoutError, APIConnectionError) as exc:
+                if last:
+                    logger.warning("LLMJudge timeout/connection — exhausted retries: %s", exc)
+                    return JudgeResult(fallback, f"Timeout/connection after {_MAX_RETRIES} retries: {exc}",
+                                       error=True, error_cause="timeout")
+                self._backoff(attempt)
+                continue
 
             except BadRequestError as exc:
-                # Content filter and other 400s are non-retryable
-                logger.warning("LLMJudge non-retryable error: %s", exc)
-                return fallback, f"Judge error (non-retryable): {exc}"
+                cause = "content_filter" if "content_filter" in str(exc).lower() else "unavailable"
+                logger.warning("LLMJudge non-retryable (%s): %s", cause, exc)
+                return JudgeResult(fallback, f"Judge error ({cause}): {exc}",
+                                   error=True, error_cause=cause)
 
             except Exception as exc:
                 logger.warning("LLMJudge call failed: %s", exc)
-                return fallback, f"Judge unavailable: {exc}"
+                return JudgeResult(fallback, f"Judge unavailable: {exc}",
+                                   error=True, error_cause="unavailable")
 
-        return fallback, "Judge unavailable: retry loop exhausted"
+            # 2) Parse the response. Malformed judge output (bad JSON / non-numeric
+            # score / unexpected shape) is retried — often transient.
+            try:
+                raw = completion.choices[0].message.content or "{}"
+                data = json.loads(raw)
+                score = max(0.0, min(1.0, float(data.get("score", fallback))))
+                reason = str(data.get("reason", "No reason provided."))
+                return JudgeResult(score, reason)
+
+            except (json.JSONDecodeError, ValueError, TypeError, IndexError, KeyError, AttributeError) as exc:
+                if last:
+                    logger.warning("LLMJudge parse error — exhausted retries: %s", exc)
+                    return JudgeResult(fallback, f"Parse error after {_MAX_RETRIES} retries: {exc}",
+                                       error=True, error_cause="parse_error")
+                self._backoff(attempt)
+
+        return JudgeResult(fallback, "Judge unavailable: retry loop exhausted",
+                           error=True, error_cause="unavailable")
+
+    def _backoff(self, attempt: int) -> None:
+        delay = _BASE_DELAY_S * (2 ** attempt) + random.uniform(0, 0.5)
+        logger.info("LLMJudge retry %d/%d in %.1fs", attempt + 1, _MAX_RETRIES, delay)
+        time.sleep(delay)

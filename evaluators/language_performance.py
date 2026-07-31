@@ -107,6 +107,7 @@ class SemanticSimilarityEvaluator(BaseEvaluator):
             passed=score >= 0.6,
             reason=reason,
             error=error,
+            error_cause="unavailable" if error else None,
         )
 
 
@@ -187,6 +188,7 @@ class AnswerCompletenessEvaluator(BaseEvaluator):
             passed=score >= 0.5,
             reason=reason,
             error=error,
+            error_cause="unavailable" if error else None,
         )
 
 
@@ -230,11 +232,20 @@ class FluencyEvaluator(BaseEvaluator):
                 "  0.0 — Incoherent, wrong language, or unreadable\n\n"
                 'Respond with: {"score": <float 0.0–1.0>, "reason": "<one sentence>"}'
             )
-            score, reason = self._judge.score(criterion)
-        else:
-            not_empty = bool(model_response.strip())
-            score = 0.5 if not_empty else 0.0
-            reason = "Stub — LLM judge not configured."
+            r = self._judge.score(criterion)
+            return MetricOutput(
+                dimension=self.dimension,
+                metric_name=self.metric_name,
+                score=r.score,
+                passed=r.score >= 0.6,
+                reason=r.reason,
+                error=r.error,
+                error_cause=r.error_cause,
+            )
+
+        not_empty = bool(model_response.strip())
+        score = 0.5 if not_empty else 0.0
+        reason = "Stub — LLM judge not configured."
 
         return MetricOutput(
             dimension=self.dimension,
@@ -379,8 +390,9 @@ class MultilingualSimilarityEvaluator(BaseEvaluator):
             if is_auth_error or is_missing_dep:
                 # Infra/config unavailability — a bad/expired HF token, or sentence-transformers
                 # not installed on this deployment. The metric CANNOT run, so this is not a
-                # genuine 0.0 score: mark it not-applicable so the dispatcher skips persistence
-                # (no dead FAIL row in the results) and it renormalises out of the composite.
+                # genuine 0.0 score: keep the row applicable but mark it error=True so the
+                # dispatcher excludes it from scoring while it stays visible/auditable
+                # (persisted-and-excluded, not silently dropped via applicable=False).
                 if is_auth_error:
                     reason = "Auth error (401) — HF_TOKEN invalid or expired. No score recorded."
                 else:
@@ -392,8 +404,8 @@ class MultilingualSimilarityEvaluator(BaseEvaluator):
                     score=0.0,
                     passed=False,
                     reason=reason,
-                    applicable=False,
                     error=True,
+                    error_cause="unavailable",
                 )
             # Other (transient) failures — e.g. a connection timeout — keep the row visible so
             # the failure is noticed; flag as error, score=0.0.
@@ -404,4 +416,5 @@ class MultilingualSimilarityEvaluator(BaseEvaluator):
                 passed=False,
                 reason=f"Multilingual similarity unavailable: {exc}",
                 error=True,
+                error_cause="unavailable",
             )
