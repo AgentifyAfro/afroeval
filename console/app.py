@@ -2027,7 +2027,7 @@ def render_language_breakdown() -> None:
         )
 
         lang_label = (
-            f"⭐ {LANGUAGE_NAMES.get(lang, lang)} (EN baseline)"
+            f"◇ {LANGUAGE_NAMES.get(lang, lang)} (control)"
             if lang == "en"
             else LANGUAGE_NAMES.get(lang, lang)
         )
@@ -2104,8 +2104,9 @@ def render_language_breakdown() -> None:
     st.subheader("Dimension × Language Comparison")
     st.caption(
         "Rows = evaluation dimensions. Columns = each language found in the selected runs. "
-        "Gap = language score minus the English (US) control. Different packs and domains — "
-        "a pack-to-pack difference, not a same-task equity measure."
+        "Scores are absolute per language. Packs differ by domain, so read across with care — "
+        "these are not like-for-like rankings. '—' means the dimension does not apply to that "
+        "pack (e.g. bias & fairness needs multiple cohorts)."
     )
 
     seen_pairs: set[tuple[str, str]] = set()
@@ -2122,46 +2123,30 @@ def render_language_breakdown() -> None:
             _label = f"{LANGUAGE_NAMES.get(_lang, _lang)} ({_model})"
             lang_cols.append((_label, _lang, _rid))
 
-    en_col = next(((lbl, lc, rid) for lbl, lc, rid in lang_cols if lc == "en"), None)
-
     def _score(lang_code: str, run_id: str, col: str) -> float | None:
         sub = df[(df["language"] == lang_code) & (df["run_id"] == run_id)]
         if sub.empty:
             return None
         val = sub[col].values[0]
-        return float(val) if val is not None else None
+        # NaN is not None — a dimension that doesn't apply to a pack (e.g. bias_fairness on a
+        # single-cohort pack) arrives here as NaN and would render as the literal string "nan".
+        if val is None or pd.isna(val):
+            return None
+        return float(val)
 
     t2_rows = []
 
     comp_row: dict = {"Dimension": "Composite", "Weight": "—"}
-    en_comp = _score(en_col[1], en_col[2], "composite") if en_col else None
     for lbl, lc, rid in lang_cols:
         v = _score(lc, rid, "composite")
         comp_row[lbl] = f"{v:.1f}" if v is not None else "—"
-    if en_col:
-        for lbl, lc, rid in lang_cols:
-            if lc == "en":
-                continue
-            v = _score(lc, rid, "composite")
-            gap = round(v - en_comp, 1) if v is not None and en_comp is not None else None
-            sign = "+" if gap is not None and gap >= 0 else ""
-            comp_row["Gap vs EN"] = f"{sign}{gap:.1f}" if gap is not None else "—"
     t2_rows.append(comp_row)
 
     for dim, short in DIM_SHORT.items():
         row: dict = {"Dimension": DIM_LABELS[dim], "Weight": DIM_WEIGHTS[dim]}
-        en_val = _score(en_col[1], en_col[2], short) if en_col else None
         for lbl, lc, rid in lang_cols:
             v = _score(lc, rid, short)
             row[lbl] = f"{v:.1f}" if v is not None else "—"
-        if en_col:
-            for lbl, lc, rid in lang_cols:
-                if lc == "en":
-                    continue
-                v = _score(lc, rid, short)
-                gap = round(v - en_val, 1) if v is not None and en_val is not None else None
-                sign = "+" if gap is not None and gap >= 0 else ""
-                row["Gap vs EN"] = f"{sign}{gap:.1f}" if gap is not None else "—"
         t2_rows.append(row)
 
     col_cfg: dict = {
@@ -2170,8 +2155,6 @@ def render_language_breakdown() -> None:
     }
     for lbl, _, _ in lang_cols:
         col_cfg[lbl] = st.column_config.TextColumn(lbl, width="small")
-    if en_col and any(lc != "en" for _, lc, _ in lang_cols):
-        col_cfg["Gap vs EN"] = st.column_config.TextColumn("Gap vs EN", width="small")
 
     st.dataframe(
         pd.DataFrame(t2_rows),
