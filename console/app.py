@@ -376,7 +376,7 @@ def load_run_items(run_id: str) -> tuple[pd.DataFrame, dict[str, list[dict]]]:
 
             resp_metrics = metrics_by_resp.get(str(r.id), [])
             for dim, short in DIM_SHORT.items():
-                dim_scores = [m["score"] for m in resp_metrics if m["dimension"] == dim]
+                dim_scores = [m["score"] for m in resp_metrics if m["dimension"] == dim and not m["error"]]
                 row[short] = round(sum(dim_scores) / len(dim_scores) * 100, 1) if dim_scores else None
 
             rows.append(row)
