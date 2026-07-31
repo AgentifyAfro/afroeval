@@ -416,6 +416,8 @@ def load_calibration_data() -> pd.DataFrame:
         ).all()
         automated_by_resp_dim: dict[tuple, list[float]] = {}
         for m in metrics:
+            if getattr(m, "error", False):
+                continue
             automated_by_resp_dim.setdefault((m.response_id, m.dimension), []).append(m.score)
 
         rows = []

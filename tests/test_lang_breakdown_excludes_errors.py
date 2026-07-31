@@ -38,3 +38,26 @@ def test_item_dimension_composite_none_when_only_error_rows():
     composite = round(sum(dim_scores) / len(dim_scores) * 100, 1) if dim_scores else None
     assert dim_scores == []
     assert composite is None
+
+
+def test_calibration_automated_by_resp_dim_excludes_error_rows():
+    # Simulate the accumulation loop in load_calibration_data: automated MetricResult
+    # scores are grouped per (response_id, dimension) for comparison against SME review
+    # scores. An error-fallback row (e.g. score=0.0 from a missing-dependency evaluator
+    # branch) must not be folded into that automated mean, or it drags the calibration
+    # comparison down and produces a false SME<->auto delta.
+    class M:
+        def __init__(self, response_id, dim, score, error):
+            self.response_id, self.dimension, self.score, self.error = response_id, dim, score, error
+
+    resp_id = "resp-1"
+    metrics = [
+        M(resp_id, "language_performance", 0.9, False),
+        M(resp_id, "language_performance", 0.0, True),  # error fallback — must be dropped
+    ]
+    automated_by_resp_dim: dict = {}
+    for m in metrics:
+        if getattr(m, "error", False):
+            continue
+        automated_by_resp_dim.setdefault((m.response_id, m.dimension), []).append(m.score)
+    assert automated_by_resp_dim[(resp_id, "language_performance")] == [0.9]
