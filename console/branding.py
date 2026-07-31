@@ -362,7 +362,10 @@ def render_callout(body_html: str, kind: str = "info") -> None:
     st.markdown(f'<div class="{cls}">{body_html}</div>', unsafe_allow_html=True)
 
 
-_METRIC_BADGE = {"pass": ("pass", "Pass"), "warn": ("warn", "Attention"), "fail": ("fail", "Fail")}
+_METRIC_BADGE = {
+    "pass": ("pass", "Pass"), "warn": ("warn", "Attention"), "fail": ("fail", "Fail"),
+    "error": ("na", "Excluded"),
+}
 
 
 def render_item_detail(detail: dict) -> None:

@@ -350,6 +350,8 @@ def load_run_items(run_id: str) -> tuple[pd.DataFrame, dict[str, list[dict]]]:
                 "score":       m.score,
                 "passed":      m.passed,
                 "reason":      m.reason,
+                "error":       m.error,
+                "error_cause": m.error_cause,
             })
 
         rows = []
@@ -561,6 +563,8 @@ def load_language_breakdown(run_ids_a: tuple[str, ...], run_ids_b: tuple[str, ..
                         lang_metric_scores[lang] = {dim: {} for dim in DIM_SHORT}
 
                 for m in metrics:
+                    if getattr(m, "error", False):
+                        continue
                     lang = resp_to_lang.get(str(m.response_id), "unknown")
                     dims = lang_metric_scores.get(lang, {})
                     if m.dimension in dims:
@@ -1780,7 +1784,9 @@ def render_run_scorecard() -> None:
     item_metrics = metrics_by_resp.get(resp_id, [])
     metrics = [
         (m["dimension"], m["metric_name"], (m["score"] or 0) * 100,
-         "pass" if m["passed"] else "fail", m.get("reason") or "")
+         "error" if m.get("error") else ("pass" if m["passed"] else "fail"),
+         (f"excluded ({m.get('error_cause') or 'unavailable'}) — {m.get('reason') or ''}"
+          if m.get("error") else (m.get("reason") or "")))
         for m in sorted(item_metrics, key=lambda m: m["dimension"])
         if m["metric_name"] not in _UNSCORED_DRILL_METRICS
     ]
