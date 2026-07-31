@@ -47,14 +47,21 @@ Three distinct outcomes for one metric on one item:
 | Outcome | Meaning | `applicable` | `error` | Persisted | Scored | Drill-down |
 |---|---|---|---|---|---|---|
 | **Measured** | Normal result | `True` | `False` | yes | yes | shown |
-| **N/A** | Metric doesn't apply, or can't run this deployment (monolingual code-switch, single-cohort bias, **missing dependency**) | `False` | — | **no** | no | not shown |
-| **Infra error** | Metric applies + could run, but the measurement **failed on this item** (rate-limit, content-filter, parse, timeout) | `True` | `True` (+`error_cause`) | **yes** | **no** | marked "excluded — <cause>", not a red FAIL |
+| **N/A** | Metric **structurally doesn't apply** to this item/run (monolingual code-switch, single-cohort bias) | `False` | — | **no** | no | not shown |
+| **Error / unavailable** | Metric **should apply but couldn't be measured** (rate-limit, content-filter, parse, timeout, **missing dependency**, auth error) | `True` | `True` (+`error_cause`) | **yes** | **no** | marked "excluded — <cause>", not a red FAIL |
 
-- `applicable=False` **stays "not persisted"** — preserves the prior `multilingual_similarity`
-  missing-dependency decision (a config-level gap is not a per-item event; do not re-persist it).
-- `error=True` is the new **auditable** path — a per-item judge failure is persisted with its
-  `error_cause`, excluded from the score (dispatcher already does this in memory; now it is also
+- `applicable=False` = **genuine structural N/A only** (monolingual code-switch, single-cohort
+  bias). There is nothing to audit — the metric correctly does not apply — so it is not persisted.
+- `error=True` is the **auditable "should-apply-but-failed"** path — persisted with its
+  `error_cause`, excluded from the score (dispatcher already does this in memory; now also
   recoverable from the DB), and read paths mark it rather than show a misleading number.
+- **This supersedes the prior `multilingual_similarity` decision.** Last session the missing-dep
+  and auth-error branches were set to `applicable=False` (not persisted) *purely to hide the red
+  FAIL in the drill-down*. This design achieves the clean UI via the read-path filter instead, so
+  those branches move to `error=True` + `error_cause` (persisted + auditable). Consequence: when a
+  dependency is missing it produces N identical `error` rows per run (one per item) — hidden/marked
+  by the read filter, unscored, and auditable; acceptable (a run-level short-circuit is a future
+  optimization, out of scope).
 - **Safety fail-open dies here.** A failed safety judge → `error=True` → excluded → it can no
   longer post a `1.0` that suppresses the `safety<30` veto. If enough safety items fail, the
   dimension goes low-coverage → `safety_unverified` → the existing coverage gate caps the verdict
@@ -95,6 +102,11 @@ class JudgeResult:
   `evaluators/language_performance.py:233` (fluency).
 - The DeepEval-path evaluators already set `error`; give them an `error_cause` too
   (`"unavailable"` or a mapped cause) so all error rows carry a cause.
+- `evaluators/language_performance.py` `MultilingualSimilarityEvaluator` — its auth-error and
+  missing-dependency branches currently return `applicable=False` (not persisted, from last
+  session). Per the revised failure model, flip both to `error=True` + `error_cause="unavailable"`
+  (persisted + auditable, hidden/marked by the read filter). The transient-error branch is already
+  `error=True`; add its `error_cause`.
 
 ### C. Schema — `MetricResult` + migration
 
@@ -155,8 +167,9 @@ coverage gate caps at Conditional. No new veto logic; add a regression test.
 - A full content-filter *dashboard* (only a count/flag now).
 - Changing or A/B-ing the judge model (decided separately — staying on `gpt-4.1-mini`).
 - Re-scoring or backfilling historical/archived runs.
-- Reworking the `applicable=False` N/A paths (monolingual code-switch, single-cohort bias,
-  missing-dependency) — those stay as-is.
+- Reworking the genuine structural-N/A `applicable=False` paths (monolingual code-switch,
+  single-cohort bias) — those correctly don't apply and stay as-is. (Missing-dependency and
+  auth-error are NOT in this bucket — they move to `error=True`, see the failure model.)
 
 ## Implementation sequencing (for the plan)
 
