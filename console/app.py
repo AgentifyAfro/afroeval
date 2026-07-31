@@ -239,11 +239,19 @@ def load_runs_summary(include_archived: bool = False) -> list[dict]:
         if not include_archived:
             query = query.where(Run.archived == False)  # noqa: E712 — SQLAlchemy needs ==
         runs = session.exec(query.order_by(Run.created_at.desc()).limit(50)).all()
+        # Batch the assessment + scorecard lookups into two IN-queries instead of two per run
+        # (was ~2*N sequential round-trips to the remote pooler — the main nav-click delay).
+        run_ids = [run.id for run in runs]
+        assessment_ids = {run.assessment_id for run in runs}
+        assessments = {
+            a.id: a for a in session.exec(select(Assessment).where(col(Assessment.id).in_(assessment_ids))).all()
+        } if assessment_ids else {}
+        scorecards = {
+            s.run_id: s for s in session.exec(select(Scorecard).where(col(Scorecard.run_id).in_(run_ids))).all()
+        } if run_ids else {}
         for run in runs:
-            assessment = session.get(Assessment, run.assessment_id)
-            scorecard = session.exec(
-                select(Scorecard).where(Scorecard.run_id == run.id)
-            ).first()
+            assessment = assessments.get(run.assessment_id)
+            scorecard = scorecards.get(run.id)
 
             name = assessment.name if assessment else "Unknown"
             if scorecard:
@@ -454,13 +462,20 @@ def load_provider_comparison(include_archived: bool = False) -> list[dict]:
         if not include_archived:
             query = query.where(Run.archived == False)  # noqa: E712 — SQLAlchemy needs ==
         runs = session.exec(query.order_by(Run.created_at.desc())).all()
+        # Batch assessment + scorecard lookups (was 2 queries per run against the remote pooler).
+        run_ids = [run.id for run in runs]
+        assessment_ids = {run.assessment_id for run in runs}
+        assessments = {
+            a.id: a for a in session.exec(select(Assessment).where(col(Assessment.id).in_(assessment_ids))).all()
+        } if assessment_ids else {}
+        scorecards = {
+            s.run_id: s for s in session.exec(select(Scorecard).where(col(Scorecard.run_id).in_(run_ids))).all()
+        } if run_ids else {}
         for run in runs:
-            scorecard = session.exec(
-                select(Scorecard).where(Scorecard.run_id == run.id)
-            ).first()
+            scorecard = scorecards.get(run.id)
             if not scorecard:
                 continue
-            assessment = session.get(Assessment, run.assessment_id)
+            assessment = assessments.get(run.assessment_id)
             if not assessment:
                 continue
             pack_ids = sorted(assessment.benchmark_pack_ids or [])
