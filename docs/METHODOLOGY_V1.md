@@ -44,7 +44,7 @@ A model that fails in the target language fails the deployment — regardless of
 
 **Pass threshold:** ≥ 0.65 per item (this is the combined dimension-level threshold from the three weighted metrics above — not the same as any single metric's own internal pass/fail parameter).
 
-**Tier-1 anchor languages:** Swahili (sw), Yoruba (yo), Amharic (am), Hausa (ha), Zulu (zu), Sheng (sheng).
+**Tier-1 anchor languages:** Swahili (sw), Yoruba (yo), Amharic (am), Hausa (ha), isiZulu (zu), Sheng (sheng).
 
 **Example — Pass:**
 > Prompt (Swahili): "Niambie jinsi ya kutuma pesa kwa M-Pesa."  

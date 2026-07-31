@@ -29,7 +29,7 @@ You do NOT write sample AI responses. You write the specification of what a corr
 
 ### Eligibility
 
-- Native or near-native speaker of the assigned language (Swahili, Yoruba, Amharic, Hausa, or Zulu)
+- Native or near-native speaker of the assigned language (Swahili, Yoruba, Amharic, Hausa, or isiZulu)
 - Domain knowledge in at least one of: mobile money, customer service, community health, agriculture
 - Minimum secondary education
 - Reliable internet access and ability to use a web-based tool (Label Studio)

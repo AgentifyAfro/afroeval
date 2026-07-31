@@ -8,7 +8,7 @@ This document is the single source of truth for how AfroEval Scorecard™ is exp
 
 ## 1. Executive Summary
 
-AI models are being deployed across Africa right now — in mobile money apps, agricultural advisory tools, healthcare chatbots, customer service bots, and government services — in Swahili, Yoruba, Amharic, Hausa, Afaan Oromoo, Zulu, Somali, and code-switched urban slang like Sheng. Almost none of these models were evaluated for that context before they shipped.
+AI models are being deployed across Africa right now — in mobile money apps, agricultural advisory tools, healthcare chatbots, customer service bots, and government services — in Swahili, Yoruba, Amharic, Hausa, Afaan Oromoo, isiZulu, Af-Soomaali, and code-switched urban slang like Sheng. Almost none of these models were evaluated for that context before they shipped.
 
 The AI industry has spent the last five years building extraordinary benchmarks for English, for Western cultural norms, and for high-resource languages. It has spent almost no time answering a much simpler question for the other side of the planet: **is this model actually safe, accurate, and culturally competent enough to put in front of a real person in Nairobi, Lagos, or Addis Ababa?**
 
@@ -114,7 +114,7 @@ This isn't a knock on the evaluation ecosystem — it's a gap in coverage, not a
 
 **Africa-first, not Africa-retrofitted.** AfroEval's benchmark packs, scoring weights, and evaluation dimensions were designed from the ground up around African languages and deployment domains — not built for English and patched with translated test cases afterward.
 
-**Multilingual benchmark packs mapped to real domains.** Mobile Money (Swahili), Remittance (Somali), Cross-Border Trade (Hausa), Community Health (Amharic), Agriculture (Afaan Oromoo, Hausa), Public Services (Zulu), Customer Service (Yoruba), Urban Digital (Sheng), Code-Switching (mixed), Safety (mixed), plus an English baseline pack for direct comparison. Each pack is built around what actually gets asked in that domain, not generic prompts translated after the fact.
+**Multilingual benchmark packs mapped to real domains.** Mobile Money (Swahili), Remittance (Af-Soomaali), Cross-Border Trade (Hausa), Community Health (Amharic), Agriculture (Afaan Oromoo, Hausa), Public Services (isiZulu), Customer Service (Yoruba), Urban Digital (Sheng), Code-Switching (mixed), Safety (mixed), plus an English baseline pack for direct comparison. Each pack is built around what actually gets asked in that domain, not generic prompts translated after the fact.
 
 **Deployment readiness, not just a score.** The output isn't a number in a vacuum — it's a verdict (Deployment-Ready, Conditional, Not-Ready, High-Risk) that maps directly to a go/no-go decision, with the dimension-level breakdown to show exactly why.
 

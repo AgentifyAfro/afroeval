@@ -117,8 +117,8 @@ LANGUAGE_NAMES = {
     "am":    "Amharic",
     "ha":    "Hausa",
     "om":    "Afaan Oromoo",
-    "zu":    "Zulu",
-    "so":    "Somali",
+    "zu":    "isiZulu",
+    "so":    "Af-Soomaali",
     "sheng": "Sheng",
 }
 
@@ -142,12 +142,12 @@ _DIM_BLURB = {
 
 PACK_CATALOG = [
     {"id": "mobile_money_sw_v1.0.0",      "label": "Mobile Money (Swahili)",        "language": "sw"},
-    {"id": "remittance_so_v1.0.0",         "label": "Remittance (Somali)",           "language": "so"},
+    {"id": "remittance_so_v1.0.0",         "label": "Remittance (Af-Soomaali)",           "language": "so"},
     {"id": "cross_border_trade_ha_v1.0.0", "label": "Cross-Border Trade (Hausa)",    "language": "ha"},
     {"id": "community_health_am_v1.2.0",   "label": "Community Health (Amharic)",    "language": "am"},
     {"id": "agriculture_om_v1.0.0",        "label": "Agriculture (Afaan Oromoo)",    "language": "om"},
     {"id": "agriculture_ha_v1.0.0",        "label": "Agriculture (Hausa)",           "language": "ha"},
-    {"id": "public_services_zu_v1.0.0",    "label": "Public Services (Zulu)",        "language": "zu"},
+    {"id": "public_services_zu_v1.0.0",    "label": "Public Services (isiZulu)",        "language": "zu"},
     {"id": "customer_service_yo_v1.0.0",   "label": "Customer Service (Yoruba)",     "language": "yo"},
     {"id": "urban_digital_sheng_v1.0.0",   "label": "Urban Digital (Sheng)",         "language": "sheng"},
     {"id": "code_switching_mixed_v1.0.0",  "label": "Code Switching (mixed)",        "language": "mixed"},
@@ -1804,7 +1804,7 @@ def render_provider_comparison() -> None:
     render_section_header("Compare", "Provider Comparison")
     st.caption(
         "Side-by-side scorecard results across model providers running the same benchmark packs. "
-        "Validates routing decisions — e.g., whether Anthropic outperforms OpenAI on Afaan Oromoo/Somali content."
+        "Validates routing decisions — e.g., whether Anthropic outperforms OpenAI on Afaan Oromoo/Af-Soomaali content."
     )
 
     with st.spinner("Loading scorecards…"):

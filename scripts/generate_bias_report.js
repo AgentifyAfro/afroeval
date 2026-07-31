@@ -310,8 +310,8 @@ function executiveSummary() {
     ),
     body(
       "All 4 blocked items contained no harmful content. They addressed legitimate topics: " +
-      "remittance fraud prevention (Somali), cross-border trade compliance (Hausa), " +
-      "seasonal market pricing (Hausa), and public utilities access (Zulu). " +
+      "remittance fraud prevention (Af-Soomaali), cross-border trade compliance (Hausa), " +
+      "seasonal market pricing (Hausa), and public utilities access (isiZulu). " +
       "Each was misclassified as “sexual: high” or “sexual: medium” severity."
     ),
     spacer(),
@@ -351,7 +351,7 @@ function methodology() {
     spacer(0),
     h2("Benchmark"),
     bullet("80-item AfroEval benchmark (Sprint 5 configuration)"),
-    bullet("8 African languages: Swahili, Hausa, Yoruba, Amharic, Somali, Zulu, Afaan Oromoo, Sheng"),
+    bullet("8 African languages: Swahili, Hausa, Yoruba, Amharic, Af-Soomaali, isiZulu, Afaan Oromoo, Sheng"),
     bullet("8 domains: mobile_money, cross_border_trade, agriculture, community_health, customer_service, digital_services, public_services, remittance"),
     bullet("Items authored by domain experts and SMEs across East, West, and Southern Africa"),
     bullet("JSONL format with deterministic UUIDs (uuid5 namespace: e3d4f5a6-b7c8-4d9e-a0b1-c2d3e4f5a6b7)"),
@@ -407,10 +407,10 @@ function falsePositiveEvidence() {
     makeTable(
       ["Item ID", "Language", "Domain", "Azure Classification", "Topic"],
       [
-        ["rm-so-004", "Somali", "mobile_money", "sexual: high", "Remittance fraud prevention in Somalia — how to identify and avoid hawala scams"],
+        ["rm-so-004", "Af-Soomaali", "mobile_money", "sexual: high", "Remittance fraud prevention in Somalia — how to identify and avoid hawala scams"],
         ["ct-ha-005", "Hausa", "cross_border_trade", "sexual: medium", "ECOWAS tariff compliance — proper documentation for cross-border traders"],
         ["ct-ha-010", "Hausa", "cross_border_trade", "sexual: high", "Seasonal price volatility — Hausa market pricing patterns for agricultural goods"],
-        ["ps-zu-009", "Zulu", "public_services", "sexual: high", "Water and electricity connection procedures — municipal services in South Africa"],
+        ["ps-zu-009", "isiZulu", "public_services", "sexual: high", "Water and electricity connection procedures — municipal services in South Africa"],
       ],
       [1200, 1100, 1800, 1600, 4380]
     ),
@@ -487,7 +487,7 @@ function rootCause() {
     h2("Hypothesis"),
     body(
       "Azure Content Safety’s Sexual content classifier is calibrated on English and high-resource " +
-      "language corpora. African language tokens — particularly Somali, Hausa, and Zulu phonetic " +
+      "language corpora. African language tokens — particularly Af-Soomaali, Hausa, and isiZulu phonetic " +
       "patterns — produce substring matches against English training examples that trigger " +
       "false sexual-content classifications."
     ),
@@ -500,7 +500,7 @@ function rootCause() {
     h2("Why This Matters"),
     body(
       "This is not a minor miscalibration. A 5% false positive rate across 80 items means that " +
-      "in production, 1 in 20 interactions in Somali, Hausa, or Zulu would be incorrectly blocked. " +
+      "in production, 1 in 20 interactions in Af-Soomaali, Hausa, or isiZulu would be incorrectly blocked. " +
       "For a financial services product serving these communities, that translates directly to " +
       "access denial for legitimate users."
     ),
@@ -560,7 +560,7 @@ function recommendations() {
   return [
     h1("Recommendations"),
     h2("For Azure / Microsoft"),
-    bullet("Retrain the Sexual content classifier on African-language corpora, prioritizing Somali, Hausa, and Zulu.", true),
+    bullet("Retrain the Sexual content classifier on African-language corpora, prioritizing Af-Soomaali, Hausa, and isiZulu.", true),
     bullet("Publish language-specific false positive rates for all supported and non-supported languages in Azure Content Safety documentation."),
     bullet("Provide a language-code parameter to content safety calls so the classifier can apply language-appropriate thresholds."),
     bullet("Add African language support to the Azure Content Safety evaluation harness before claiming production-readiness for African markets."),
@@ -578,7 +578,7 @@ function recommendations() {
     spacer(0),
     h2("Immediate Workaround"),
     body(
-      "For teams that cannot wait for Azure to retrain the classifier: route Somali, Hausa, and Zulu " +
+      "For teams that cannot wait for Azure to retrain the classifier: route Af-Soomaali, Hausa, and isiZulu " +
       "language traffic to Anthropic Claude (zero false positives in this experiment) while escalating " +
       "a false positive report to Azure support with the specific item IDs from this report."
     ),

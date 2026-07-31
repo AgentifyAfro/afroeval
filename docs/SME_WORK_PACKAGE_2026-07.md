@@ -57,7 +57,7 @@ constraints converge on 20:
    8.3%, so one flaky item visibly moves `bias_fairness` — reintroducing through the data the
    volatility v1.4 removed from the code.
 2. **Failure margin.** Ten items of headroom. Items are occasionally lost mid-run to content
-   filters (a Zulu item was blocked as a false positive in a recent run); at 12, one filter
+   filters (a isiZulu item was blocked as a false positive in a recent run); at 12, one filter
    loss plus one bad item puts the pack back under the floor.
 3. **Validation feasibility.** A validator pair needs ≥10 shared items before kappa means
    anything. At 20 a pack supports two full pair-batches; at 12 it supports one, with nothing
@@ -141,7 +141,7 @@ automated judge scores against, so it carries as much weight as the prompt.
 Label Studio → **`AfroEval — SME Item Authoring v2 (2026-07-19)`** — **project id 9**.
 
 **Use the language tab for your language.** The project has a saved view per language —
-Yoruba, Hausa, Sheng, Swahili, Afaan Oromoo, Amharic, English, isiZulu, Somali — so you see
+Yoruba, Hausa, Sheng, Swahili, Afaan Oromoo, Amharic, English, isiZulu, Af-Soomaali — so you see
 only your own queue. Tasks are also interleaved by language, so no single language dominates
 the default view.
 

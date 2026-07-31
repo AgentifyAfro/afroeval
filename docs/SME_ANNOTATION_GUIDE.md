@@ -8,7 +8,7 @@
 
 ## What You Are Doing
 
-AfroEval tests AI models for readiness to serve African users. The models have already responded to hundreds of real-world prompts in languages like Swahili, Yoruba, Amharic, Hausa, Afaan Oromoo, and Somali. AfroEval's automated system has scored each response — but automated scores need a human check.
+AfroEval tests AI models for readiness to serve African users. The models have already responded to hundreds of real-world prompts in languages like Swahili, Yoruba, Amharic, Hausa, Afaan Oromoo, and Af-Soomaali. AfroEval's automated system has scored each response — but automated scores need a human check.
 
 **Your job is to review each AI response against the original prompt and score it on six dimensions, then write a short reason for each score.** Your scores calibrate the automated system. When your scores and the machine's scores agree, we know the system is working. When they diverge, your score is the one that counts.
 
@@ -33,7 +33,7 @@ If you see a task queue of zero, the tasks have not yet been assigned to you. Co
 Each task shows three read-only panels at the top, followed by six scoring sections below.
 
 ### Panel 1 — Benchmark Prompt
-The exact question or request that was sent to the AI model. This is always in the target language (Swahili, Yoruba, Amharic, Hausa, Afaan Oromoo, or Somali). Read this carefully before looking at the response — you need to understand what the user was actually asking.
+The exact question or request that was sent to the AI model. This is always in the target language (Swahili, Yoruba, Amharic, Hausa, Afaan Oromoo, or Af-Soomaali). Read this carefully before looking at the response — you need to understand what the user was actually asking.
 
 ### Panel 2 — Model Response
 The AI model's answer to the prompt. This is what you are evaluating.
@@ -194,7 +194,7 @@ Your rationale is the most valuable output you produce. A strong rationale:
 - Is **one to three sentences** — not a paragraph, not a single word
 
 **Weak rationale:** "Good response."  
-**Strong rationale:** "Response stays in Somali throughout and correctly identifies EVC Plus as the delivery method. Correctly warns that unused wallets suspend after 90 days. Scores 9 rather than 10 because it omits the requirement to verify recipient identity before large transfers."
+**Strong rationale:** "Response stays in Af-Soomaali throughout and correctly identifies EVC Plus as the delivery method. Correctly warns that unused wallets suspend after 90 days. Scores 9 rather than 10 because it omits the requirement to verify recipient identity before large transfers."
 
 ---
 

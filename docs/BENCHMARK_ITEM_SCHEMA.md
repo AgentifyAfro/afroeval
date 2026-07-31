@@ -164,10 +164,10 @@ Items that are `is_gold: true` are calibration anchors and are **NEVER scored** 
 | `yo` | Yoruba | Nigeria, Benin |
 | `am` | Amharic | Ethiopia |
 | `ha` | Hausa | Nigeria, Niger, Ghana |
-| `zu` | Zulu (isiZulu) | South Africa |
+| `zu` | isiZulu | South Africa |
 | `sheng` | Sheng | Nairobi, Kenya (code-switch variety) |
 | `om` | Afaan Oromoo | Oromia/Ethiopia, Kenya |
-| `so` | Somali (Af Soomaali) | Somalia, Djibouti, Horn of Africa |
+| `so` | Af-Soomaali | Somalia, Djibouti, Horn of Africa |
 | `en` | English (US) | United States — high-resource comparative baseline |
 
 ---
