@@ -25,6 +25,7 @@ class MetricOutput:
                               # (e.g. code-switching metrics on a monolingual item).
     error: bool = False       # True when score is an infra-error fallback (rate limit,
                               # auth failure, etc.), not a real measurement.
+    error_cause: str | None = None   # rate_limit|content_filter|parse_error|timeout|unavailable; set when error=True
 
 
 class BaseEvaluator(ABC):

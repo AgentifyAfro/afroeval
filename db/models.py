@@ -179,6 +179,8 @@ class MetricResult(SQLModel, table=True):
     score: float                              # 0.0–1.0 (normalized before composite)
     passed: bool
     reason: str = ""                          # Evidence / explanation
+    error: bool = Field(default=False)        # True = infra failure (excluded from scoring, marked in UI)
+    error_cause: str | None = Field(default=None)  # rate_limit|content_filter|parse_error|timeout|unavailable
     evaluator_version: str = "0.1.0"
     created_at: datetime = Field(default_factory=datetime.utcnow)
     extra: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))

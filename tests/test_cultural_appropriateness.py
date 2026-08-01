@@ -7,11 +7,12 @@ Uses a fake LLMJudge — no real Azure calls.
 from unittest.mock import MagicMock
 
 from ail.cultural_appropriateness import CulturalAppropriatenessEvaluator
+from evaluators.llm_judge import JudgeResult
 
 
 def _fake_judge(score: float, reason: str = "test reason") -> MagicMock:
     judge = MagicMock()
-    judge.score.return_value = (score, reason)
+    judge.score.return_value = JudgeResult(score, reason)
     return judge
 
 

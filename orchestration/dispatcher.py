@@ -502,6 +502,8 @@ async def dispatch_run(run_id: str) -> None:
                             passed=output.passed,
                             reason=output.reason,
                             extra=output.extra,
+                            error=output.error,
+                            error_cause=getattr(output, "error_cause", None),
                         ))
 
                     # Infra-error fallbacks (rate limit / content filter / timeout) are

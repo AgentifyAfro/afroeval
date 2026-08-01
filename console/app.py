@@ -350,6 +350,8 @@ def load_run_items(run_id: str) -> tuple[pd.DataFrame, dict[str, list[dict]]]:
                 "score":       m.score,
                 "passed":      m.passed,
                 "reason":      m.reason,
+                "error":       m.error,
+                "error_cause": m.error_cause,
             })
 
         rows = []
@@ -374,7 +376,7 @@ def load_run_items(run_id: str) -> tuple[pd.DataFrame, dict[str, list[dict]]]:
 
             resp_metrics = metrics_by_resp.get(str(r.id), [])
             for dim, short in DIM_SHORT.items():
-                dim_scores = [m["score"] for m in resp_metrics if m["dimension"] == dim]
+                dim_scores = [m["score"] for m in resp_metrics if m["dimension"] == dim and not m["error"]]
                 row[short] = round(sum(dim_scores) / len(dim_scores) * 100, 1) if dim_scores else None
 
             rows.append(row)
@@ -414,6 +416,8 @@ def load_calibration_data() -> pd.DataFrame:
         ).all()
         automated_by_resp_dim: dict[tuple, list[float]] = {}
         for m in metrics:
+            if getattr(m, "error", False):
+                continue
             automated_by_resp_dim.setdefault((m.response_id, m.dimension), []).append(m.score)
 
         rows = []
@@ -561,6 +565,8 @@ def load_language_breakdown(run_ids_a: tuple[str, ...], run_ids_b: tuple[str, ..
                         lang_metric_scores[lang] = {dim: {} for dim in DIM_SHORT}
 
                 for m in metrics:
+                    if getattr(m, "error", False):
+                        continue
                     lang = resp_to_lang.get(str(m.response_id), "unknown")
                     dims = lang_metric_scores.get(lang, {})
                     if m.dimension in dims:
@@ -764,6 +770,17 @@ def _render_remediation(roadmap: list[dict]) -> None:
 
 def _provider_short(provider: str) -> str:
     return PROVIDER_SHORT.get(provider, provider)
+
+
+def _content_filter_count(metrics_by_resp: dict[str, list[dict]]) -> int:
+    """Count metric rows blocked by the judge's content filter — the African-language
+    fairness signal (the judge sees the target-language response)."""
+    return sum(
+        1
+        for rows in metrics_by_resp.values()
+        for m in rows
+        if m.get("error") and m.get("error_cause") == "content_filter"
+    )
 
 
 def _render_comparison_insight(row_a: dict, row_b: dict, dims: list[str]) -> None:
@@ -1696,6 +1713,15 @@ def render_run_scorecard() -> None:
         st.info("No item data — ModelResponse rows may not have been persisted for this run.")
         return
 
+    _cf = _content_filter_count(metrics_by_resp)
+    if _cf:
+        render_callout(
+            f"<b>Content-filter note.</b> {_cf} judge call(s) in this run were blocked by the "
+            "content filter and excluded from scoring — a known false-positive risk on "
+            "African-language responses. See the item drill-down (rows marked <b>Excluded</b>).",
+            kind="warn",
+        )
+
     # Filters
     fc1, fc2, fc3 = st.columns(3)
     with fc1:
@@ -1780,7 +1806,9 @@ def render_run_scorecard() -> None:
     item_metrics = metrics_by_resp.get(resp_id, [])
     metrics = [
         (m["dimension"], m["metric_name"], (m["score"] or 0) * 100,
-         "pass" if m["passed"] else "fail", m.get("reason") or "")
+         "error" if m.get("error") else ("pass" if m["passed"] else "fail"),
+         (f"excluded ({m.get('error_cause') or 'unavailable'}) — {m.get('reason') or ''}"
+          if m.get("error") else (m.get("reason") or "")))
         for m in sorted(item_metrics, key=lambda m: m["dimension"])
         if m["metric_name"] not in _UNSCORED_DRILL_METRICS
     ]
