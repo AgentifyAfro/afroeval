@@ -452,6 +452,16 @@ _RADAR_SIZE_PT = 165
 _RADAR_COL_IN = 2.9
 
 
+def _divergence_line(count: int) -> str:
+    """One-line judge-divergence disclosure for the report; empty when none."""
+    if not count:
+        return ""
+    return (
+        f"Judge-divergence: on {count} item(s), a local judge-independent model "
+        f"(LaBSE) sharply disputed the judge's similarity score. Unscored QA signal."
+    )
+
+
 def _key_observations_section(scorecard, s):
     """Auto-generated observation bullets alongside a radar chart of the six dimensions."""
     from reporting.observations import build_key_observations
@@ -482,6 +492,13 @@ def _key_observations_section(scorecard, s):
         block.append(layout)
     else:
         block.extend(obs_flow)
+
+    # judge_divergence_count is read via getattr(..., 0) so historical scorecards
+    # (predating the column) render nothing instead of crashing.
+    divergence_line = _divergence_line(getattr(scorecard, "judge_divergence_count", 0))
+    if divergence_line:
+        block.append(Spacer(1, 0.06 * inch))
+        block.append(Paragraph(f"ⓘ {divergence_line}", s["small"]))
 
     # Keep the heading with its radar + notes so a page break never orphans the
     # "Key Observations" title on one page with its content on the next. KeepTogether
