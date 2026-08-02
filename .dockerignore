@@ -1,0 +1,21 @@
+# Keep the build context small + deterministic. NOTE: benchmarks/ is a shipped
+# package (see pyproject [tool.hatch.build.targets.wheel].packages) — do NOT exclude it.
+.venv/
+venv/
+.git/
+.github/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+tests/
+docs/
+.superpowers/
+.env
+*.log
+node_modules/
+*.egg-info/
+dist/
+build/
