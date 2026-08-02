@@ -1,8 +1,9 @@
 """
 Tests for language_performance evaluators — stub/mock mode, no API calls.
 """
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
+import evaluators.language_performance as lp
 from evaluators.language_performance import MultilingualSimilarityEvaluator
 
 
@@ -65,3 +66,12 @@ def test_multilingual_similarity_dimension_and_metric_name():
     ev = MultilingualSimilarityEvaluator()
     assert ev.dimension == "language_performance"
     assert ev.metric_name == "multilingual_similarity"
+
+
+def test_multilingual_model_is_labse():
+    """Verify that the multilingual model loader requests the LaBSE model."""
+    lp._MULTILINGUAL_MODEL = None  # reset module singleton
+    fake_st = MagicMock(return_value=MagicMock())
+    with patch.dict("sys.modules", {"sentence_transformers": MagicMock(SentenceTransformer=fake_st)}):
+        lp._get_multilingual_model()
+    assert fake_st.call_args.args[0] == "sentence-transformers/LaBSE"

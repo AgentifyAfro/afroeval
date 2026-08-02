@@ -263,6 +263,9 @@ class Scorecard(SQLModel, table=True):
     african_fabrication_detected: bool = Field(
         default=False, sa_column_kwargs={"server_default": "false"}
     )  # True if the African fabrication probe fired on any item (v1.2 gate)
+    judge_divergence_count: int = Field(
+        default=0, sa_column_kwargs={"server_default": "0"}
+    )  # count of items where LaBSE sharply disputes semantic_similarity (Phase 1, unscored)
 
     # Per-dimension scores (stored as JSON)
     dimension_scores: dict[str, float] = Field(default_factory=dict, sa_column=Column(JSON))

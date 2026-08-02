@@ -286,6 +286,7 @@ def load_runs_summary(include_archived: bool = False) -> list[dict]:
                 "dimension_confidence_intervals": (
                     getattr(scorecard, "dimension_confidence_intervals", None) or {}
                 ) if scorecard else {},
+                "judge_divergence_count": scorecard.judge_divergence_count if scorecard else 0,
                 "remediation_roadmap": scorecard.remediation_roadmap if scorecard else [],
                 "pack_ids":            assessment.benchmark_pack_ids if assessment else [],
                 "model":               assessment.model_identifier if assessment else "",
@@ -352,6 +353,7 @@ def load_run_items(run_id: str) -> tuple[pd.DataFrame, dict[str, list[dict]]]:
                 "reason":      m.reason,
                 "error":       m.error,
                 "error_cause": m.error_cause,
+                "extra":       m.extra,
             })
 
         rows = []
@@ -780,6 +782,18 @@ def _content_filter_count(metrics_by_resp: dict[str, list[dict]]) -> int:
         for rows in metrics_by_resp.values()
         for m in rows
         if m.get("error") and m.get("error_cause") == "content_filter"
+    )
+
+
+def _divergence_item_count(metrics_by_resp: dict[str, list[dict]]) -> int:
+    """Count items whose multilingual_similarity row is flagged as judge-divergent
+    (LaBSE sharply disputes the judge's semantic_similarity) — Phase 1, unscored."""
+    return sum(
+        1
+        for rows in metrics_by_resp.values()
+        for m in rows
+        if m.get("metric_name") == "multilingual_similarity"
+        and (m.get("extra") or {}).get("judge_divergence")
     )
 
 
@@ -1722,6 +1736,16 @@ def render_run_scorecard() -> None:
             kind="warn",
         )
 
+    _div = _divergence_item_count(metrics_by_resp)
+    if _div:
+        render_callout(
+            f"<b>Judge-divergence note.</b> On {_div} item(s), LaBSE (a local, "
+            "judge-independent similarity model) sharply disputes the judge's "
+            "semantic_similarity score. Unscored signal — review these items in the "
+            "drill-down (marked <b>Divergent</b>).",
+            kind="info",
+        )
+
     # Filters
     fc1, fc2, fc3 = st.columns(3)
     with fc1:
@@ -1804,14 +1828,22 @@ def render_run_scorecard() -> None:
         foot_bits.append(f"Tokens: {row['tokens_used']}")
 
     item_metrics = metrics_by_resp.get(resp_id, [])
-    metrics = [
-        (m["dimension"], m["metric_name"], (m["score"] or 0) * 100,
-         "error" if m.get("error") else ("pass" if m["passed"] else "fail"),
-         (f"excluded ({m.get('error_cause') or 'unavailable'}) — {m.get('reason') or ''}"
-          if m.get("error") else (m.get("reason") or "")))
-        for m in sorted(item_metrics, key=lambda m: m["dimension"])
-        if m["metric_name"] not in _UNSCORED_DRILL_METRICS
-    ]
+    metrics = []
+    for m in sorted(item_metrics, key=lambda m: m["dimension"]):
+        extra = m.get("extra") or {}
+        is_divergent = m["metric_name"] == "multilingual_similarity" and extra.get("judge_divergence")
+        if m["metric_name"] in _UNSCORED_DRILL_METRICS and not is_divergent:
+            continue
+        if is_divergent:
+            status = "divergent"
+            reason = f"{m.get('reason') or ''} Divergent (Δ{extra.get('divergence_delta')})".strip()
+        elif m.get("error"):
+            status = "error"
+            reason = f"excluded ({m.get('error_cause') or 'unavailable'}) — {m.get('reason') or ''}"
+        else:
+            status = "pass" if m["passed"] else "fail"
+            reason = m.get("reason") or ""
+        metrics.append((m["dimension"], m["metric_name"], (m["score"] or 0) * 100, status, reason))
 
     render_item_detail({
         "id":       row["item_id"],

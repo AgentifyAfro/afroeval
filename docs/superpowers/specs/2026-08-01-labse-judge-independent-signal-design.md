@@ -182,8 +182,14 @@ never conflated.
   persisting a `MetricResult` row (now LaBSE-backed) — already excluded from scoring
   and reconstruction by the error-plumbing read paths.
 - **Divergence flag (persisted):** compute per-item `|laBSE_similarity*100 −
-  item_language_performance_score|`; when it exceeds a configurable threshold, set a
-  **persisted** `judge_divergence` marker. Persistence so it reaches the PDF report:
+  semantic_similarity*100|` — compared against the judge's **`semantic_similarity`**
+  metric specifically (decided 2026-08-01), NOT the full LP dimension score. Both
+  measure "how close is the answer to the reference," so the flag isolates a genuine
+  judge-vs-independent-model disagreement on that one question; comparing to the full
+  dimension would let fluency/completeness gaps (which LaBSE doesn't measure) muddy the
+  signal. When the delta exceeds a configurable threshold, set a **persisted**
+  `judge_divergence` marker. Items where `semantic_similarity` errored/absent or LaBSE
+  is `unavailable` produce no flag (nothing to compare). Persistence so it reaches the PDF report:
   the per-item flag on the `MetricResult`/item (a boolean/float column or a typed
   `extra` key) plus a per-run divergence count on the `Scorecard` row (new column →
   Alembic migration). Both `render_run_scorecard` (console) and

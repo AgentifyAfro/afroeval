@@ -364,7 +364,7 @@ def render_callout(body_html: str, kind: str = "info") -> None:
 
 _METRIC_BADGE = {
     "pass": ("pass", "Pass"), "warn": ("warn", "Attention"), "fail": ("fail", "Fail"),
-    "error": ("na", "Excluded"),
+    "error": ("na", "Excluded"), "divergent": ("info", "Divergent"),
 }
 
 

@@ -402,6 +402,13 @@ async def dispatch_run(run_id: str) -> None:
                 item_counts: dict[str, int] = {dim: 0 for dim in DEFAULT_WEIGHTS}
                 item_passed_flags: dict[int, list[bool]] = {idx: [] for idx in range(len(all_items))}
 
+                # LaBSE Phase 1 — judge-divergence (unscored). Per item_idx, remember
+                # the LaBSE (multilingual_similarity) and judge semantic_similarity
+                # scores, plus a handle to the multilingual row to annotate after.
+                labse_by_item: dict[int, float] = {}
+                semantic_by_item: dict[int, float] = {}
+                multilingual_row_by_item: dict[int, MetricResult] = {}
+
                 # Two semaphores cap simultaneous Azure calls to stay under the TPM
                 # limit. Single-call LLM-judge metrics (fluency, cultural, safety,
                 # code-switching) run judge-wide. The DeepEval metrics each fire SEVERAL
@@ -493,7 +500,7 @@ async def dispatch_run(run_id: str) -> None:
                     # fallbacks — so the item drill-down and SME export still show them
                     # (the export sanitizes error reasons to "unavailable").
                     if item_idx in response_id_by_idx:
-                        session.add(MetricResult(
+                        _mr = MetricResult(
                             id=uuid.uuid4(),
                             response_id=response_id_by_idx[item_idx],
                             dimension=output.dimension,
@@ -504,7 +511,14 @@ async def dispatch_run(run_id: str) -> None:
                             extra=output.extra,
                             error=output.error,
                             error_cause=getattr(output, "error_cause", None),
-                        ))
+                        )
+                        session.add(_mr)
+                        if not output.error:
+                            if output.metric_name == "multilingual_similarity":
+                                labse_by_item[item_idx] = output.score
+                                multilingual_row_by_item[item_idx] = _mr
+                            elif output.metric_name == "semantic_similarity":
+                                semantic_by_item[item_idx] = output.score
 
                     # Infra-error fallbacks (rate limit / content filter / timeout) are
                     # not real measurements: exclude them from the score, pass-rate and
@@ -560,6 +574,20 @@ async def dispatch_run(run_id: str) -> None:
                         continue
 
                     item_passed_flags[item_idx].append(output.passed)
+
+                # LaBSE Phase 1 — annotate divergence per item + count for the scorecard.
+                # Unscored: only writes `extra` on the multilingual row and the
+                # scorecard's judge_divergence_count; never touches dimension_scores,
+                # item_passed_flags, or coverage above.
+                from scoring.divergence import count_divergences, item_divergence  # noqa: PLC0415
+                _div_flags = []
+                for _idx, _row in multilingual_row_by_item.items():
+                    _flag = item_divergence(labse_by_item.get(_idx), semantic_by_item.get(_idx))
+                    _div_flags.append(_flag)
+                    if _flag is not None:
+                        # extra is JSON; copy-update so SQLModel detects the change
+                        _row.extra = {**(_row.extra or {}), **_flag}
+                _divergence_count = count_divergences(_div_flags)
 
                 # Coverage = distinct items assessed per dimension (not evaluator
                 # outputs), so the low_coverage flag reflects real item counts even
@@ -645,6 +673,7 @@ async def dispatch_run(run_id: str) -> None:
                     remediation_roadmap=result.remediation_roadmap,
                     benchmark_pack_version=",".join(assessment.benchmark_pack_ids),
                     methodology_version=result.methodology_version,
+                    judge_divergence_count=_divergence_count,
                 )
                 # ── Step 6b: Generate PDF and JSON artefacts ──────────────────
                 # Set completed_at before artefact generation so the timestamp
