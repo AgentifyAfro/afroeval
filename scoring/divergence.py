@@ -13,6 +13,14 @@ whose *residual* (deviation from the run's typical gap) exceeds the threshold �
 isolating genuine per-item disagreement from the scale mismatch.
 
 Weight-0: this NEVER enters the composite — a QA/trust signal only.
+
+Limitations of per-run centering (by design): it flags per-item OUTLIERS relative
+to the run's typical offset, so it cannot detect a run where the judge diverges on
+*most* items — the median follows the majority and residuals collapse. It is also
+uninformative on tiny runs (n=1 comparable item → residual always 0; n=2 → both
+flag symmetrically). A quiet divergence count is therefore not proof of agreement,
+only of no per-item outliers. Detecting run-wide divergence is a separate question
+(cf. the ~28-33pt scale offset itself), out of scope for this signal.
 """
 from __future__ import annotations
 
