@@ -321,14 +321,13 @@ def _get_multilingual_model():
         with _MULTILINGUAL_MODEL_LOCK:
             if _MULTILINGUAL_MODEL is None:
                 from sentence_transformers import SentenceTransformer  # noqa: PLC0415
-                # L12 is the real multilingual paraphrase MiniLM. There is NO "L6"
-                # multilingual variant — an earlier "L6" typo pointed at a nonexistent
-                # repo, so HF returned a 401 "repository not found" that silently disabled
-                # this metric on every run. token=False downloads anonymously (the model is
-                # public) and ignores any stale ambient HF_TOKEN; set HF_TOKEN only if
-                # anonymous download rate limits become an issue.
+                # LaBSE (Language-Agnostic BERT Sentence Embedding, 109 languages):
+                # markedly stronger low-resource African-language coverage than the
+                # old MiniLM. Weight-0 diagnostic; also drives the judge_divergence
+                # flag (scoring/divergence.py). Local, no API — unaffected by rate
+                # limits or content filters.
                 _MULTILINGUAL_MODEL = SentenceTransformer(
-                    "paraphrase-multilingual-MiniLM-L12-v2", token=False
+                    "sentence-transformers/LaBSE", token=False
                 )
     return _MULTILINGUAL_MODEL
 
@@ -336,11 +335,11 @@ def _get_multilingual_model():
 class MultilingualSimilarityEvaluator(BaseEvaluator):
     """
     Cosine similarity between model response and expected behavior using a
-    multilingual sentence-transformer (paraphrase-multilingual-MiniLM-L12-v2).
+    multilingual sentence-transformer (sentence-transformers/LaBSE).
 
-    Supports 50+ languages including Swahili, Hausa, Amharic, Somali, Zulu.
-    Zero API calls — runs locally, unaffected by rate limits or content filters.
-    Requires: sentence-transformers
+    Supports 109 languages with markedly stronger low-resource African-language
+    coverage. Zero API calls — runs locally, unaffected by rate limits or content
+    filters. Requires: sentence-transformers
     """
 
     @property
