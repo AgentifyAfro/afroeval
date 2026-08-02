@@ -1,8 +1,7 @@
 """
 Tests for language_performance evaluators — stub/mock mode, no API calls.
 """
-import sys
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import evaluators.language_performance as lp
 from evaluators.language_performance import MultilingualSimilarityEvaluator
