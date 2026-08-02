@@ -63,9 +63,9 @@ Store sensitive values as Container App **secrets**, then reference them as env 
 ```bash
 az containerapp secret set -n "$APP" -g "$RG" --secrets \
   database-url="<SUPABASE_SESSION_POOLER_URL>" \
-  afroeval-secret-key="<STRONG_RANDOM_KEY>" \
   supabase-url="<SUPABASE_URL>" \
   supabase-anon-key="<SUPABASE_ANON_KEY>" \
+  operator-password="<OPERATOR_PASSWORD>" \
   azure-openai-api-key="<...>" \
   anthropic-api-key="<...>" \
   openai-api-key="<...>" \
@@ -74,27 +74,37 @@ az containerapp secret set -n "$APP" -g "$RG" --secrets \
 az containerapp update -n "$APP" -g "$RG" \
   --set-env-vars \
     DATABASE_URL=secretref:database-url \
-    AFROEVAL_SECRET_KEY=secretref:afroeval-secret-key \
     SUPABASE_URL=secretref:supabase-url \
     SUPABASE_ANON_KEY=secretref:supabase-anon-key \
+    OPERATOR_PASSWORD=secretref:operator-password \
     AZURE_OPENAI_API_KEY=secretref:azure-openai-api-key \
     AZURE_OPENAI_ENDPOINT="<https://...openai.azure.com/>" \
     AZURE_OPENAI_DEPLOYMENT_NAME="gpt-4.1-mini" \
     AZURE_OPENAI_API_VERSION="<e.g. 2024-06-01>" \
+    AIL_JUDGE_PROVIDER="azure" \
+    AIL_JUDGE_MODEL="gpt-4.1-mini" \
     ANTHROPIC_API_KEY=secretref:anthropic-api-key \
     OPENAI_API_KEY=secretref:openai-api-key \
     GEMINI_API_KEY=secretref:gemini-api-key \
+    AFROEVAL_ENV="production" \
     HF_HOME=/models/hf
 ```
 
 | Var | Purpose |
 |---|---|
 | `DATABASE_URL` | Supabase session pooler (data) |
-| `AFROEVAL_SECRET_KEY` | app secret key |
 | `SUPABASE_URL`, `SUPABASE_ANON_KEY` | console login (Supabase Auth — `auth/client.py`) |
-| `AZURE_OPENAI_*` | LLM judge (gpt-4.1-mini) |
+| `OPERATOR_PASSWORD` | **unlocks Run Evaluation** (Category-2/admin) — required to launch runs |
+| `AZURE_OPENAI_*` + `AIL_JUDGE_PROVIDER`/`AIL_JUDGE_MODEL` | LLM judge (Azure gpt-4.1-mini) |
 | `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY` | evaluated providers |
+| `AFROEVAL_ENV` | `production` (quiets SQL echo, prod behavior) |
 | `HF_HOME` | `/models/hf` — must match the Dockerfile so the baked LaBSE is found |
+
+Optional (nice-to-have): `JUDGE_MAX_CONCURRENCY` / `DEEPEVAL_MAX_CONCURRENCY` /
+`DEEPEVAL_ASYNC_MODE` (run-speed tuning — Azure can go more aggressive than Cloud);
+`LABEL_STUDIO_URL` / `LABEL_STUDIO_API_KEY` (HITL features — degrade gracefully if absent).
+`AFROEVAL_SECRET_KEY` is only needed if you also run the FastAPI (`api.main`) — not for
+the Streamlit console, so you can skip it here.
 
 Non-secret note: the DB must be at head (the deploy-migrate workflow already handles
 prod migrations; the console container does not migrate).
