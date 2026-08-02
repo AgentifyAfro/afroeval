@@ -75,13 +75,25 @@ score.
 
 Its job in Phase 1: when the LaBSE similarity **diverges sharply** from the item's
 judge-derived Language Performance score (beyond a configurable threshold), raise a
-**`judge_divergence` flag** on the item / surface a per-run divergence count in the
+**`judge_divergence` flag** on the item and a per-run divergence count in the
 scorecard. This is a QA / trust signal for reviewers, not a score mover.
+
+**Surfacing — decided 2026-08-01: persist the flag, so it appears in the downloadable
+scorecard report, not just the live console.** Dan wants divergence visible in the
+exported PDF a client would see. The console view recomputes from DB rows on the fly,
+but the PDF report (`reporting/generator.py`) renders from **stored** rows — so a
+console-only recompute would show on screen but be absent from the PDF. Persisting the
+per-item flag + per-run count means one stored value feeds **both** the console
+scorecard and the PDF report, and makes divergence auditable per-run (same principle as
+the `error`/`error_cause` columns from the error-plumbing work). Cost: a small schema
+addition + migration (see cost table) — accepted deliberately for report inclusion.
 
 Because scores are untouched:
 
-- **No methodology version bump.** No rebaseline. No SME sign-off gate.
-- It is reversible — if the flag proves noisy, turn it off with no scoring fallout.
+- **No methodology version bump.** No rebaseline. No SME sign-off gate. (The persisted
+  field is unscored — it never enters `DEFAULT_METRIC_WEIGHTS` or the composite.)
+- Still reversible in scoring terms — if the flag proves noisy, stop populating/showing
+  it with no scoring fallout; the column is inert data.
 - Every run silently accumulates the paired (LaBSE score, judge score) data that
   Phase 2 needs for calibration.
 
@@ -121,6 +133,11 @@ never conflated.
   execute out-of-band — *not* the Streamlit console, so the console memory ceiling is
   not touched). This is the main real cost: env provisioning + cold-load time.
 - Adds `sentence-transformers` + `torch` to the eval env's dependency footprint.
+- **Small schema + migration** — a per-item flag and a per-run `Scorecard` count column,
+  so divergence flows to the **downloadable PDF report** (Dan's requirement), not just
+  the live console. Unscored/inert, so no methodology or rebaseline impact — but it is a
+  DB change (Alembic migration + prod apply via the deploy-migrate workflow), unlike a
+  pure console-only recompute.
 - LaBSE is slower to load and embed than MiniLM (still trivial vs judge latency).
 - A **divergence threshold** must be picked; too tight → noise, too loose → misses.
   Starts as a configurable knob, tuned on real data.
@@ -150,8 +167,10 @@ never conflated.
 | Per-item latency | ~tens of ms | ~tens of ms |
 | Eval-env footprint | +~1.8 GB model, +torch | (already present) |
 | Console impact | none (runs out-of-band) | none |
-| Methodology / rebaseline | **none** | full rebaseline + SME sign-off |
-| Reversibility | trivial (flag off) | hard (versioned methodology) |
+| Schema / migration | **small** (per-item flag + `Scorecard` count col, so it reaches the PDF report) | (reuses Phase 1) |
+| Report (PDF) inclusion | ✅ yes (persisted) | ✅ yes |
+| Methodology / rebaseline | **none** (flag is unscored) | full rebaseline + SME sign-off |
+| Reversibility | easy (stop populating; column inert) | hard (versioned methodology) |
 
 ## Technical design (Phase 1)
 
@@ -162,19 +181,25 @@ never conflated.
 - **Still weight-0:** no change to `DEFAULT_METRIC_WEIGHTS`. The metric keeps
   persisting a `MetricResult` row (now LaBSE-backed) — already excluded from scoring
   and reconstruction by the error-plumbing read paths.
-- **Divergence flag:** compute per-item `|laBSE_similarity*100 − item_language_
-  performance_score|`; when it exceeds a configurable threshold, set a
-  `judge_divergence` marker (item `extra` and/or a per-run count surfaced in the
-  scorecard). Exact surfacing (scorecard field vs console-only) is an open question
-  below.
+- **Divergence flag (persisted):** compute per-item `|laBSE_similarity*100 −
+  item_language_performance_score|`; when it exceeds a configurable threshold, set a
+  **persisted** `judge_divergence` marker. Persistence so it reaches the PDF report:
+  the per-item flag on the `MetricResult`/item (a boolean/float column or a typed
+  `extra` key) plus a per-run divergence count on the `Scorecard` row (new column →
+  Alembic migration). Both `render_run_scorecard` (console) and
+  `reporting/generator.py` (PDF) read the stored value, so console and report never
+  drift. Plumb it through the dispatcher persist path the same way `error`/`error_cause`
+  were.
 - **Deps:** `sentence-transformers` + `torch` provisioned in the eval env only.
   Model cached on disk after first load (thread-safe loader already exists).
 
 ## Open questions (resolve during planning, not now)
 
-1. **Divergence surfacing** — a persisted scorecard field (survives, auditable, but a
-   schema/migration) vs console-only recomputation (no schema, ephemeral). Leaning
-   console-only for Phase 1 to stay reversible and schema-free.
+1. ~~**Divergence surfacing** — persisted field vs console-only recompute.~~
+   **RESOLVED 2026-08-01: persist it.** Dan wants divergence in the downloadable PDF
+   report, and the PDF renders from stored rows — so the flag is persisted (per-item +
+   per-run `Scorecard` count) and feeds both console and report from one value. Exact
+   column shape (dedicated column vs typed `extra` key) is a plan-time detail.
 2. **Threshold default** — starting value for "sharp" divergence; pick provisionally,
    tune on real data.
 3. **Model choice sanity check** — confirm LaBSE beats the alternatives (e.g. a newer
