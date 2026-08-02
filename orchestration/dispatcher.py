@@ -579,15 +579,20 @@ async def dispatch_run(run_id: str) -> None:
                 # Unscored: only writes `extra` on the multilingual row and the
                 # scorecard's judge_divergence_count; never touches dimension_scores,
                 # item_passed_flags, or coverage above.
-                from scoring.divergence import count_divergences, item_divergence  # noqa: PLC0415
-                _div_flags = []
+                from scoring.divergence import count_divergences, run_divergences  # noqa: PLC0415
+                # Per-run centering: pass ALL items' (LaBSE, semantic) pairs so the
+                # median scale-offset can be removed before flagging (see divergence.py).
+                _div_pairs = {
+                    _idx: (labse_by_item.get(_idx), semantic_by_item.get(_idx))
+                    for _idx in multilingual_row_by_item
+                }
+                _div_flags = run_divergences(_div_pairs)
                 for _idx, _row in multilingual_row_by_item.items():
-                    _flag = item_divergence(labse_by_item.get(_idx), semantic_by_item.get(_idx))
-                    _div_flags.append(_flag)
+                    _flag = _div_flags.get(_idx)
                     if _flag is not None:
                         # extra is JSON; copy-update so SQLModel detects the change
                         _row.extra = {**(_row.extra or {}), **_flag}
-                _divergence_count = count_divergences(_div_flags)
+                _divergence_count = count_divergences(_div_flags.values())
 
                 # Coverage = distinct items assessed per dimension (not evaluator
                 # outputs), so the low_coverage flag reflects real item counts even

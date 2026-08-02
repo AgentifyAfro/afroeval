@@ -1,21 +1,26 @@
 # tests/test_dispatcher_divergence.py
-"""Divergence is computed per item from the LaBSE + semantic_similarity rows,
-written to the multilingual row's extra, and counted onto the scorecard."""
-from scoring.divergence import count_divergences, item_divergence
+"""The dispatcher builds per-item (LaBSE, semantic_similarity) pairs and calls
+run_divergences (per-run centered): only genuine outliers flag after the scale
+offset is removed, and the count lands on the scorecard."""
+from scoring.divergence import count_divergences, run_divergences
 
 
-def test_per_item_divergence_and_count():
-    # item A: LaBSE 0.2 vs semantic 0.9 -> flagged; item B: 0.85 vs 0.9 -> not
-    per_item = {
-        "A": {"multilingual_similarity": 0.2, "semantic_similarity": 0.9},
-        "B": {"multilingual_similarity": 0.85, "semantic_similarity": 0.9},
-        "C": {"semantic_similarity": 0.7},  # no LaBSE -> uncomparable
+def test_dispatcher_pairs_centered_flagging():
+    # mirrors the dispatcher's `_div_pairs`: {item_idx: (labse, semantic)}.
+    # None on either side (metric errored/absent) -> uncomparable.
+    pairs = {
+        0: (0.60, 0.88),   # gap 0.28  (on the scale offset)
+        1: (0.55, 0.83),   # gap 0.28
+        2: (0.60, 0.90),   # gap 0.30
+        3: (0.20, 0.90),   # gap 0.70  <- genuine outlier
+        4: (0.40, None),   # semantic absent -> uncomparable
     }
-    flags = {
-        k: item_divergence(v.get("multilingual_similarity"), v.get("semantic_similarity"))
-        for k, v in per_item.items()
-    }
-    assert flags["A"]["judge_divergence"] is True
-    assert flags["B"]["judge_divergence"] is False
-    assert flags["C"] is None
+    flags = run_divergences(pairs)
+    assert flags[4] is None
+    assert flags[3]["judge_divergence"] is True
+    assert flags[0]["judge_divergence"] is False
     assert count_divergences(flags.values()) == 1
+    # the record the dispatcher copy-merges into the multilingual row's `extra`
+    assert set(flags[3]) >= {
+        "judge_divergence", "divergence_residual", "run_baseline_offset", "compared_to",
+    }

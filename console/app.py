@@ -381,6 +381,14 @@ def load_run_items(run_id: str) -> tuple[pd.DataFrame, dict[str, list[dict]]]:
                 dim_scores = [m["score"] for m in resp_metrics if m["dimension"] == dim and not m["error"]]
                 row[short] = round(sum(dim_scores) / len(dim_scores) * 100, 1) if dim_scores else None
 
+            # Judge-divergence marker (LaBSE Phase 1) — item flagged if its
+            # multilingual_similarity row diverges sharply from the judge (persisted
+            # in `extra`). Surfaced in the item table so divergent items are findable.
+            row["is_divergent"] = any(
+                m["metric_name"] == "multilingual_similarity" and (m.get("extra") or {}).get("judge_divergence")
+                for m in resp_metrics
+            )
+
             rows.append(row)
 
     return pd.DataFrame(rows), metrics_by_resp
@@ -1777,10 +1785,12 @@ def render_run_scorecard() -> None:
             fdf = fdf[fdf[avail].min(axis=1, skipna=True) < 60]
 
     # Build display df (no complex-type columns)
-    display_cols = ["item_id", "language", "domain", "is_gold", "is_filtered"] + list(DIM_SHORT.values()) + ["latency_ms"]
+    display_cols = ["item_id", "language", "domain", "is_gold", "is_filtered", "is_divergent"] + list(DIM_SHORT.values()) + ["latency_ms"]
     disp = fdf[[c for c in display_cols if c in fdf.columns]].copy()
     disp["is_filtered"] = disp["is_filtered"].map({True: "⚠ BLOCKED", False: ""})
     disp["is_gold"]     = disp["is_gold"].map({True: "★", False: ""})
+    if "is_divergent" in disp.columns:
+        disp["is_divergent"] = disp["is_divergent"].map({True: "⚠ Div", False: ""})
 
     col_cfg: dict = {
         "item_id":     st.column_config.TextColumn("Item", width="small"),
@@ -1788,6 +1798,7 @@ def render_run_scorecard() -> None:
         "domain":      st.column_config.TextColumn("Domain"),
         "is_gold":     st.column_config.TextColumn("Gold", width="small"),
         "is_filtered": st.column_config.TextColumn("Filter", width="small"),
+        "is_divergent": st.column_config.TextColumn("Div", width="small", help="LaBSE sharply disputes the judge's semantic_similarity on this item"),
         "latency_ms":  st.column_config.NumberColumn("ms", width="small", format="%d"),
     }
     for short in DIM_SHORT.values():
@@ -1836,7 +1847,10 @@ def render_run_scorecard() -> None:
             continue
         if is_divergent:
             status = "divergent"
-            reason = f"{m.get('reason') or ''} Divergent (Δ{extra.get('divergence_delta')})".strip()
+            # residual = deviation from the run's typical LaBSE-vs-judge offset (the
+            # value the flag is based on); fall back to raw delta for pre-centering rows.
+            _resid = extra.get("divergence_residual", extra.get("divergence_delta"))
+            reason = f"{m.get('reason') or ''} Divergent (residual Δ{_resid})".strip()
         elif m.get("error"):
             status = "error"
             reason = f"excluded ({m.get('error_cause') or 'unavailable'}) — {m.get('reason') or ''}"
