@@ -1,163 +1,160 @@
-# Design — Azure eval backend (run full evals, incl. LaBSE, from the Cloud console)
+# Design — Host the AfroEval console on Azure (run full evals incl. LaBSE)
 
 **Date:** 2026-08-02
 **Status:** Approved design, pre-implementation
-**Author:** Dan Haile (with Claude)
+**Supersedes:** the earlier "deploy the FastAPI backend + console calls it via API"
+draft in this file's history — see Decision below.
 
 ## Problem
 
 The Streamlit Cloud console runs the **entire** evaluation dispatcher **in-process**
-(`render_run_evaluation` → a thread → `asyncio.run(dispatch_run(...))`,
-`console/app.py`). Streamlit Cloud is memory-capped (~1 GB), requirements.txt-only,
-and ephemeral — so heavy runs already struggle there, and LaBSE (1.8 GB model + torch)
-cannot load at all. Result: evals kicked off from the Cloud console record
-`multilingual_similarity` as `unavailable` and produce no judge-divergence signal;
-full runs are only reliable when run locally out-of-band (`scripts/run_eval.py` in
-`.venv`). The operator cannot run a complete eval — with LaBSE — from the cloud.
+(`render_run_evaluation` → a thread → `asyncio.run(dispatch_run(...))`). Streamlit Cloud
+is memory-capped (~1 GB), requirements.txt-only, and ephemeral — so heavy runs struggle
+and LaBSE (1.8 GB model + torch) cannot load at all. Evals launched from the Cloud console
+record `multilingual_similarity` as `unavailable` and produce no divergence signal; full
+runs only work locally out-of-band.
+
+## Decision
+
+**Move the whole console to Azure Container Apps** rather than keep it on Streamlit Cloud
+and decouple execution via an API. Rationale (Dan's call, 2026-08-02):
+
+- The heavy eval must run on Azure regardless — Streamlit Cloud cannot host LaBSE. So the
+  only question is whether to *also* keep the console on Cloud (which then needs an API
+  layer) or move it to Azure too.
+- The console's auth is **Supabase Auth** (`auth.client.SupabaseAuthClient`), not Streamlit
+  Cloud's access control — so it is fully portable; moving off Cloud costs no auth rework.
+- With the console on Azure (memory + LaBSE present), it simply keeps running the eval
+  **in-process as today** — so the API-decoupling layer is **not needed at all**. One
+  platform, fewer moving parts, and it escapes every Streamlit Cloud constraint
+  (memory ceiling, requirements.txt-only, ephemeral disk, reboot-after-push, sleep/wake).
+
+Trade accepted: an always-on Azure container (~low-tens USD/mo) and owning the deploy loop,
+vs. Streamlit Cloud's free zero-ops hosting.
 
 ## Goal
 
-Kick off a full evaluation (all evaluators, **including LaBSE**) from the Cloud
-console, with execution running on a backend that has the resources to host it, and
-results appearing in the console as they do today.
+Run the existing Streamlit console on Azure Container Apps with `.[eval]` + LaBSE, so the
+operator can launch a full evaluation (all evaluators, incl. LaBSE, divergence) from the
+browser and see results — no separate backend, no console code rewrite.
 
 ## Non-goals
 
-- A job queue / horizontal scale (documented as the later upgrade; one run at a time
-  is fine for a single operator now).
-- Changing scoring, evaluators, or the divergence logic.
-- Replacing the local `scripts/run_eval.py` / `.venv` path — it stays, unchanged.
-- Moving the console itself off Streamlit Cloud (it stays; it just becomes a thin client).
+- Decoupling the UI from execution via an API / job queue (documented as the later upgrade
+  if this ever becomes multi-user or runs get very heavy — then revisit the API-worker
+  split). Not now.
+- Changing scoring, evaluators, dispatch, or divergence logic.
+- Changing auth (Supabase Auth stays).
+- Removing the local `scripts/run_eval.py` / `.venv` path — it stays as a fallback.
 
 ## Architecture
 
 ```
-Streamlit Cloud console (thin client)
-   │  POST /v1/runs {assessment_id}      (HTTPS + X-API-Key)
-   ▼
-Azure Container Apps — FastAPI worker (api.main:app)
-   • min-replicas = 1 (always warm)  → background eval tasks never torn down;
-     LaBSE stays resident between runs
-   • image bakes in .[eval] + CPU-only torch + LaBSE (pre-downloaded at build)
-   • POST /v1/runs creates the Run + dispatch_run() in a BackgroundTask →
-     runs the FULL dispatcher (all evaluators incl. LaBSE) → writes Supabase
-   • liveness/health probe → GET /v1/health   (already exists)
-   ▲
-   │  console polls Supabase for status + scorecard (UNCHANGED — it already
-   │  reads runs/scorecards straight from Postgres)
+Browser (operator)  ──HTTPS/WebSocket──▶  Azure Container Apps
+                                          Streamlit console (container)
+                                          • streamlit run console/app.py
+                                          • .[eval] + CPU-torch + LaBSE baked in image
+                                          • min-replicas = 1 (always warm; in-process
+                                            eval thread never torn down; LaBSE resident)
+                                          • Supabase Auth (login) + Supabase Postgres (data)
+                                          • health probe → GET /_stcore/health
+                                                    │
+                                                    ▼
+                                          Supabase (Postgres) — unchanged
 ```
 
-**Key insight:** the FastAPI backend already implements this pattern. `POST /v1/runs`
-(`api/v1/routes/runs.py`) takes a `RunCreate {assessment_id}`, creates the Run, and
-`background_tasks.add_task(_execute_run, run_id)` → `dispatch_run`. It is simply not
-deployed anywhere (no Dockerfile; `docker-compose.yml` is local-only Postgres +
-Label Studio). This design deploys it and points the console at it.
+The console runs **unchanged**: `render_run_evaluation` still creates the Assessment + Run
+and dispatches in-process — it just now has the RAM and LaBSE to complete a full run.
 
 ## Components
 
-### A. Dockerfile (new)
+### A. Dockerfile (new) — the console image
 
-- Base `python:3.12-slim`.
-- Install the project with the `[eval]` extra, using a **CPU-only torch** index
-  (`--extra-index-url https://download.pytorch.org/whl/cpu`) to avoid the multi-GB CUDA
-  wheels — LaBSE runs on CPU.
-- **Bake LaBSE into the image**: a build step
-  `RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('sentence-transformers/LaBSE')"`
-  with a fixed `HF_HOME`/cache path, so there is **zero runtime download** and every
-  deploy is deterministic.
-- `CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]`.
-- Order layers so deps + model (slow, stable) are cached and only the app-code layer
-  rebuilds on iteration.
-- Expected image size ~2.5–3.5 GB (torch + LaBSE); one-time-per-deploy cost, cached,
-  never touches a run.
+- Base `python:3.12-slim`; system deps for scientific wheels.
+- Install the project with the `[eval]` extra, using **CPU-only torch**
+  (`--extra-index-url https://download.pytorch.org/whl/cpu`) — LaBSE runs on CPU.
+- **Bake LaBSE into the image** at build (`SentenceTransformer('sentence-transformers/LaBSE')`
+  with a fixed `HF_HOME`) — zero runtime download, deterministic deploys.
+- `CMD`: `streamlit run console/app.py` with container-appropriate flags
+  (`--server.port 8000 --server.address 0.0.0.0 --server.headless true`), and XSRF/CORS
+  settings compatible with running behind Container Apps ingress.
+- Layer order: deps + model (slow, stable) cached; only app-code layer rebuilds on iteration.
+- `.dockerignore` excludes `.venv/`, `.git/`, `tests/`, `docs/`, caches; **keeps** `benchmarks/`
+  and all app packages.
 
-### B. Console change (`console/app.py` `render_run_evaluation`)
+### B. Streamlit container config
 
-- Today it creates an Assessment row, creates a Run row, and runs `dispatch_run`
-  in-process in a thread. Change to: create the Assessment (as today, direct DB write —
-  the console has Supabase access), then **`POST {AFROEVAL_API_URL}/v1/runs`** with the
-  `assessment_id` and the `X-API-Key` header. The API creates the Run and dispatches on
-  Azure. **Remove** the in-process Run-create + thread (so there is no double Run and no
-  Cloud-side execution).
-- Everything downstream is unchanged: the console already polls Supabase
-  (`load_runs_summary`, scorecards) for status and results.
-- New Streamlit secrets: `AFROEVAL_API_URL` (the Container App HTTPS URL) and
-  `AFROEVAL_API_KEY`.
-- Degrade gracefully: if `AFROEVAL_API_URL` is unset, keep the current in-process path
-  (so local `streamlit run` still works without the backend) and show a clear notice.
+- A `.streamlit/config.toml` (or CMD flags) for headless server, correct address/port, and
+  ingress-compatible XSRF/CORS/websocket settings. Container Apps supports WebSockets (which
+  Streamlit requires); confirm ingress transport during deploy.
 
 ### C. Azure Container Apps config
 
-- Image pushed to Azure Container Registry (ACR); Container App with
-  **min-replicas = 1**, external HTTPS ingress, ~1–2 vCPU / **4 GB** (LaBSE + torch
-  resident ~2–2.5 GB).
-- Secrets/env: `DATABASE_URL` (Supabase session pooler), a **strong** `AFROEVAL_API_KEY`
-  (NOT the `dev-secret-change-in-production` default), the Azure-judge creds
-  (`AZURE_OPENAI_*`), and `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY`, plus
-  the `HF_HOME` cache path matching the Dockerfile.
-- Liveness probe → `GET /v1/health`.
+- Image in ACR; Container App with **min-replicas = 1** (always warm — the in-process eval
+  thread is never torn down mid-run; LaBSE stays resident), external HTTPS ingress on port
+  8000 with WebSocket support, ~1–2 vCPU / **4 GB** (LaBSE + torch resident ~2–2.5 GB).
+- Liveness probe → `GET /_stcore/health` (Streamlit's health endpoint).
+- Env/secrets (as Container App secrets): everything the console reads today —
+  `DATABASE_URL`, `AFROEVAL_SECRET_KEY`, the Supabase Auth creds the login uses
+  (e.g. `SUPABASE_URL` / `SUPABASE_ANON_KEY` — confirm exact names from `auth/client.py`),
+  the Azure-judge creds (`AZURE_OPENAI_*`), `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` /
+  `GEMINI_API_KEY`, and `HF_HOME` matching the Dockerfile. The app reads config from env
+  via pydantic settings, so container env vars are sufficient (no `secrets.toml` needed;
+  the existing `st.secrets.get(...)` sync is already wrapped in try/except and degrades to
+  env vars).
 
 ### D. Deploy runbook (docs)
 
-- The exact copy-paste `az` commands: `az acr build` (builds the image **remotely** —
-  no local Docker needed), then `az containerapp create/update`. The deploy runs under
-  **Dan's** Azure subscription.
+- Copy-paste `az` commands: `az acr build` (builds the image **remotely** — no local Docker),
+  then `az containerapp create/update`. Runs under Dan's Azure subscription.
 
-## Auth & security
+## Console code changes
 
-- The endpoint is public HTTPS; access is gated by the `X-API-Key` header (the app's
-  existing mechanism — confirm during implementation whether it is enforced by global
-  middleware in `api/main.py` or needs a `Depends` on the write routes; if the latter,
-  add it). Set a strong key in prod; store it as a Container App secret and a Streamlit
-  secret.
-- Consider (optional, later) restricting ingress or adding IP allowlisting.
+**None expected.** The console already dispatches in-process; it just needs the runtime
+environment. Confirm during implementation that: (a) config resolves from env vars when
+`st.secrets` is absent (it does — the sync is try/except-wrapped and `get_settings()` reads
+env), and (b) nothing hard-requires a Streamlit-Cloud-only feature. If a small config read
+needs adjusting, that is the only code touched.
 
 ## Migrations
 
-- The worker reads/writes the same Supabase; the schema must be at head. This is already
-  handled by the existing deploy-migrate workflow (`alembic upgrade head` on
-  `db/migrations/**` changes). The worker just needs `DATABASE_URL`; it does not run
-  migrations itself.
+Unchanged: the schema is kept at head by the existing deploy-migrate workflow. The console
+container just needs `DATABASE_URL`.
 
 ## Division of labor
 
-- **Claude produces:** the Dockerfile, the `console/app.py` API-client change (+ graceful
-  local fallback), the config/secrets documentation, and the copy-paste `az` deploy
-  runbook. Plus any small API auth hardening if the write routes aren't already gated.
-- **Dan runs:** the actual `az acr build` + `az containerapp` deploy (his Azure
-  subscription), sets the Container App + Streamlit secrets, and does the first
-  end-to-end run.
+- **Claude produces:** the Dockerfile, `.dockerignore`, the Streamlit container config, and
+  the copy-paste `az` deploy runbook + env/secrets table. Plus any tiny config-read fix if
+  one proves necessary.
+- **Dan runs:** `az acr build` + `az containerapp` deploy (his subscription), sets the
+  Container App secrets, points DNS/uses the Container App URL, and does the first run.
 
 ## Testing
 
-- Local: `docker`-free — verify the console API-client path with the API running locally
-  (`uvicorn api.main:app`), pointing `AFROEVAL_API_URL` at `http://localhost:8000`; a run
-  triggered from the console executes via the API and LaBSE scores (since local `.venv`
-  has it). Confirm the graceful fallback when `AFROEVAL_API_URL` is unset.
-- Post-deploy: a smoke run from the Cloud console against the Azure API → run completes,
+- No unit-testable code is added (Dockerfile + docs + config). Guard rails: the full pytest
+  suite stays green (nothing app-level changes), `import console.app` succeeds, and the
+  real gate is a **post-deploy smoke run** from the browser: a run completes,
   `multilingual_similarity` scores (not `unavailable`), divergence populates, scorecard
-  renders in the console.
-- Keep the full pytest suite green; the console change is unit-tested where it is pure
-  (the request-building helper), the DB/HTTP path guarded by the suite + import as usual.
+  renders.
 
 ## Cost
 
-- One small always-on Container Apps instance (~4 GB) — roughly low tens of USD/month.
-  ACR storage for a ~3 GB image. No per-run compute beyond the eval's own API calls.
+One small always-on Container Apps instance (~4 GB) — roughly low-tens USD/month; ACR
+storage for a ~3 GB image. No per-run compute beyond the eval's own API calls.
 
 ## Rollout
 
-1. Build + push the image (ACR), create the Container App with secrets, confirm
-   `GET /v1/health`.
-2. Set `AFROEVAL_API_URL` + `AFROEVAL_API_KEY` Streamlit secrets; reboot the console.
-3. Smoke run from the console; confirm LaBSE + divergence populate.
-4. The local `run_eval.py` path remains available throughout as a fallback.
+1. Build + push the image (ACR); create the Container App with secrets + WebSocket ingress;
+   confirm `GET /_stcore/health` and that login works.
+2. Smoke run from the browser; confirm LaBSE + divergence populate and the scorecard renders.
+3. Keep the Streamlit Cloud deployment available as a **fallback** during cutover (it can be
+   retired once Azure is proven). `scripts/run_eval.py` in `.venv` remains a fallback too.
 
-## Open questions (resolve during planning)
+## Open questions (resolve during implementation)
 
-1. **API-key enforcement location** — confirm whether `X-API-Key` is already enforced
-   globally or must be added to the write routes; harden if needed.
-2. **Assessment creation** — console writes the Assessment directly (current behavior,
-   keep) vs going through `POST /v1/assessments`. Leaning keep-direct for minimal change.
-3. **Run-status UX** — the console already polls Supabase; confirm the post-POST UX
-   (spinner/redirect) reads cleanly with the API path.
+1. **Exact Supabase Auth env-var names** — read from `auth/client.py`; include them in the
+   runbook's secrets table.
+2. **Streamlit ingress/XSRF** — confirm the minimal `config.toml` that works behind Container
+   Apps WebSocket ingress (headless, address, and whether XSRF/CORS need relaxing).
+3. **Cutover** — DNS/custom domain vs the default Container App URL; retire Cloud or keep as
+   fallback (leaning keep-as-fallback initially).

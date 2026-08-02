@@ -12,7 +12,6 @@ import json
 import os
 import subprocess
 import sys
-import threading
 import time
 import uuid
 from collections import defaultdict
@@ -998,25 +997,16 @@ def _launch_run(name: str, provider: str, model_id: str, pack_ids: list) -> None
 
     run_id_str = str(run_id_uuid)
 
-    def _thread() -> None:
-        try:
-            import asyncio
-
-            from orchestration.dispatcher import dispatch_run
-            asyncio.run(dispatch_run(run_id_str))
-        except Exception as exc:
-            try:
-                with Session(get_engine()) as s:
-                    run = s.get(Run, uuid.UUID(run_id_str))
-                    if run and run.status not in ("completed",):
-                        run.status = RunStatus.FAILED
-                        run.error_message = str(exc)
-                        s.add(run)
-                        s.commit()
-            except Exception:
-                pass
-
-    threading.Thread(target=_thread, daemon=True).start()
+    # Dispatch in a SUBPROCESS (its own main thread), not a Streamlit worker thread:
+    # some eval-stack libraries arm signal-based timeouts that only work in the main
+    # thread of the main interpreter (else "signal only works in main thread ..."). The
+    # child inherits our env (DB, judge/provider keys, DEEPEVAL_*), writes results to the
+    # DB, and persists its own failure; the console polls the run below. Non-blocking.
+    _repo_root = str(Path(__file__).resolve().parent.parent)
+    subprocess.Popen(  # noqa: S603 — fixed argv, no shell
+        [sys.executable, "scripts/dispatch_run.py", run_id_str],
+        cwd=_repo_root,
+    )
     st.session_state["op_active_run_id"] = run_id_str
 
 
