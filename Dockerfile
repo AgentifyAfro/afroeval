@@ -22,10 +22,12 @@ WORKDIR /app
 
 # 1) Heavy, stable ML deps FIRST so they stay cached across app-code changes.
 #    CPU-only torch (LaBSE runs on CPU — avoids the multi-GB CUDA wheels), then the
-#    eval extras. These layers only rebuild when the versions here change.
+#    eval extras. PINNED to the versions verified working locally: a newer deepeval
+#    removed `LLMTestCaseParams` (used by the language-performance metrics), so a loose
+#    `deepeval>=1.4.0` silently pulled an incompatible release and those metrics errored.
 RUN pip install --upgrade pip \
     && pip install torch --index-url https://download.pytorch.org/whl/cpu \
-    && pip install "sentence-transformers>=2.0.0" "deepeval>=1.4.0" "ragas>=0.1.9"
+    && pip install "sentence-transformers==5.5.1" "deepeval==4.0.6" "ragas==0.4.3"
 
 # 2) Bake LaBSE into the image → zero runtime download, deterministic deploys.
 #    Cached: depends only on the layer above, not on app code.
