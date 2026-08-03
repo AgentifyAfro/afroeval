@@ -457,8 +457,9 @@ def _divergence_line(count: int) -> str:
     if not count:
         return ""
     return (
-        f"Judge-divergence: on {count} item(s), a local judge-independent model "
-        f"(LaBSE) sharply disputed the judge's similarity score. Unscored QA signal."
+        f"Second-opinion check: on {count} item(s), an independent, bias-resistant similarity "
+        f"model disagreed with the AI judge on how well the response matched the expected "
+        f"answer. Flagged for human review; does not affect the score."
     )
 
 
