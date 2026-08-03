@@ -1737,10 +1737,10 @@ def render_run_scorecard() -> None:
     _div = _divergence_item_count(metrics_by_resp)
     if _div:
         render_callout(
-            f"<b>Judge-divergence note.</b> On {_div} item(s), LaBSE (a local, "
-            "judge-independent similarity model) sharply disputes the judge's "
-            "semantic_similarity score. Unscored signal — review these items in the "
-            "drill-down (marked <b>Divergent</b>).",
+            f"<b>Second-opinion check.</b> On {_div} item(s), an independent, bias-resistant "
+            "similarity model disagrees with the AI judge on how well the response matches the "
+            "expected answer. Neither is treated as the final word — these items are flagged for "
+            "a human to review (marked <b>Divergent</b> below) and do not affect the score.",
             kind="info",
         )
 
@@ -1788,7 +1788,7 @@ def render_run_scorecard() -> None:
         "domain":      st.column_config.TextColumn("Domain"),
         "is_gold":     st.column_config.TextColumn("Gold", width="small"),
         "is_filtered": st.column_config.TextColumn("Filter", width="small"),
-        "is_divergent": st.column_config.TextColumn("Div", width="small", help="LaBSE sharply disputes the judge's semantic_similarity on this item"),
+        "is_divergent": st.column_config.TextColumn("Div", width="small", help="An independent, bias-resistant similarity check disagrees with the AI judge on this item — flagged for human review (does not affect the score)"),
         "latency_ms":  st.column_config.NumberColumn("ms", width="small", format="%d"),
     }
     for short in DIM_SHORT.values():
@@ -1837,10 +1837,27 @@ def render_run_scorecard() -> None:
             continue
         if is_divergent:
             status = "divergent"
-            # residual = deviation from the run's typical LaBSE-vs-judge offset (the
-            # value the flag is based on); fall back to raw delta for pre-centering rows.
-            _resid = extra.get("divergence_residual", extra.get("divergence_delta"))
-            reason = f"{m.get('reason') or ''} Divergent (residual Δ{_resid})".strip()
+            # Plain-English finding (no jargon): an independent, bias-resistant similarity
+            # check disagrees with the AI judge on this item. Neither is ground truth —
+            # it's a "look here" flag for a human. Add a direction cue from the judge's
+            # own similarity number when it's available for this item.
+            _labse_pct = round((m["score"] or 0) * 100)
+            _judge = next(
+                (x for x in item_metrics
+                 if x["metric_name"] == "semantic_similarity" and not x.get("error")),
+                None,
+            )
+            if _judge is not None:
+                _dir = "lower" if (m["score"] or 0) < (_judge["score"] or 0) else "higher"
+                _cmp = f", rating it {_dir} than the AI judge did"
+            else:
+                _cmp = ", out of step with the AI judge's rating"
+            reason = (
+                f"Second-opinion disagreement — an independent, bias-resistant similarity "
+                f"check finds this response {_labse_pct}% similar in meaning to the expected "
+                f"answer{_cmp}. Neither is the final word; flagged for a human to review. "
+                f"Does not affect the score."
+            )
         elif m.get("error"):
             status = "error"
             reason = f"excluded ({m.get('error_cause') or 'unavailable'}) — {m.get('reason') or ''}"
