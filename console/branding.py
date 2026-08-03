@@ -235,6 +235,38 @@ def inject_brand_css() -> None:
     .cmp-fill.f1 {{ background:{GRADIENT}; }}
     .cmp-fill.f2 {{ background:linear-gradient(90deg,#4169E1,#00CFFF); }}
     .cmp-v {{ font-size:14px; font-weight:700; color:#FFFFFF; font-variant-numeric:tabular-nums; }}
+
+    /* ── mobile / responsive hardening ─────────────────────────────────────────
+       Kill the horizontal rubber-band ("swiggle") by never letting the page itself
+       scroll sideways, damp the iOS overscroll bounce, and let wide custom tables
+       scroll INSIDE their own box. Then a phone breakpoint tightens paddings and the
+       oversized display fonts so nothing overflows a narrow viewport. */
+    html, body {{ overflow-x:hidden; overscroll-behavior-y:none; }}
+    .stApp {{ max-width:100vw; overflow-x:hidden; }}
+    .main .block-container {{ max-width:100%; }}
+    /* wide drill-down metric table scrolls within itself, never pushing page width */
+    .idetail .mtable {{ display:block; max-width:100%; overflow-x:auto; }}
+
+    @media (max-width:640px) {{
+        .main .block-container {{ padding-left:0.85rem !important; padding-right:0.85rem !important; padding-top:1rem; }}
+        h1 {{ font-size:1.6rem !important; line-height:1.2 !important; }}
+        .brand-sec-title {{ font-size:19px; margin-bottom:14px; }}
+        .sc-hero {{ padding:18px 18px; }}
+        .sc-hero .score {{ font-size:48px; }}
+        .sc-hero .score small {{ font-size:18px; }}
+        .sc-kpi {{ padding:13px 14px; }}
+        .sc-kpi .v {{ font-size:21px; }}
+        .sc-kpi .v.sm {{ font-size:15px; }}
+        .sc-dcard {{ padding:13px 14px; }}
+        .sc-dcard .vl {{ font-size:23px; }}
+        .kpi-row .k {{ padding:13px 14px; }}
+        .kpi-row .k .v {{ font-size:21px; }}
+        .kpi-row .k .v.sm {{ font-size:15px; }}
+        .idetail {{ padding:16px 14px; }}
+        /* keep the comparison rows on one line but with a slimmer label column */
+        .cmp-row {{ grid-template-columns:minmax(78px,108px) 1fr auto; gap:8px; }}
+        .cmp-track {{ height:20px; }}
+    }}
     </style>
     """,
         unsafe_allow_html=True,
