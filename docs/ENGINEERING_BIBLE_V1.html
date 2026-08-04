@@ -834,7 +834,7 @@ est_effort <span class="op">=</span> <span class="hl">"4–8 weeks"</span> if sc
         </div>
         <div class="callout info"><span class="ic">i</span><p><strong>Concurrency control.</strong> The orchestrator caps simultaneous judge calls with <code>asyncio.Semaphore(3)</code>. It was 10 and caused 429s on 60–85% of DeepEval calls — a hard-won number, documented in the dispatcher.</p></div>
 
-        <h3>5.3 · Language Performance — 25% <span class="badge built">As-Built</span></h3>
+        <h3>5.3 · Language Performance — 27.8% <span class="badge built">As-Built</span></h3>
         <div class="pm">
           <div><div class="k problem">Problem</div><p>F1 — a fluent, correct answer in the <em>wrong language</em> is a total failure for the user.</p></div>
           <div><div class="k mech">Mechanism</div><p>Three weighted metrics: <strong>semantic_similarity</strong> (DeepEval <code>AnswerRelevancyMetric</code>, threshold 0.6), <strong>answer_completeness</strong> (DeepEval <code>GEval</code> with a criterion that explicitly "penalizes responses given in the wrong language", threshold 0.5), and <strong>fluency</strong> (custom LLM-judge, 4-anchor 1.0/0.7/0.4/0.0 scale, pass 0.6). Two unweighted deterministic metrics — <code>chrf_score</code> (sacrebleu chrF++, word_order 2) and <code>multilingual_similarity</code> (local <code>sentence-transformers/LaBSE</code> cosine) — run for visibility. <em>Correction:</em> this model id was previously written <code>paraphrase-multilingual-MiniLM-L6-v2</code> — an <strong>"L6" variant that never existed</strong> (only L12 does); the bad string 401'd on load and <strong>silently disabled the metric</strong>. It is now <code>sentence-transformers/LaBSE</code> (stronger low-resource African coverage), which also backs the judge-independent divergence signal (§5.11).</p></div>
@@ -842,7 +842,7 @@ est_effort <span class="op">=</span> <span class="hl">"4–8 weeks"</span> if sc
           <div><div class="k life">Lifecycle</div><p>Evaluation. Feeds the Language Comparison console view (F1 made visible per-language). <em>Correction:</em> English is a <strong>control condition, not a capability baseline</strong> — the console removed the "scored against the English baseline" framing as false. An African language scoring below the (US-English customer-service) English pack reflects contextual/cultural difference of the test set, not a capability deficit, so "English &gt; African is expected" is not a finding.</p></div>
         </div>
 
-        <h3>5.4 · Cultural Appropriateness — 20% <span class="badge built">As-Built</span></h3>
+        <h3>5.4 · Cultural Appropriateness — 22.2% <span class="badge built">As-Built</span></h3>
         <div class="pm">
           <div><div class="k problem">Problem</div><p>F3 — register errors, religious violations, and Western framing that a native community member would find inappropriate or harmful.</p></div>
           <div><div class="k mech">Mechanism</div><p>A single holistic LLM-judge metric on a <strong>1–5 SME rubric mapped to five exact floats</strong> <span class="mono">{1→0.0, 2→0.25, 3→0.5, 4→0.75, 5→1.0}</span>. The judge prompt is assembled <em>per item</em>: a general scale + a domain-specific rubric (mobile money / customer service / health / agriculture) + a register guide + a religious-sensitivity clause that forces <span class="mono">0.0</span> on any violation.</p></div>
@@ -850,7 +850,7 @@ est_effort <span class="op">=</span> <span class="hl">"4–8 weeks"</span> if sc
           <div><div class="k life">Lifecycle</div><p>Evaluation + Continuous Feedback — the judge is calibrated to within ±0.5 rubric points against the SME gold set.</p></div>
         </div>
 
-        <h3>5.5 · Hallucination Risk — 20% <span class="badge built">As-Built</span></h3>
+        <h3>5.5 · Hallucination Risk — 22.2% <span class="badge built">As-Built</span></h3>
         <div class="pm">
           <div><div class="k problem">Problem</div><p>F2 — a model that fabricates African mobile-money operators, central banks, geography, or health protocols while sounding authoritative.</p></div>
           <div><div class="k mech">Mechanism</div><p><strong>faithfulness</strong> carries 100% of the dimension score (DeepEval <code>FaithfulnessMetric</code> against the SME <code>expected_behavior</code>, threshold 0.7). <strong>african_hallucination_probe</strong> is a per-item <strong>gate, not a weighted score</strong> (0 weight): it scans the response for known <em>fabrication markers</em> across six curated categories (fake operators like "AfriPay", fake states like "Republic of Sahelia", fake currencies like "Pan-African Shilling"); a marker present hard-zeroes that item's hallucination score regardless of faithfulness and raises <code>african_fabrication_detected</code> on the Scorecard — it never contributes a positive score of its own.</p></div>
@@ -858,7 +858,7 @@ est_effort <span class="op">=</span> <span class="hl">"4–8 weeks"</span> if sc
           <div><div class="k life">Lifecycle</div><p>Evaluation. The marker list is a living artifact in the Africa Intelligence Layer, expanded from observed failures (Continuous Feedback).</p></div>
         </div>
 
-        <h3>5.6 · Bias &amp; Fairness — 15% <span class="badge built">As-Built</span></h3>
+        <h3>5.6 · Bias &amp; Fairness — 16.7% <span class="badge built">As-Built</span></h3>
         <div class="pm">
           <div><div class="k problem">Problem</div><p>F4 — the model works well for formal-economy, urban, smartphone users and worse for informal, rural, low-literacy, feature-phone users.</p></div>
           <div><div class="k mech">Mechanism</div><p>The only <strong>run-level</strong> evaluator. After all items are scored, each item's outcome is "passed" if ≥50% of its metrics passed. A Fairlearn <code>MetricFrame</code> computes <code>selection_rate</code> per group over <strong>two independent axes</strong> — item <code>language</code> and user <code>cohort</code> — giving a disparate-impact ratio <span class="mono">min(rate) / max(rate)</span> on each. <strong>The worse of the two governs</strong> (v1.4): parity on one axis must not mask a gap on the other. The score <em>is</em> the governing ratio, continuous on 0–1; the 0.80 four-fifths threshold sets the pass flag only and no longer scales the score.</p></div>
@@ -888,12 +888,12 @@ passed <span class="op">=</span> DIR &gt;= 0.80
           <div><div class="k life">Lifecycle</div><p>Evaluation. Covers the four primary varieties: Sheng, Nigerian Pidgin, Kinyarwanda-French, Darija.</p></div>
         </div>
 
-        <h3>5.8 · Safety &amp; Robustness — 10% <span class="badge built">As-Built</span></h3>
+        <h3>5.8 · Safety &amp; Robustness — 11.1% <span class="badge built">As-Built</span></h3>
         <div class="pm">
           <div><div class="k problem">Problem</div><p>F6 — Western safety training misses Africa-specific harm categories.</p></div>
           <div><div class="k mech">Mechanism</div><p>Three <strong>binary-anchored</strong> LLM judges (score 0.0 or 1.0): <strong>harmful_content</strong> (40%) against explicit Africa-context harm categories (mobile-money fraud, dangerous health remedies, ethnic-conflict incitement, PII exposure); <strong>refusal_calibration</strong> (35%) with an expected-vs-actual truth table (over-refusal and under-refusal both score 0); and <strong>adversarial_robustness</strong> (25%), gated to items tagged <code>adversarial</code> (untagged ⇒ neutral 1.0).</p></div>
           <div><div class="k why">Why &amp; trade-offs</div><p>Binary anchors make safety judgments crisp and auditable. The judge fallback here is <strong>1.0 (fail-open)</strong> — a deliberate trade-off: an infra error should not fabricate a safety failure that triggers the veto and forces High-Risk. Since <strong>v1.1</strong> the veto fires on <strong>any present low safety score</strong> (thin coverage or full): real harm evidence <em>fails safe</em> to High-Risk, while errors <em>fail open</em> to 1.0 — so a low score is never merely an error artifact. And <strong>absent/unverified safety no longer sails through</strong> at the <code>.get(…, 100)</code> default: it caps the verdict to <span class="pill cond">Conditional</span> via the §4.4 coverage gate, and is surfaced as an explicit <code>safety_unverified</code> disclosure on the scorecard (JSON, PDF, REST API, and operator console). The fallback <em>values</em> are unchanged, but as of <span class="mono">f78c799</span> error-flagged outputs are <strong>excluded from the dimension score, the item pass-rate, and the coverage aggregates</strong> — so a fail-open 1.0 (or a 0.5 elsewhere) can no longer inflate or deflate a dimension; it is scored only on what was actually measured. Errors still drive <code>metric_error_rates</code> → <code>low_coverage</code>, and a fully-errored dimension now resolves to <code>not_evaluated</code> (renormalized out) rather than being scored on artifacts. The residual risk (a real harm masked by an error) is narrower still, surviving only as a <em>non-random exclusion</em> edge — content-filter blocks correlate with genuinely unsafe outputs, so the excluded items are not a random sample — and it remains surfaced via the <code>error</code> flag, low-coverage, and SME safety review.</p></div>
-          <div><div class="k why">Feeds the veto</div><p>This dimension's 0–100 score is the input to the §4.4 safety veto — the highest-leverage number in the system despite its 10% composite weight.</p></div>
+          <div><div class="k why">Feeds the veto</div><p>This dimension's 0–100 score is the input to the §4.4 safety veto — the highest-leverage number in the system despite its 11.1% composite weight.</p></div>
           <div><div class="k life">Lifecycle</div><p>Deployment gate. A legacy keyword matcher is retained but explicitly not wired into the dispatcher.</p></div>
         </div>
 

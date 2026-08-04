@@ -63,6 +63,21 @@ DEFAULT_WEIGHTS: dict[str, float] = {
     "safety_robustness": 0.1111,
 }
 
+# The full set of scorecard dimensions SMEs rate in the HITL calibration project — a
+# superset of DEFAULT_WEIGHTS that still includes code_switching_quality. Since v1.8 that
+# dimension is an unscored diagnostic (0 composite weight), but it is still computed,
+# persisted, and human-reviewed/monitored, so SMEs keep rating it. Kept separate from
+# DEFAULT_WEIGHTS on purpose: a scoring re-weight (like the v1.8 demotion) must never
+# silently drop an SME rating block or an import mapping. Order matches ResponseReview.
+REVIEW_DIMENSIONS: tuple[str, ...] = (
+    "language_performance",
+    "cultural_appropriateness",
+    "hallucination_risk",
+    "bias_fairness",
+    "code_switching_quality",
+    "safety_robustness",
+)
+
 # Sub-metric weights *within* a dimension (Methodology v1.0, Sections 2.1 / 2.3).
 # Only dimensions listed here use weighted aggregation; any dimension not listed
 # (or any metric not named here) falls back to a flat equal-average, same as before.

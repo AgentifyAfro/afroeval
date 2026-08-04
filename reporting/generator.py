@@ -464,7 +464,7 @@ def _divergence_line(count: int) -> str:
 
 
 def _key_observations_section(scorecard, s):
-    """Auto-generated observation bullets alongside a radar chart of the six dimensions."""
+    """Auto-generated observation bullets alongside a radar chart of the scorecard dimensions."""
     from reporting.observations import build_key_observations
     from reporting.radar import radar_drawing
 

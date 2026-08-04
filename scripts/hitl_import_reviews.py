@@ -24,7 +24,7 @@ from db.models import ResponseReview
 from db.session import get_engine
 from hitl.client import LabelStudioClient
 from hitl.label_config import PROJECT_TITLE, RATING_MAX
-from scoring.engine import DEFAULT_WEIGHTS
+from scoring.engine import REVIEW_DIMENSIONS
 
 
 def _build_user_lookup(client: LabelStudioClient) -> dict[int, str]:
@@ -42,7 +42,7 @@ def _parse_annotation(result: list[dict]) -> dict:
         from_name = entry.get("from_name", "")
         value = entry.get("value", {})
 
-        for dimension in DEFAULT_WEIGHTS:
+        for dimension in REVIEW_DIMENSIONS:
             if from_name == f"{dimension}_score" and "rating" in value:
                 fields[f"{dimension}_score"] = value["rating"] / RATING_MAX
             elif from_name == f"{dimension}_rationale" and value.get("text"):

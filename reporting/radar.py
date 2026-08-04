@@ -1,4 +1,5 @@
-"""Radar / spider chart for the six scorecard dimensions.
+"""Radar / spider chart for the scorecard dimensions (five scored since v1.8 + the
+code-switching diagnostic; the renderer is data-driven off the card's own dimensions).
 
 One geometry core (`radar_geometry`) feeds two dependency-free renderers so the
 PDF (ReportLab vector shapes) and the console (inline SVG) draw an identical
