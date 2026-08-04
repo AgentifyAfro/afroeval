@@ -54,9 +54,11 @@ dependencies = [
 
 [project.optional-dependencies]
 eval = [
-    "deepeval>=1.4.0",
-    "ragas>=0.1.9",
-    "sentence-transformers>=2.0.0",
+    # Pinned to the versions verified working (mirror of the Dockerfile). A newer deepeval
+    # removed LLMTestCaseParams, silently breaking the language-performance metrics (gap G10).
+    "deepeval==4.0.6",
+    "ragas==0.4.3",
+    "sentence-transformers==5.5.1",
 ]
 dev = [
     "pytest>=8.2.0",

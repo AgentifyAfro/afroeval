@@ -1734,7 +1734,10 @@ def render_run_scorecard() -> None:
             kind="warn",
         )
 
-    _div = _divergence_item_count(metrics_by_resp)
+    # Read the PERSISTED per-run count (the dispatcher's authoritative value), not a
+    # second recompute (gap G6 — one source of truth, matching the §4.3 principle). None
+    # means "not computed" (LaBSE unavailable), which correctly shows no callout.
+    _div = selected.get("judge_divergence_count")
     if _div:
         render_callout(
             f"<b>Second-opinion check.</b> On {_div} item(s), an independent, bias-resistant "
@@ -1833,7 +1836,10 @@ def render_run_scorecard() -> None:
     for m in sorted(item_metrics, key=lambda m: m["dimension"]):
         extra = m.get("extra") or {}
         is_divergent = m["metric_name"] == "multilingual_similarity" and extra.get("judge_divergence")
-        if m["metric_name"] in _UNSCORED_DRILL_METRICS and not is_divergent:
+        # Unscored metrics are hidden UNLESS they carry signal: a divergent flag, or an
+        # error row (gap G8 — error rows are persisted/excluded/marked and must still be
+        # visible in the one UI built to read them; test the error branch before the filter).
+        if m["metric_name"] in _UNSCORED_DRILL_METRICS and not is_divergent and not m.get("error"):
             continue
         if is_divergent:
             status = "divergent"
