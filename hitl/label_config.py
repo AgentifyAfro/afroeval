@@ -7,7 +7,7 @@ Control names match the `response_reviews` column naming convention
 annotation results straight back onto ResponseReview fields.
 """
 
-from scoring.engine import DEFAULT_WEIGHTS
+from scoring.engine import REVIEW_DIMENSIONS
 
 PROJECT_TITLE = "AfroEval — Response Calibration"
 
@@ -28,7 +28,7 @@ def _dimension_block(dimension: str) -> str:
 
 def build_calibration_label_config() -> str:
     """Full <View> XML for the SME model-response calibration interface."""
-    dimension_blocks = "\n".join(_dimension_block(d) for d in DEFAULT_WEIGHTS)
+    dimension_blocks = "\n".join(_dimension_block(d) for d in REVIEW_DIMENSIONS)
 
     return f"""<View>
   <Header value="Benchmark Prompt"/>
