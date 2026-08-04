@@ -47,6 +47,9 @@ def _stub_scorecard(run):
         benchmark_pack_version="customer_service_yo_v1.0.0",
         methodology_version="v1.0",
         created_at=datetime(2026, 6, 16, 10, 5, 30),
+        # A historical (pre-v1.8) card: 6 dimensions incl. code_switching_quality. The
+        # reporting layer must still render legacy cards — see Methodology v1.8 (gap G5),
+        # which dropped code_switching_quality from new cards but not from archived ones.
         dimension_scores={
             "language_performance": 84.0,
             "cultural_appropriateness": 60.0,

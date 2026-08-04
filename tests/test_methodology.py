@@ -273,3 +273,38 @@ def test_composite_formula_matches_manual_calculation():
     result = compute_composite_score(scores)
     assert abs(result.composite_score - 78.33) < 0.5
     assert result.verdict == "Conditional"
+
+
+# ── v1.8 gap G5: code-switching is unscored ───────────────────────────────────
+
+def test_composite_ignores_code_switching_dimension():
+    """A code_switching_quality entry in the raw scores must not move the composite —
+    it is not in DEFAULT_WEIGHTS, so the roll-up never touches it (gap G5)."""
+    base = {dim: [0.79] * 15 for dim in DEFAULT_WEIGHTS}
+    with_cs = {**base, "code_switching_quality": [0.99] * 15}
+
+    composite_without = compute_composite_score(base).composite_score
+    composite_with = compute_composite_score(with_cs).composite_score
+
+    assert composite_with == composite_without
+
+
+def test_english_shaped_run_lands_conditional_not_deployment_ready():
+    """The regression this fix exists to prevent: with code-switching inflating the
+    composite (the live customer_service_en case, cs ~98.8 -> 81.46 Deployment-Ready),
+    the verdict was a false certification. Under v1.8 the same run, scored on the five
+    real dimensions at ~0.79, lands at 79.0 -> Conditional.
+
+    This mirrors production: the dispatcher only feeds DEFAULT_WEIGHTS dimensions to the
+    engine, so code_switching_quality never reaches dimension_scores at all.
+
+    (For reference, the pre-v1.8 roll-up WITH code-switching at 0.99 would have been
+     0.79*0.90 + 0.99*0.10 = 0.811 -> 81.1 -> Deployment-Ready — the false certification.)"""
+    scores = {dim: [0.79] * 15 for dim in DEFAULT_WEIGHTS}  # 5 dims, as the dispatcher feeds
+
+    result = compute_composite_score(scores)
+
+    assert result.composite_score == pytest.approx(79.0, abs=0.1)
+    assert result.composite_score < 80.0
+    assert result.verdict == "Conditional"
+    assert "code_switching_quality" not in result.dimension_scores
