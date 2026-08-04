@@ -141,3 +141,48 @@ class LabelStudioClient:
         )
         resp.raise_for_status()
         return resp.json()
+
+    def list_projects(self, page_size: int = 100) -> list[dict]:
+        """Every project (paginated) — used for full-instance backups."""
+        projects: list[dict] = []
+        page = 1
+        while True:
+            resp = requests.get(
+                f"{self.base_url}/api/projects/",
+                headers=self._headers(),
+                params={"page": page, "page_size": page_size},
+                timeout=30,
+            )
+            # LS 404s on a page past the last one (see list_tasks) — treat as end.
+            if resp.status_code == 404 and page > 1:
+                break
+            resp.raise_for_status()
+            body = resp.json()
+            batch = body["results"] if isinstance(body, dict) else body
+            projects.extend(batch)
+            has_next = isinstance(body, dict) and bool(body.get("next"))
+            if not has_next and len(batch) < page_size:
+                break
+            if not batch:
+                break
+            page += 1
+        return projects
+
+    def export_full_snapshot(self, project_id: int, timeout: int = 300) -> list[dict]:
+        """Full backup of a project: EVERY task + its annotations (not just annotated
+        ones), so un-annotated in-flight drafts are captured too. Retries once on a read
+        timeout — exports on the small NANO App Service tier can be slow."""
+        last_exc: Exception | None = None
+        for _ in range(2):
+            try:
+                resp = requests.get(
+                    f"{self.base_url}/api/projects/{project_id}/export",
+                    headers=self._headers(),
+                    params={"exportType": "JSON", "download_all_tasks": "true"},
+                    timeout=timeout,
+                )
+                resp.raise_for_status()
+                return resp.json()
+            except requests.exceptions.ReadTimeout as exc:
+                last_exc = exc
+        raise last_exc  # type: ignore[misc]
