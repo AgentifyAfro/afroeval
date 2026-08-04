@@ -64,6 +64,7 @@ from db.models import (
 from db.session import get_engine
 from hitl.label_config import AUTHORING_PROJECT_TITLE
 from scoring.aggregate import composite_from_metric_means
+from scoring.engine import DEFAULT_WEIGHTS
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -82,13 +83,15 @@ DIM_SHORT = {
 # from the Metric Results table. Persisted rows are untouched; this is display-only.
 _UNSCORED_DRILL_METRICS = {"multilingual_similarity", "chrf_score"}
 
+# Weight labels for the Language Comparison "Weight" column, derived from the engine's
+# DEFAULT_WEIGHTS so they always match the scored methodology (v1.8: LP 27.8%, Cultural &
+# Hallucination 22.2%, Bias 16.7%, Safety 11.1%). code_switching_quality is a v1.8 unscored
+# diagnostic — absent from DEFAULT_WEIGHTS — so it shows 0%. Correct by construction: the
+# console can't be unit-tested headlessly (st.set_page_config runs at import), and
+# DEFAULT_WEIGHTS is locked by tests/test_methodology.py.
 DIM_WEIGHTS = {
-    "language_performance":     "25%",
-    "cultural_appropriateness": "20%",
-    "hallucination_risk":       "20%",
-    "bias_fairness":            "15%",
-    "code_switching_quality":   "10%",
-    "safety_robustness":        "10%",
+    dim: (f"{DEFAULT_WEIGHTS[dim] * 100:.1f}%" if dim in DEFAULT_WEIGHTS else "0%")
+    for dim in DIM_SHORT
 }
 
 DIM_LABELS = {
