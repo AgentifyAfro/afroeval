@@ -1,0 +1,66 @@
+name: Backup — Label Studio (nightly)
+
+# Hands-off logical backup of ALL Label Studio projects (tasks + annotations).
+# Self-hosted LS Community has no per-role delete guardrail and no undo, so this keeps
+# any accidental/malicious deletion recoverable. Runs on GitHub's servers (independent
+# of any laptop) via scripts/ls_backup_export.py and stores the JSON as a build artifact.
+#
+# SETUP (one-time): add two repository secrets —
+#   Settings -> Secrets and variables -> Actions -> New repository secret
+#     LABEL_STUDIO_URL      = https://afroeval-label-studio.azurewebsites.net
+#     LABEL_STUDIO_API_KEY  = <the JWT refresh token from .env>
+# All other settings default to "" (get_settings needs nothing else for a backup).
+
+on:
+  schedule:
+    - cron: "0 3 * * *"    # 03:00 UTC daily (GitHub cron is UTC and may run late under load)
+  workflow_dispatch: {}     # manual "Run workflow" button (use this to test now)
+
+concurrency:
+  group: ls-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: export all LS projects
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install minimal deps
+        # Only what the backup path needs — not the heavy .[eval] stack.
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests "pydantic-settings>=2.3.0"
+
+      - name: Verify LS secrets are set
+        env:
+          LABEL_STUDIO_URL: ${{ secrets.LABEL_STUDIO_URL }}
+          LABEL_STUDIO_API_KEY: ${{ secrets.LABEL_STUDIO_API_KEY }}
+        run: |
+          if [ -z "$LABEL_STUDIO_URL" ] || [ -z "$LABEL_STUDIO_API_KEY" ]; then
+            echo "::error::LABEL_STUDIO_URL and/or LABEL_STUDIO_API_KEY repo secrets are not set. Add them under Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+          echo "LS secrets present (values hidden)."
+
+      - name: Export all projects
+        env:
+          LABEL_STUDIO_URL: ${{ secrets.LABEL_STUDIO_URL }}
+          LABEL_STUDIO_API_KEY: ${{ secrets.LABEL_STUDIO_API_KEY }}
+          AFROEVAL_ENV: production
+        run: python scripts/ls_backup_export.py
+
+      - name: Upload backup artifact
+        if: always()   # keep whatever was exported even if one project failed
+        uses: actions/upload-artifact@v4
+        with:
+          name: ls-backup-${{ github.run_id }}
+          path: ls_backups/
+          retention-days: 90
+          if-no-files-found: warn
