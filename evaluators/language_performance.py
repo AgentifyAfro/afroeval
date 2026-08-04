@@ -282,6 +282,7 @@ class ChrFEvaluator(BaseEvaluator):
         expected_behavior: str,
         context: dict | None = None,
     ) -> MetricOutput:
+        _error = False
         try:
             import sacrebleu  # noqa: PLC0415
             chrf = sacrebleu.corpus_chrf(
@@ -293,6 +294,10 @@ class ChrFEvaluator(BaseEvaluator):
             score = round(chrf.score / 100.0, 4)
             reason = f"chrF++ = {chrf.score:.1f}/100 (char+word n-gram overlap with reference)"
         except Exception as exc:
+            # An exception is an infra failure, NOT a real 0.0 — flag error=True so it is
+            # excluded from scoring (gap G11; matches the three-outcome model). Harmless while
+            # chrF is unweighted, a correctness trap the moment it is promoted.
+            _error = True
             score = 0.0
             reason = f"chrF unavailable: {exc}"
 
@@ -302,6 +307,8 @@ class ChrFEvaluator(BaseEvaluator):
             score=score,
             passed=score >= 0.25,   # chrF is strict — 0.25 (~25/100) is a reasonable pass bar
             reason=reason,
+            error=_error,
+            error_cause="unavailable" if _error else None,
         )
 
 

@@ -592,7 +592,11 @@ async def dispatch_run(run_id: str) -> None:
                     if _flag is not None:
                         # extra is JSON; copy-update so SQLModel detects the change
                         _row.extra = {**(_row.extra or {}), **_flag}
-                _divergence_count = count_divergences(_div_flags.values())
+                # None when LaBSE never produced a comparable row (unavailable) — "not
+                # computed", distinct from 0 "computed, none found" (gap G7).
+                _divergence_count = (
+                    count_divergences(_div_flags.values()) if multilingual_row_by_item else None
+                )
 
                 # Coverage = distinct items assessed per dimension (not evaluator
                 # outputs), so the low_coverage flag reflects real item counts even

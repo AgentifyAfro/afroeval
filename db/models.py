@@ -263,9 +263,11 @@ class Scorecard(SQLModel, table=True):
     african_fabrication_detected: bool = Field(
         default=False, sa_column_kwargs={"server_default": "false"}
     )  # True if the African fabrication probe fired on any item (v1.2 gate)
-    judge_divergence_count: int = Field(
-        default=0, sa_column_kwargs={"server_default": "0"}
-    )  # count of items where LaBSE sharply disputes semantic_similarity (Phase 1, unscored)
+    # count of items where LaBSE sharply disputes semantic_similarity (Phase 1, unscored).
+    # Nullable BY DESIGN (gap G7): NULL = "not computed" (LaBSE unavailable this run) vs
+    # 0 = "computed, none found" — the same null-not-estimated pattern as irr_score. Do not
+    # coalesce to 0, or the Phase 2 calibration corpus can't tell a quiet run from a blind one.
+    judge_divergence_count: int | None = Field(default=None)
 
     # Per-dimension scores (stored as JSON)
     dimension_scores: dict[str, float] = Field(default_factory=dict, sa_column=Column(JSON))
