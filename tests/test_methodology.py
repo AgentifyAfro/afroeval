@@ -299,7 +299,7 @@ def test_english_shaped_run_lands_conditional_not_deployment_ready():
     engine, so code_switching_quality never reaches dimension_scores at all.
 
     (For reference, the pre-v1.8 roll-up WITH code-switching at 0.99 would have been
-     0.79*0.90 + 0.99*0.10 = 0.811 -> 81.1 -> Deployment-Ready — the false certification.)"""
+     0.79*0.90 + 0.99*0.10 = 0.810 -> 81.0 -> Deployment-Ready — the false certification.)"""
     scores = {dim: [0.79] * 15 for dim in DEFAULT_WEIGHTS}  # 5 dims, as the dispatcher feeds
 
     result = compute_composite_score(scores)
