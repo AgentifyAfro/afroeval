@@ -11,9 +11,13 @@ Lineage, all founder-approved, on top of the v1.0 weights / bands / veto:
   v1.3  Tier 2 single-expert item validation — a publication rule, not a scoring change
         (see docs/BENCHMARK_ITEM_SCHEMA.md; no assertions here)
   v1.4  bias & fairness measured on language + cohort axes, continuous disparity scoring
+  v1.5  Tier 1 IRR floor raised 0.60 -> 0.70 — a publication rule, not a scoring change,
+        so NO METHODOLOGY_VERSION bump: the constant stayed v1.4 (same as v1.3)
   v1.8  code_switching_quality demoted to a persisted-but-unscored diagnostic (gap G5);
-        composite renormalized over 5 dimensions. Also a one-time unification of the
-        Bible Rev and METHODOLOGY_VERSION to 1.8 — there were never v1.5/v1.6/v1.7.
+        composite renormalized over 5 dimensions. First scoring change since v1.4, so it
+        stamps the constant: v1.4 -> v1.8. The jump aligns METHODOLOGY_VERSION with the
+        Engineering Bible Rev (unified at 1.8 going forward) — v1.6/v1.7 never existed,
+        and v1.5 was doc-only (unstamped).
 """
 
 import pytest
