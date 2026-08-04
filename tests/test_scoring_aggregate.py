@@ -35,7 +35,9 @@ def test_partial_submetrics_renormalize():
 
 
 def test_composite_weighted_and_renormalized_when_bias_absent():
-    # English gpt-4o profile (no bias_fairness) -> faithful composite ~77.9.
+    # English gpt-4o profile (no bias_fairness) -> faithful composite ~77.85.
+    # code_switching_quality is included here to prove it's computed (dim_scores) but does
+    # NOT enter the composite — it's a persisted-but-unscored diagnostic since v1.8 (gap G5).
     metric_means = {
         "language_performance": {"semantic_similarity": 1.0, "answer_completeness": 0.345,
                                  "fluency": 1.0, "chrf_score": 0.246, "multilingual_similarity": 0.0},
@@ -49,9 +51,9 @@ def test_composite_weighted_and_renormalized_when_bias_absent():
     dim_scores, composite = composite_from_metric_means(metric_means)
     assert dim_scores["language_performance"] == pytest.approx(80.35, abs=0.01)
     assert dim_scores.get("bias_fairness") is None  # absent input -> not in dict / None
-    # weighted over 0.85 (bias 0.15 dropped), renormalized; raw = 77.95.
-    # (Real-data means give ~77.9; these idealized inputs land exactly on 77.95.)
-    assert composite == pytest.approx(77.95, abs=0.01)
+    # v1.8: weighted over LP .2778 + CA .2222 + HR .2222 + SR .1111 = 0.8333 (bias .1667
+    # dropped; code_switching_quality excluded from weighting entirely), renormalized.
+    assert composite == pytest.approx(77.85, abs=0.01)
 
 
 def test_no_dimensions_composite_none():

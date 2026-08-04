@@ -139,13 +139,21 @@ def test_weighted_dimension_average_renormalizes_missing_metric():
 
 
 def test_weighted_dimension_average_matches_code_switching_weights():
-    # code_switching_quality: register_match 35%, switch_naturalness 35%, language_preservation 30%
+    # code_switching_quality is a persisted-but-unscored diagnostic since v1.8 (gap G5) —
+    # it no longer has an entry in DEFAULT_METRIC_WEIGHTS, but the underlying weighted-average
+    # helper is generic and this locks in its original sub-metric split (register_match 35%,
+    # switch_naturalness 35%, language_preservation 30%) as a regression guard.
     metric_scores = {
         "register_match": [1.0],
         "switch_naturalness": [1.0],
         "language_preservation": [0.0],
     }
-    avg = _weighted_dimension_average(metric_scores, DEFAULT_METRIC_WEIGHTS["code_switching_quality"])
+    code_switching_weights = {
+        "register_match": 0.35,
+        "switch_naturalness": 0.35,
+        "language_preservation": 0.30,
+    }
+    avg = _weighted_dimension_average(metric_scores, code_switching_weights)
     assert avg == pytest.approx(0.70)  # 1.0*0.35 + 1.0*0.35 + 0.0*0.30
 
 
@@ -323,10 +331,10 @@ def test_healthy_full_coverage_sets_no_unverified_flags():
     assert result.verdict == "Deployment-Ready"
 
 
-def test_methodology_version_is_v1_4():
+def test_methodology_version_is_v1_8():
     scores = {dim: [1.0] for dim in DEFAULT_WEIGHTS}
     result = compute_composite_score(scores)
-    assert result.methodology_version == "v1.4"
+    assert result.methodology_version == "v1.8"
 
 
 def test_veto_wins_over_coverage_cap():
@@ -369,7 +377,7 @@ class TestV12HallucinationScoring:
 
     def test_methodology_version_is_current(self):
         from scoring.engine import METHODOLOGY_VERSION
-        assert METHODOLOGY_VERSION == "v1.4"
+        assert METHODOLOGY_VERSION == "v1.8"
 
     def test_all_faithfulness_errored_is_not_evaluated_not_zero(self):
         from scoring.engine import compute_composite_score
