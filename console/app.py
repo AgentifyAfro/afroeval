@@ -312,6 +312,11 @@ def load_runs_summary(include_archived: bool = False) -> list[dict]:
                 "remediation_roadmap": scorecard.remediation_roadmap if scorecard else [],
                 "pack_ids":            assessment.benchmark_pack_ids if assessment else [],
                 "model":               assessment.model_identifier if assessment else "",
+                "methodology_version": scorecard.methodology_version if scorecard else None,
+                # Effective run timestamp, same precedence as the PDF header (completed ->
+                # started -> created); created_at always exists so this is never None.
+                "run_date":            (run.completed_at or run.started_at or run.created_at)
+                                       .strftime("%b %d, %Y · %H:%M UTC"),
             })
     return rows
 
@@ -1657,6 +1662,8 @@ def render_run_scorecard() -> None:
         model=selected["model"],
         lang_domain=_pack_val,
         runtime=(f"{_rt // 60}m {_rt % 60}s" if _rt is not None else None),
+        methodology=selected.get("methodology_version"),
+        run_date=selected.get("run_date"),
     )
 
     if selected.get("safety_unverified"):

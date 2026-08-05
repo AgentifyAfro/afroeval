@@ -150,7 +150,7 @@ def inject_brand_css() -> None:
          background:{GRADIENT}; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; }}
     .sc-hero .score small {{ font-size:24px; color:{CAPTION}; -webkit-text-fill-color:{CAPTION}; }}
     .sc-kpis {{ display:grid; grid-template-columns:repeat(2,1fr); gap:14px; }}
-    @media (min-width:1100px) {{ .sc-kpis {{ grid-template-columns:repeat(4,1fr); }} }}
+    @media (min-width:1100px) {{ .sc-kpis {{ grid-template-columns:repeat(3,1fr); }} }}
     .sc-kpi {{ background:{SURFACE}; border:1px solid {BORDER}; border-radius:9px; padding:16px 18px; }}
     .sc-kpi .l {{ font-size:11px; font-weight:600; letter-spacing:0.05em; text-transform:uppercase; color:{CAPTION}; }}
     .sc-kpi .v {{ font-size:26px; font-weight:700; color:#FFFFFF; margin-top:6px; line-height:1.1; }}
@@ -315,14 +315,17 @@ _VERDICT_STATUS = {
 def render_scorecard_header(
     composite: float, verdict: str, confidence: str, model: str,
     lang_domain: str, runtime: str | None = None,
+    methodology: str | None = None, run_date: str | None = None,
 ) -> None:
     """Hero composite score (gradient) + a row of KPI cards. Data only; no computation."""
     vstatus, vicon = _VERDICT_STATUS.get(verdict, ("na", "•"))
     # Text KPIs use the smaller `.v.sm` (17px); numeric ones (Runtime) use `.v` (26px) — as the mock.
+    # Methodology (e.g. "v1.8") and Run date/time mirror the PDF header's METHODOLOGY + DATE.
     kpis = "".join(
         f'<div class="sc-kpi"><div class="l">{_esc(lbl)}</div><div class="v{sm}">{_esc(val)}</div></div>'
         for lbl, val, sm in (("Language & Domain", lang_domain, " sm"), ("Confidence", confidence, " sm"),
-                             ("Verdict", verdict, " sm"), ("Runtime", runtime or "—", ""))
+                             ("Verdict", verdict, " sm"), ("Methodology", methodology or "—", " sm"),
+                             ("Runtime", runtime or "—", ""), ("Run date", run_date or "—", " sm"))
     )
     st.markdown(
         f'<div class="sc-top"><div class="sc-hero"><div class="lab">Composite score · {_esc(model)}</div>'
