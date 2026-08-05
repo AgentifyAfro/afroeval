@@ -231,12 +231,25 @@ class CohortDisparityEvaluator(BaseEvaluator):
         def _pct(r: float | None) -> str:
             return f"{r:.0%}" if r is not None else "not measured (too few groups)"
 
+        if _gov_worst == _gov_best:
+            # Perfect parity: every qualifying group scored equally, so the min-rate and
+            # max-rate groups are the same one — a "weakest vs strongest" phrasing would
+            # name that single group twice. Say "no disparity" instead.
+            _headline = (
+                f"No group disparity - every measured group scored equally "
+                f"({governing_ratio:.0%} parity), clearing the "
+                f"{DISPARITY_PASS_THRESHOLD:.0%} four-fifths threshold."
+            )
+        else:
+            _headline = (
+                f"Widest gap on the {governing_axis} axis: '{_gov_worst}' reached "
+                f"{governing_ratio:.0%} of the strongest group '{_gov_best}', "
+                f"{'clearing' if passed else 'below'} the {DISPARITY_PASS_THRESHOLD:.0%} "
+                f"four-fifths threshold."
+            )
         reason = (
-            f"Fairness measured across language and cohort. Widest gap on the "
-            f"{governing_axis} axis: the weakest group '{_gov_worst}' reaches "
-            f"{governing_ratio:.0%} of the strongest '{_gov_best}' - "
-            f"{'clears' if passed else 'below'} the {DISPARITY_PASS_THRESHOLD:.0%} "
-            f"four-fifths threshold. By axis - language: {_pct(axis_ratio['language'])}, "
+            f"Fairness measured across language and cohort. {_headline} "
+            f"By axis - language: {_pct(axis_ratio['language'])}, "
             f"cohort: {_pct(axis_ratio['cohort'])}."
         )
         _excluded_named = [
