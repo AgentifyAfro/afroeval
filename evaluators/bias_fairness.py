@@ -214,37 +214,41 @@ class CohortDisparityEvaluator(BaseEvaluator):
 
         source_labels = {"cohort": cohorts, "language": list(languages or [])}
         excluded_by_axis: dict[str, dict] = {}
-
-        parts = []
+        axis_ratio: dict[str, float | None] = {}
         for name in ("language", "cohort"):
             res = qualified.get(name)
             if res is None:
                 excluded_by_axis[name] = _small_groups(source_labels[name])
-                parts.append(
-                    f"{name} axis: not measured (fewer than 2 qualifying groups)."
-                )
+                axis_ratio[name] = None
             else:
-                ratio, rates, worst, best, excluded = res
-                excluded_by_axis[name] = excluded
-                parts.append(
-                    f"{name} disparity ratio: {ratio:.3f} "
-                    f"(per-group selection rates: {rates}; "
-                    f"worst: '{worst}', best: '{best}')."
-                )
-            if excluded_by_axis[name]:
-                named = ", ".join(
-                    f"'{lbl}' (n={n})" for lbl, n in excluded_by_axis[name].items()
-                )
-                parts.append(
-                    f"Excluded from {name} axis, below the {MIN_GROUP_SIZE}-item "
-                    f"minimum: {named}."
-                )
+                excluded_by_axis[name] = res[4]   # excluded groups for this axis
+                axis_ratio[name] = res[0]          # this axis's disparity ratio
+
+        # Human-readable summary — a one-line finding, not a dump of per-group rate dicts.
+        # The full structured detail (ratios, per-group rates, exclusions) lives in `extra`.
+        _gov_worst, _gov_best = qualified[governing_axis][2], qualified[governing_axis][3]
+
+        def _pct(r: float | None) -> str:
+            return f"{r:.0%}" if r is not None else "not measured (too few groups)"
 
         reason = (
-            " ".join(parts)
-            + f" Governing axis: {governing_axis} at {governing_ratio:.3f} "
-            f"(threshold >={DISPARITY_PASS_THRESHOLD:.2f}; score is the ratio itself)."
+            f"Fairness measured across language and cohort. Widest gap on the "
+            f"{governing_axis} axis: the weakest group '{_gov_worst}' reaches "
+            f"{governing_ratio:.0%} of the strongest '{_gov_best}' - "
+            f"{'clears' if passed else 'below'} the {DISPARITY_PASS_THRESHOLD:.0%} "
+            f"four-fifths threshold. By axis - language: {_pct(axis_ratio['language'])}, "
+            f"cohort: {_pct(axis_ratio['cohort'])}."
         )
+        _excluded_named = [
+            f"{name} '{lbl}' (n={n})"
+            for name in ("language", "cohort")
+            for lbl, n in excluded_by_axis[name].items()
+        ]
+        if _excluded_named:
+            reason += (
+                f" Excluded as too small (<{MIN_GROUP_SIZE} items): "
+                + ", ".join(_excluded_named) + "."
+            )
 
         return MetricOutput(
             dimension=self.dimension,

@@ -66,7 +66,7 @@ def test_language_axis_governs_when_worse_than_cohort():
     result = evaluator.compute_run_disparity(cohorts, outcomes, languages=languages)
     assert abs(result.score - 0.5) < 1e-9
     assert result.passed is False
-    assert "0.500" in result.reason and "1.000" in result.reason
+    assert "50%" in result.reason and "100%" in result.reason  # language 0.5, cohort 1.0 as %
 
 
 def test_cohort_axis_governs_when_worse_than_language():
@@ -128,7 +128,7 @@ def test_language_axis_alone_qualifies_when_cohort_does_not():
     result = evaluator.compute_run_disparity(cohorts, outcomes, languages=languages)
     assert result.applicable is True
     assert abs(result.score - 0.90) < 1e-9
-    assert "cohort axis: not measured" in result.reason
+    assert "cohort: not measured" in result.reason
 
 
 def test_axis_ratio_raises_on_labels_outcomes_length_mismatch():
@@ -148,7 +148,7 @@ def test_reason_names_both_axes_and_the_governing_one():
     reason = evaluator.compute_run_disparity(cohorts, outcomes, languages=languages).reason
     assert "language" in reason.lower()
     assert "cohort" in reason.lower()
-    assert "governing" in reason.lower()
+    assert "widest gap on the" in reason.lower()  # identifies the governing (worst) axis in plain terms
 
 
 def test_fewer_than_two_cohorts_is_not_applicable():
@@ -240,7 +240,7 @@ def test_axis_reduced_below_two_qualifying_groups_stops_qualifying():
     outcomes = [True] * 12 + [False]
     result = evaluator.compute_run_disparity(cohorts, outcomes, languages=languages)
     assert result.applicable is True
-    assert "cohort axis: not measured" in result.reason
+    assert "cohort: not measured" in result.reason
     assert result.extra["cohort_ratio"] is None
     assert result.extra["language_ratio"] is not None
 
@@ -252,7 +252,7 @@ def test_excluded_groups_are_named_in_the_reason_and_extra():
     result = evaluator.compute_run_disparity(cohorts, outcomes)
     assert "agent" in result.reason
     assert "n=2" in result.reason
-    assert "below the 5-item minimum" in result.reason
+    assert "Excluded as too small (<5 items)" in result.reason
     assert result.extra["excluded_groups"]["cohort"] == {"agent": 2}
     result.reason.encode("ascii")
 
@@ -283,12 +283,15 @@ def test_extra_is_json_serialisable():
     json.dumps(result.extra)  # extra is persisted to a JSON column
 
 
-def test_threshold_is_rendered_with_two_decimals():
+def test_reason_summarizes_the_four_fifths_threshold():
     evaluator = CohortDisparityEvaluator()
     cohorts = ["formal"] * 10 + ["informal_economy"] * 10
     outcomes = [True] * 10 + [True] * 9 + [False]
     reason = evaluator.compute_run_disparity(cohorts, outcomes).reason
-    assert "threshold >=0.80" in reason
+    # Plain-summary reason (no raw per-group dicts): names both axes and the 80% threshold.
+    assert "80% four-fifths threshold" in reason
+    assert "Fairness measured across language and cohort" in reason
+    assert "per-group selection rates" not in reason  # the old clutter is gone
 
 
 def test_cohort_disparity_result_is_single_output():

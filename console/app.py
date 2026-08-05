@@ -1839,9 +1839,14 @@ def render_run_scorecard() -> None:
     for m in sorted(item_metrics, key=lambda m: m["dimension"]):
         extra = m.get("extra") or {}
         is_divergent = m["metric_name"] == "multilingual_similarity" and extra.get("judge_divergence")
-        # Unscored metrics are hidden UNLESS they carry signal: a divergent flag, or an
-        # error row (gap G8 — error rows are persisted/excluded/marked and must still be
-        # visible in the one UI built to read them; test the error branch before the filter).
+        # chrf_score is an unweighted, low-value diagnostic — always hidden; even its error
+        # rows are noise, not actionable for a reviewer (it errors "unavailable" on some
+        # inputs and carries 0 composite weight, so surfacing it just clutters the table).
+        if m["metric_name"] == "chrf_score":
+            continue
+        # multilingual_similarity is hidden too, UNLESS it carries signal: a divergence flag
+        # or an error row (gap G8 — those are persisted/excluded/marked and must stay visible
+        # in the one UI built to read them; test the error branch before the filter).
         if m["metric_name"] in _UNSCORED_DRILL_METRICS and not is_divergent and not m.get("error"):
             continue
         if is_divergent:
