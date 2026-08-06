@@ -393,8 +393,8 @@
         <p class="lede">The single source of truth for how AfroEval measures whether an AI system is ready to serve African users — in their language, in their cultural context, across every community. This document explains the exact mechanisms, not the marketing: the formulas, thresholds, control flow, and design trade-offs behind the score.</p>
         <dl class="meta">
           <div><dt>Classification</dt><dd>Confidential — Internal</dd></div>
-          <div><dt>Methodology</dt><dd>v1.5</dd></div>
-          <div><dt>Dimensions</dt><dd>6 weighted</dd></div>
+          <div><dt>Methodology</dt><dd>v1.8</dd></div>
+          <div><dt>Dimensions</dt><dd>5 weighted</dd></div>
           <div><dt>Benchmark Packs</dt><dd>12 · 9 languages</dd></div>
           <div><dt>Baseline</dt><dd>Current build (Jul 2026)</dd></div>
         </dl>
@@ -405,7 +405,7 @@
         <div class="sec-head"><span class="num">00</span><h2>Executive technical summary</h2></div>
         <p class="sec-sub">What the system is, in one read — for an engineer picking it up cold or a leader who needs the architecture without the sales gloss.</p>
 
-        <p>AfroEval Scorecard™ is an <strong>out-of-band batch evaluation engine</strong> that takes a target AI model and a set of SME-authored benchmark packs, runs the model over every item, scores each response across <strong>six weighted quality dimensions</strong>, and collapses those into a single <strong>governance-grade composite score (0–100)</strong> with a four-band deployment verdict. Every number decomposes back to a specific prompt, a specific model response, and a specific machine- or human-authored reason — nothing hides behind an average.</p>
+        <p>AfroEval Scorecard™ is an <strong>out-of-band batch evaluation engine</strong> that takes a target AI model and a set of SME-authored benchmark packs, runs the model over every item, scores each response across <strong>five weighted quality dimensions</strong>, and collapses those into a single <strong>governance-grade composite score (0–100)</strong> with a four-band deployment verdict. Every number decomposes back to a specific prompt, a specific model response, and a specific machine- or human-authored reason — nothing hides behind an average.</p>
 
         <p>The system is a Python monolith with three runtime surfaces over one Postgres database: a <strong>FastAPI</strong> service (programmatic runs), a <strong>Streamlit console</strong> (operator UI), and a set of <strong>CLI entrypoints</strong> (headless pipelines). All three converge on a single orchestrator, <code>dispatch_run</code>, which is the heart of the product.</p>
 
@@ -500,7 +500,7 @@
         <p class="sec-sub">High-level component topology, the run control flow, and the persistence model. Everything routes through one orchestrator over one database.</p>
 
         <h3>3.1 · Component topology <span class="badge built">As-Built</span></h3>
-        <p>Seven logical layers. The benchmark library feeds the orchestrator; the orchestrator drives connectors and evaluators; results land in Postgres; three surfaces (API, console, CLI) read and write through it. Label Studio sits to the side as the human-in-the-loop authoring/validation plane.</p>
+        <p>Seven logical layers. The benchmark library feeds the orchestrator; the orchestrator drives connectors and evaluators; results land in Postgres; three surfaces (API, console, CLI) read and write through it. Label Studio sits to the side as the human-in-the-loop authoring/validation plane. The console runs on <strong>Azure Container Apps</strong> — the full eval stack (incl. LaBSE) is resident there so complete runs execute in-process; <strong>Streamlit Cloud is retained as a fallback</strong>, not retired (deployment detail in §10.4).</p>
 
         <figure>
           <div class="diagram">
@@ -517,7 +517,7 @@
 
               <rect x="240" y="20" width="200" height="60" rx="8" class="svg-box"/>
               <text x="340" y="45" text-anchor="middle" class="svg-t" font-size="13">Streamlit Console</text>
-              <text x="340" y="63" text-anchor="middle" class="svg-tm" font-size="10">operator UI · 7 views</text>
+              <text x="340" y="63" text-anchor="middle" class="svg-tm" font-size="10">on Azure Container Apps</text>
 
               <rect x="460" y="20" width="200" height="60" rx="8" class="svg-box"/>
               <text x="560" y="45" text-anchor="middle" class="svg-t" font-size="13">CLI Entrypoints</text>
@@ -558,7 +558,7 @@
               <rect x="460" y="220" width="200" height="76" rx="8" class="svg-box"/>
               <text x="560" y="245" text-anchor="middle" class="svg-t" font-size="12.5">Evaluator Bank</text>
               <text x="560" y="263" text-anchor="middle" class="svg-tm" font-size="9">14 evaluators · 6 dims</text>
-              <text x="560" y="278" text-anchor="middle" class="svg-tm" font-size="9">LLM-judge · DeepEval · Fairlearn</text>
+              <text x="560" y="278" text-anchor="middle" class="svg-tm" font-size="8.5">LLM-judge · DeepEval · Fairlearn · LaBSE</text>
 
               <line x1="120" y1="186" x2="120" y2="220" class="svg-line" marker-end="url(#arrow)"/>
               <line x1="340" y1="186" x2="340" y2="220" class="svg-line" marker-end="url(#arrow)"/>
@@ -627,7 +627,7 @@
         </div>
 
         <h3>3.3 · Persistence model <span class="badge built">As-Built</span></h3>
-        <p>Postgres is the <em>only</em> durable state — a deliberate choice so the console can run on ephemeral Streamlit Cloud disk (PDFs are regenerated in-memory on demand). The schema is a clean lineage from configuration to evidence to verdict. Full field-level schema is in §06 and Appendix C.</p>
+        <p>Postgres is the <em>only</em> durable state — a deliberate choice so the console can run on ephemeral container disk — Azure Container Apps (Streamlit Cloud retained as a fallback, §10.4); PDFs are regenerated in-memory on demand. The schema is a clean lineage from configuration to evidence to verdict. Full field-level schema is in §06 and Appendix C.</p>
 
         <figure>
           <div class="diagram">
@@ -704,7 +704,7 @@
 
         <p>The weighted path <em>renormalizes over present metrics</em> — a missing or erroring sub-metric does not zero the dimension. Unnamed metrics (<code>chrf_score</code>, <code>multilingual_similarity</code>, and — since v1.8 — the three <code>code_switching_quality</code> metrics) still run and carry <strong>zero weight</strong>, but are now <strong>hidden from the item drill-down</strong> (<code>multilingual_similarity</code> surfaces there only when flagged <em>divergent</em> — §5.11). On missing-dependency or auth failure the metric cannot run, so <code>multilingual_similarity</code> is <strong>persisted as an error row</strong> (<code>error_cause=unavailable</code>), excluded from scoring and marked — the <em>persisted-and-excluded</em> outcome of the three-outcome failure model (§5.10), not a silent 0.0 and not a genuine measurement.</p>
 
-        <p><strong>In plain terms.</strong> Each dimension's score is built up from one or more smaller measurements (its "sub-metrics"). For the four <em>weighted</em> dimensions, those sub-metrics don't count equally — each carries its own internal weight. Language Performance, for example, lets semantic similarity count for half, completeness for a third, and fluency for the rest. We multiply each sub-metric's average result by its weight, add them together, and then divide by the weights that were actually available. That final step is what keeps the score honest: if one sub-metric is missing or errors out, we divide by only the weights that remain, so a missing piece is simply set aside rather than dragging the whole dimension toward zero. The two <em>flat</em> dimensions (Cultural, Bias&nbsp;&amp;&nbsp;Fairness) each come down to a single measurement, so there is nothing to weight — we just take the plain average. Finally we multiply by 100 to put the result on a familiar 0–100 scale; a dimension with no data at all scores 0.</p>
+        <p><strong>In plain terms.</strong> Each dimension's score is built up from one or more smaller measurements (its "sub-metrics"). For the three <em>weighted</em> dimensions, those sub-metrics don't count equally — each carries its own internal weight. Language Performance, for example, lets semantic similarity count for half, completeness for a third, and fluency for the rest. We multiply each sub-metric's average result by its weight, add them together, and then divide by the weights that were actually available. That final step is what keeps the score honest: if one sub-metric is missing or errors out, we divide by only the weights that remain, so a missing piece is simply set aside rather than dragging the whole dimension toward zero. The two <em>flat</em> dimensions (Cultural, Bias&nbsp;&amp;&nbsp;Fairness) each come down to a single measurement, so there is nothing to weight — we just take the plain average. Finally we multiply by 100 to put the result on a familiar 0–100 scale; a dimension with no data at all scores 0.</p>
 
         <div class="formula">
 <span class="cm"># Weighted dimension raw (0.0–1.0), over present named metrics only</span>
@@ -1169,7 +1169,7 @@ stable_pack_uuid(name, ver) <span class="op">=</span> uuid5(NAMESPACE, f"{name}_
           <table>
             <thead><tr><th>Function</th><th>As-Built</th><th>Recommended next</th></tr></thead>
             <tbody>
-              <tr><td><strong>GOVERN</strong></td><td>ADR log with replacement triggers; methodology versioning (v1.5); founder review gate on publication.</td><td><span class="badge rec">Design Rec</span> formal model-card + eval-card per run; sign-off workflow captured in-system.</td></tr>
+              <tr><td><strong>GOVERN</strong></td><td>ADR log with replacement triggers; methodology versioning (v1.8); founder review gate on publication.</td><td><span class="badge rec">Design Rec</span> formal model-card + eval-card per run; sign-off workflow captured in-system.</td></tr>
               <tr><td><strong>MAP</strong></td><td>Problem taxonomy → dimensions; cohort definitions; provenance on every item.</td><td><span class="badge rec">Design Rec</span> per-deployment context intake (use-case, population, risk tier) attached to an Assessment.</td></tr>
               <tr><td><strong>MEASURE</strong></td><td>Six dimensions, language + cohort disparity, coverage/confidence flags, per-item evidence, SME calibration + IRR.</td><td><span class="badge partial">Partial</span> confidence intervals on scores; automated IRR dashboards; drift trend charts.</td></tr>
               <tr><td><strong>MANAGE</strong></td><td>Verdict + safety veto + prioritized remediation roadmap; provider routing recommendation.</td><td><span class="badge rec">Design Rec</span> continuous re-evaluation triggers on model/version change; incident linkage.</td></tr>
