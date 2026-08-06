@@ -65,7 +65,7 @@ class AnchorLanguage(str, enum.Enum):
     ZULU = "zu"
     SHENG = "sheng"   # Nairobi code-switch variety
     OROMO = "om"      # Afaan Oromoo — Oromia (Ethiopia/Kenya)
-    SOMALI = "so"     # Af Soomaali — Somalia/Djibouti/Horn of Africa
+    SOMALI = "so"     # Af-Soomaali — Somalia, Djibouti, Ethiopia (Somali Region), NE Kenya (the Somali-speaking Horn)
     ENGLISH = "en"    # US English — high-resource baseline for comparative evaluation
 
 

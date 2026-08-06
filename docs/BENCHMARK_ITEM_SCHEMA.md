@@ -1,4 +1,4 @@
-# Benchmark Item Schema — Version 1.3
+# Benchmark Item Schema — Version 1.4
 
 **Status:** Locked for MVP  
 **Enforced by:** `benchmarks/loader.py` (required fields, `SINGLE_EXPERT_VALIDATED_TAG`) and `db/models.py` (BenchmarkItem table)  
@@ -167,7 +167,7 @@ Items that are `is_gold: true` are calibration anchors and are **NEVER scored** 
 | `zu` | isiZulu | South Africa |
 | `sheng` | Sheng | Nairobi, Kenya (code-switch variety) |
 | `om` | Afaan Oromoo | Oromia/Ethiopia, Kenya |
-| `so` | Af-Soomaali | Somalia, Djibouti, Horn of Africa |
+| `so` | Af-Soomaali | Somalia, Djibouti, Ethiopia (Somali Region), Kenya (North Eastern) — the wider Horn of Africa |
 | `en` | English (US) | United States — high-resource comparative baseline |
 
 ---
@@ -180,3 +180,4 @@ Items that are `is_gold: true` are calibration anchors and are **NEVER scored** 
 | v1.1 | 2026-06-16 | Added `om` (Oromo) and `so` (Somali) to AnchorLanguage; added `remittance` domain and `re` ID abbreviation. |
 | v1.2 | 2026-06-17 | Added `en` (US English) as high-resource comparative baseline language. |
 | v1.3 | 2026-07-18 | **Tier 1 / Tier 2 publication regime** (aligns with Methodology v1.3). Publication Rules split into Tier 1 — dual-SME validated, the default and unchanged — and Tier 2 — single-expert validated, an exception requiring `validation_count == 1`, `irr_score: null`, an authoritative external source in `provenance`, `is_gold: false`, attested dual qualification, dated founder sign-off, the reserved `single_expert_validated` tag, a ≤40% cap on the pack's scored set, and mandatory disclosure. Field reference updated for `tags`, `validation_count`, and `irr_score`. No structural field added or removed. |
+| v1.4 | 2026-08-05 | **`so` (Af-Soomaali) scope clarified.** `so` denotes the Somali language across the whole Somali-speaking Horn — Somalia, Djibouti, **Ethiopia's Somali Region**, and North-Eastern Kenya — **not Somalia alone**. Af-Soomaali is one language spanning these areas (there is no separate "Ethiopian Somali" code); the Label Studio reference pack for `so` already covers Ethiopian-Somali content. Documentation-only clarification — no structural field added or removed; the `db/models.py` `AnchorLanguage.SOMALI` comment was updated to match. |
