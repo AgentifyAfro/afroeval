@@ -21,6 +21,7 @@ The judge prompts are written to handle both cases correctly:
 
 from evaluators.base import BaseEvaluator, MetricOutput
 from evaluators.llm_judge import LLMJudge
+from evaluators.thresholds import METRIC_PASS_THRESHOLDS
 
 _PRIMARY_VARIETIES = "Sheng (Nairobi), Nigerian Pidgin, Kinyarwanda-French, Darija (Moroccan Arabic-French)"
 
@@ -55,7 +56,7 @@ class RegisterMatchEvaluator(BaseEvaluator):
                 dimension=self.dimension,
                 metric_name=self.metric_name,
                 score=score,
-                passed=score >= 0.6,
+                passed=score >= METRIC_PASS_THRESHOLDS[self.metric_name],
                 reason="Stub — LLM judge not configured.",
             )
 
@@ -82,7 +83,7 @@ class RegisterMatchEvaluator(BaseEvaluator):
             dimension=self.dimension,
             metric_name=self.metric_name,
             score=r.score,
-            passed=r.score >= 0.6,
+            passed=r.score >= METRIC_PASS_THRESHOLDS[self.metric_name],
             reason=r.reason,
             error=r.error,
             error_cause=r.error_cause,
@@ -119,7 +120,7 @@ class SwitchNaturalnessEvaluator(BaseEvaluator):
                 dimension=self.dimension,
                 metric_name=self.metric_name,
                 score=score,
-                passed=score >= 0.6,
+                passed=score >= METRIC_PASS_THRESHOLDS[self.metric_name],
                 reason="Stub — LLM judge not configured.",
             )
 
@@ -145,7 +146,7 @@ class SwitchNaturalnessEvaluator(BaseEvaluator):
             dimension=self.dimension,
             metric_name=self.metric_name,
             score=r.score,
-            passed=r.score >= 0.6,
+            passed=r.score >= METRIC_PASS_THRESHOLDS[self.metric_name],
             reason=r.reason,
             error=r.error,
             error_cause=r.error_cause,
@@ -182,7 +183,7 @@ class LanguagePreservationEvaluator(BaseEvaluator):
                 dimension=self.dimension,
                 metric_name=self.metric_name,
                 score=score,
-                passed=score >= 0.6,
+                passed=score >= METRIC_PASS_THRESHOLDS[self.metric_name],
                 reason="Stub — LLM judge not configured.",
             )
 
@@ -209,7 +210,7 @@ class LanguagePreservationEvaluator(BaseEvaluator):
             dimension=self.dimension,
             metric_name=self.metric_name,
             score=r.score,
-            passed=r.score >= 0.6,
+            passed=r.score >= METRIC_PASS_THRESHOLDS[self.metric_name],
             reason=r.reason,
             error=r.error,
             error_cause=r.error_cause,

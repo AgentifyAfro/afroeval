@@ -19,6 +19,7 @@ clamps is already the correct final score, not an intermediate one.
 
 from evaluators.base import BaseEvaluator, MetricOutput
 from evaluators.llm_judge import LLMJudge
+from evaluators.thresholds import METRIC_PASS_THRESHOLDS
 
 _GENERAL_SCALE = """\
 **The 5-Point Scale (report your answer as the matching 0.0-1.0 value)**
@@ -182,7 +183,7 @@ class CulturalAppropriatenessEvaluator(BaseEvaluator):
                 dimension=self.dimension,
                 metric_name=self.metric_name,
                 score=score,
-                passed=score >= 0.5,
+                passed=score >= METRIC_PASS_THRESHOLDS[self.metric_name],
                 reason="Stub — LLM judge not configured.",
             )
 
@@ -200,7 +201,7 @@ class CulturalAppropriatenessEvaluator(BaseEvaluator):
             dimension=self.dimension,
             metric_name=self.metric_name,
             score=r.score,
-            passed=r.score >= 0.5,
+            passed=r.score >= METRIC_PASS_THRESHOLDS[self.metric_name],
             reason=r.reason,
             error=r.error,
             error_cause=r.error_cause,

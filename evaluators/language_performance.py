@@ -33,6 +33,7 @@ except ImportError:
 
 from evaluators.base import BaseEvaluator, MetricOutput
 from evaluators.llm_judge import LLMJudge
+from evaluators.thresholds import METRIC_PASS_THRESHOLDS
 
 # Deepeval metrics use tenacity internally and exhaust their own retries before
 # propagating the error. These constants add an outer retry layer that waits
@@ -104,7 +105,7 @@ class SemanticSimilarityEvaluator(BaseEvaluator):
             dimension=self.dimension,
             metric_name=self.metric_name,
             score=score,
-            passed=score >= 0.6,
+            passed=score >= METRIC_PASS_THRESHOLDS["semantic_similarity"],
             reason=reason,
             error=error,
             error_cause="unavailable" if error else None,
@@ -185,7 +186,7 @@ class AnswerCompletenessEvaluator(BaseEvaluator):
             dimension=self.dimension,
             metric_name=self.metric_name,
             score=score,
-            passed=score >= 0.5,
+            passed=score >= METRIC_PASS_THRESHOLDS["answer_completeness"],
             reason=reason,
             error=error,
             error_cause="unavailable" if error else None,
@@ -237,7 +238,7 @@ class FluencyEvaluator(BaseEvaluator):
                 dimension=self.dimension,
                 metric_name=self.metric_name,
                 score=r.score,
-                passed=r.score >= 0.6,
+                passed=r.score >= METRIC_PASS_THRESHOLDS["fluency"],
                 reason=r.reason,
                 error=r.error,
                 error_cause=r.error_cause,
@@ -251,7 +252,7 @@ class FluencyEvaluator(BaseEvaluator):
             dimension=self.dimension,
             metric_name=self.metric_name,
             score=score,
-            passed=score >= 0.6,
+            passed=score >= METRIC_PASS_THRESHOLDS[self.metric_name],
             reason=reason,
         )
 
@@ -305,6 +306,8 @@ class ChrFEvaluator(BaseEvaluator):
             dimension=self.dimension,
             metric_name=self.metric_name,
             score=score,
+            # PB-1 exempt: unscored diagnostic — deliberately absent from thresholds.py, so
+            # it shows no pass bar in the drill-down and cannot drift against one.
             passed=score >= 0.25,   # chrF is strict — 0.25 (~25/100) is a reasonable pass bar
             reason=reason,
             error=_error,
@@ -383,6 +386,8 @@ class MultilingualSimilarityEvaluator(BaseEvaluator):
                 dimension=self.dimension,
                 metric_name=self.metric_name,
                 score=score,
+                # PB-1 exempt: unscored diagnostic — deliberately absent from thresholds.py,
+                # so it shows no pass bar in the drill-down and cannot drift against one.
                 passed=score >= 0.5,
                 reason=reason,
             )

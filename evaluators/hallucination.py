@@ -39,6 +39,7 @@ from evaluators.language_performance import (
     _DEEPEVAL_RETRY_BASE_S,
     _is_rate_limit_error,
 )
+from evaluators.thresholds import METRIC_PASS_THRESHOLDS
 
 
 class FaithfulnessEvaluator(BaseEvaluator):
@@ -104,7 +105,7 @@ class FaithfulnessEvaluator(BaseEvaluator):
             dimension=self.dimension,
             metric_name=self.metric_name,
             score=score,
-            passed=score >= 0.7,
+            passed=score >= METRIC_PASS_THRESHOLDS["faithfulness"],
             reason=reason,
             error=error,
             error_cause="unavailable" if error else None,
