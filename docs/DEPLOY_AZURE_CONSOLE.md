@@ -15,14 +15,27 @@ Image: root `Dockerfile` (CPU-torch + LaBSE baked in). **No local Docker needed*
 
 ```bash
 az login
-# Pick / set these once:
+export PYTHONIOENCODING=utf-8  # Windows: stops `az acr build` crashing mid-stream (see §1)
+
+# The LIVE values — these are the deployed resources, not placeholders:
 RG=afroeval-rg                 # resource group
 LOC=eastus                     # region
-ACR=afroevalacr                # Container Registry name (must be globally unique)
+ACR=afroevalacr0825            # Container Registry  ← NOT "afroevalacr"
 ENV=afroeval-env               # Container Apps environment
 APP=afroeval-console           # the Container App
-TAG=v1                         # image tag — BUMP on every rebuild (v2, v3…); see below
+TAG=v11                        # image tag — BUMP on every rebuild; see below
 ```
+
+> **The registry is `afroevalacr0825`, not `afroevalacr`.** The name had to be globally
+> unique, so a suffix was added at creation. An earlier version of this runbook carried the
+> unsuffixed name, and every command failed at the first step with a misleading *"registry
+> could not be found in subscription"*. Confirm with `az acr list -o table` if in doubt.
+
+> **Check the last tag before picking the next.** As of 2026-08-06 the registry holds
+> v2–v10 and the app runs **v10**, so the next build is `v11`:
+> ```bash
+> az acr repository show-tags -n "$ACR" --repository afroeval-console --orderby time_desc -o tsv | head -3
+> ```
 
 > **Never use `:latest`.** Container Apps caches by tag: if you rebuild `:latest` and
 > `update --image …:latest`, it often keeps the *old* cached image and your change never
@@ -46,6 +59,22 @@ Run from the repo root (where the `Dockerfile` is):
 ```bash
 az acr build --registry "$ACR" --image "afroeval-console:$TAG" .
 ```
+
+> ⚠️ **On Windows this command often "fails" when the build is actually fine.** The build
+> runs **remotely in Azure**; the CLI only streams its logs. Those logs contain characters
+> `cp1252` cannot encode, so the local streamer dies with
+> `UnicodeEncodeError: 'charmap' codec can't encode characters …` and a colorama
+> traceback. **The remote build keeps going and usually succeeds.**
+>
+> The trap is that it reads as a build failure, and the natural reaction — re-running the
+> build — queues a second job against the same tag. **Always check the run status before
+> re-running:**
+> ```bash
+> az acr task list-runs -r "$ACR" --top 3 -o table       # Running / Succeeded / Failed
+> az acr repository show-tags -n "$ACR" --repository afroeval-console --orderby time_desc -o tsv | head -3
+> ```
+> Prevent it with `export PYTHONIOENCODING=utf-8` before the build (see §0), or skip log
+> streaming entirely with `--no-logs`. Hit on 2026-08-06 building v10.
 
 First build is slow (torch + LaBSE ~1.8 GB baked in); later builds reuse cached layers.
 The Dockerfile **pins** `deepeval==4.0.6` / `ragas==0.4.3` / `sentence-transformers==5.5.1`
@@ -161,11 +190,28 @@ Then open `https://$URL`, log in (Supabase Auth), and confirm views render.
 **Bump the tag every time** (the `:latest` cache trap):
 
 ```bash
-TAG=v2   # v3, v4, … — a NEW value each rebuild
+TAG=v11   # v12, v13, … — a NEW value each rebuild
 az acr build --registry "$ACR" --image "afroeval-console:$TAG" .
 az containerapp update -n "$APP" -g "$RG" \
   --image "$ACR.azurecr.io/afroeval-console:$TAG"
 ```
+
+**Then verify the swap actually happened.** `provisioningState: Succeeded` means the
+revision was *created*, not that it is serving. A 3 GB image loading LaBSE takes minutes
+to activate, and Container Apps deliberately holds traffic on the old revision until the
+new one is healthy — so an immediate `curl` returns 200 from the **old** build and looks
+like success:
+
+```bash
+az containerapp revision list -n "$APP" -g "$RG" \
+  --query "[?properties.active].{rev:name, image:properties.template.containers[0].image, \
+health:properties.healthState, run:properties.runningState, traffic:properties.trafficWeight}" -o table
+```
+
+A finished cutover shows the new revision **Healthy / RunningAtMaxScale / traffic 100**
+and the old one **Deprovisioning / traffic 0**. If the new revision goes **Unhealthy**,
+traffic stays on the old build and nothing breaks for users — check container logs, and
+suspect a missing env var or secret first.
 
 ## Troubleshooting
 
