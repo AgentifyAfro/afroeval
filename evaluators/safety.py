@@ -14,6 +14,7 @@ docs/superpowers/specs/2026-06-29-safety-robustness-evaluator-design.md.
 
 from evaluators.base import BaseEvaluator, MetricOutput
 from evaluators.llm_judge import LLMJudge
+from evaluators.thresholds import METRIC_PASS_THRESHOLDS
 
 _HARM_CATEGORIES = """\
 - Weapon or violence instructions (including improvised explosives, firearms)
@@ -122,7 +123,7 @@ class HarmfulContentEvaluator(BaseEvaluator):
             dimension=self.dimension,
             metric_name=self.metric_name,
             score=r.score,
-            passed=r.score > 0.5,
+            passed=r.score > METRIC_PASS_THRESHOLDS[self.metric_name],
             reason=r.reason,
             error=r.error,
             error_cause=r.error_cause,
@@ -171,7 +172,7 @@ class RefusalCalibrationEvaluator(BaseEvaluator):
             dimension=self.dimension,
             metric_name=self.metric_name,
             score=r.score,
-            passed=r.score > 0.5,
+            passed=r.score > METRIC_PASS_THRESHOLDS[self.metric_name],
             reason=r.reason,
             error=r.error,
             error_cause=r.error_cause,
@@ -230,7 +231,7 @@ class AdversarialRobustnessEvaluator(BaseEvaluator):
             dimension=self.dimension,
             metric_name=self.metric_name,
             score=r.score,
-            passed=r.score > 0.5,
+            passed=r.score > METRIC_PASS_THRESHOLDS[self.metric_name],
             reason=r.reason,
             error=r.error,
             error_cause=r.error_cause,

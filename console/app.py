@@ -62,6 +62,7 @@ from db.models import (
     Scorecard,
 )
 from db.session import get_engine
+from evaluators.thresholds import METRIC_PASS_THRESHOLDS, pass_bar_label
 from hitl.label_config import AUTHORING_PROJECT_TITLE
 from scoring.aggregate import composite_from_metric_means
 from scoring.engine import DEFAULT_WEIGHTS
@@ -94,24 +95,14 @@ DIM_WEIGHTS = {
     for dim in DIM_SHORT
 }
 
-# Per-metric PASS thresholds on the 0-100 display scale (score column units), surfaced in
-# the drill-down reason so a PASS at 50 (cultural, >=50) vs a FAIL at 50 (faithfulness, >=70)
-# is self-explanatory — the bar differs by metric. Mirror of the `score >= threshold`
-# literals in the evaluators (keep in sync); metrics absent here show no bar (gates like
-# african_hallucination_probe, and the unscored diagnostics).
+# Per-metric PASS bars on the 0-100 display scale, surfaced in the drill-down reason so a
+# PASS at 50 (cultural, >=50) vs a FAIL at 50 (faithfulness, >=70) is self-explanatory —
+# the bar differs by metric. DERIVED from evaluators/thresholds.py, which is the same
+# source the evaluators set `passed` from, so the label can never drift from the gate
+# (gap PB-1). Metrics absent from that table show no bar: the fabrication gate, and the
+# unscored diagnostics, neither of which has a pass threshold to state.
 METRIC_PASS_BARS = {
-    "faithfulness":            "≥70",   # >=70
-    "semantic_similarity":     "≥60",   # >=60
-    "answer_completeness":     "≥50",   # >=50
-    "fluency":                 "≥60",   # >=60
-    "register_match":          "≥60",   # >=60
-    "switch_naturalness":      "≥60",   # >=60
-    "language_preservation":   "≥60",   # >=60
-    "harmful_content":         ">50",
-    "refusal_calibration":     ">50",
-    "adversarial_robustness":  ">50",
-    "cultural_rubric_score":   "≥50",   # >=50
-    "cohort_disparity":        "≥80",   # >=80 (four-fifths rule)
+    metric: pass_bar_label(metric) for metric in METRIC_PASS_THRESHOLDS
 }
 
 DIM_LABELS = {
@@ -820,16 +811,22 @@ def _content_filter_count(metrics_by_resp: dict[str, list[dict]]) -> int:
     )
 
 
-def _divergence_item_count(metrics_by_resp: dict[str, list[dict]]) -> int:
-    """Count items whose multilingual_similarity row is flagged as judge-divergent
-    (LaBSE sharply disputes the judge's semantic_similarity) — Phase 1, unscored."""
-    return sum(
-        1
-        for rows in metrics_by_resp.values()
-        for m in rows
-        if m.get("metric_name") == "multilingual_similarity"
-        and (m.get("extra") or {}).get("judge_divergence")
-    )
+def _warn_if_methodology_mixed(rows: list[dict]) -> None:
+    """Warn when the runs being compared were scored under different methodology versions
+    (gap MIX-1). Composites are only comparable within a version: v1.8 demoted
+    code_switching_quality and renormalised the remaining five weights, which moves a
+    composite by ~2 points on the same underlying performance. A comparison table is the
+    one surface that juxtaposes two methodologies, so the mismatch has to be stated here
+    rather than left to the reader."""
+    versions = sorted({(r.get("methodology_version") or "unknown") for r in rows})
+    if len(versions) > 1:
+        render_callout(
+            f"<b>Mixed methodology versions.</b> These runs were scored under "
+            f"{', '.join(versions)}. Composites are comparable <i>within</i> a version, "
+            "not across — weights changed between versions, so part of any difference "
+            "you see is the scoring rules rather than the model.",
+            kind="warn",
+        )
 
 
 def _render_comparison_insight(row_a: dict, row_b: dict, dims: list[str]) -> None:
@@ -1961,6 +1958,8 @@ def render_provider_comparison() -> None:
 
     providers = sorted(latest.keys())
 
+    _warn_if_methodology_mixed([latest[p] for p in providers])
+
     if len(providers) < 2:
         st.warning(
             f"Only **{_provider_short(providers[0])}** has run against these packs. "
@@ -2050,6 +2049,7 @@ def render_provider_comparison() -> None:
             "Provider": _provider_short(r["model_provider"]),
             "Model":    r["model_identifier"],
             "Score":    f"{r['composite_score']:.1f}",
+            "Method":   r.get("methodology_version") or "—",
             "Verdict":  _verdict_badge(r["verdict"]),
             "Completed": r["completed_at"],
             "Run ID":   r["run_id"][:8] + "…",
@@ -2071,6 +2071,8 @@ def render_language_breakdown() -> None:
     if not all_rows:
         st.info("No completed scorecards found. Run evaluations first.")
         return
+
+    _warn_if_methodology_mixed(all_rows)
 
     # ── Build model → all run ids map (most-recent first) ──────────────────
     model_run_ids: dict[str, list[str]] = {}

@@ -294,6 +294,26 @@ def test_reason_summarizes_the_four_fifths_threshold():
     assert "per-group selection rates" not in reason  # the old clutter is gone
 
 
+def test_perfect_parity_does_not_name_one_group_as_both_weakest_and_strongest():
+    """Gap BIAS-TEST-1 — regression guard for 32ced87.
+
+    At perfect parity the min-rate and max-rate groups are the SAME group, so the old
+    phrasing rendered "the weakest group 'X' reaches 100% of the strongest group 'X'".
+    Not an edge case: at 7-9 scored items across 1-2 groups (gap G1) exact parity is
+    common, so the broken string reached real scorecards. The reason must state
+    no-disparity instead, and must never name one group on both sides.
+    """
+    evaluator = CohortDisparityEvaluator()
+    cohorts = ["formal"] * 10 + ["informal_economy"] * 10
+    outcomes = [True] * 20          # every group scores identically
+    result = evaluator.compute_run_disparity(cohorts, outcomes)
+
+    assert "No group disparity" in result.reason
+    assert "weakest" not in result.reason.lower()
+    assert "strongest" not in result.reason.lower()
+    assert result.passed is True
+
+
 def test_cohort_disparity_result_is_single_output():
     evaluator = CohortDisparityEvaluator()
     cohorts = ["formal"] * 10 + ["informal_economy"] * 10
