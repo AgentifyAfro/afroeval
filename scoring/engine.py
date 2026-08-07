@@ -175,9 +175,12 @@ def compute_composite_score(
     active_metric_weights = metric_weights or DEFAULT_METRIC_WEIGHTS
     metric_error_rates = metric_error_rates or {}
 
-    # Dimensions where every item returned applicable=False (e.g. code-switching
-    # evaluators on a monolingual English pack). These must not contribute 0 to
-    # the composite — they are excluded and the remaining weights are renormalized.
+    # Dimensions where every item returned applicable=False (e.g. bias_fairness on a
+    # single-cohort pack, where there is no second group to compare against). These must
+    # not contribute 0 to the composite — they are excluded and the remaining weights are
+    # renormalized. NB: the previous example here was "code-switching evaluators on a
+    # monolingual English pack", which cannot occur — ail/code_switching.py has no
+    # applicability gate at all and scores every item by design (§5.7). Gap CMT-1.
     # Only applied when the caller explicitly provides item_counts tracking data
     # (the dispatcher always does; test helpers that omit it get the old behavior).
     not_evaluated_dims: set[str] = set()
